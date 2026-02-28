@@ -56,7 +56,13 @@ class ProviderOrdersAdapter(
             tvClientName.text = "Cliente: ${order.clientName}"
             tvAddress.text = order.address
             tvDescription.text = order.description
-            tvPrice.text = "R$ ${String.format("%.2f", order.estimatedPrice)}"
+            
+            // Mostrar APENAS a comissão do prestador (não o valor total que o cliente pagou)
+            if (order.providerCommission > 0) {
+                tvPrice.text = "💰 Você ganha: R$ ${String.format("%.2f", order.providerCommission)}"
+            } else {
+                tvPrice.text = "Valor não disponível"
+            }
             
             // Formatar data
             val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())

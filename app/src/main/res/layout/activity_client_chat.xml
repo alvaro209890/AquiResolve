@@ -123,7 +123,8 @@
         android:orientation="horizontal"
         android:padding="12dp"
         android:background="@color/surface_color"
-        android:elevation="2dp">
+        android:elevation="2dp"
+        android:visibility="gone">
 
         <!-- Botão de avaliação -->
         <com.google.android.material.button.MaterialButton
@@ -177,7 +178,7 @@
         android:id="@+id/recyclerViewMessages"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/actionButtonsSection"
+        android:layout_below="@id/headerSection"
         android:layout_above="@id/inputSection"
         android:background="@color/background_color"
         android:padding="8dp"

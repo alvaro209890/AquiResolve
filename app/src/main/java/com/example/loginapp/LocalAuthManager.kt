@@ -2,6 +2,7 @@
 package com.example.loginapp
 
 import kotlinx.coroutines.delay
+import java.security.MessageDigest
 
 /**
  * Gerenciador de autenticação local
@@ -22,39 +23,6 @@ object LocalAuthManager {
     var currentProvider: ProviderData? = null
         private set
 
-    init {
-        // Adicionar alguns usuários de teste
-        mockUsers["teste@email.com"] = UserData(
-            id = "user1",
-            email = "teste@email.com",
-            fullName = "Usuário Teste",
-            password = "123456"
-        )
-        mockUsers["admin@email.com"] = UserData(
-            id = "user2", 
-            email = "admin@email.com",
-            fullName = "Administrador",
-            password = "admin123"
-        )
-        
-        // Adicionar alguns prestadores de teste
-        mockProviders["joao@email.com"] = ProviderData(
-            id = "provider1",
-            email = "joao@email.com",
-            fullName = "João Silva",
-            password = "123456",
-            cpf = "12345678901",
-            phone = "(11) 99999-9999",
-            cep = "01234-567",
-            address = "Rua das Flores, 123 - São Paulo/SP",
-            services = listOf("Elétrica", "Hidráulica"),
-            bank = "Banco do Brasil",
-            agency = "1234",
-            account = "12345-6",
-            isVerified = true
-        )
-    }
-    
     /**
      * Dados do usuário cliente
      */
@@ -125,15 +93,15 @@ object LocalAuthManager {
     
     /**
      * Faz login com email e senha
-     * 
-     * DESENVOLVIMENTO: Aceita qualquer email e senha válidos
      */
     suspend fun signInWithEmailAndPassword(email: String, password: String): AuthResult {
         // Simular delay de rede
         delay(1000)
+        clearSession()
+        val normalizedEmail = normalizeEmail(email)
         
         // Verificar se o email é válido
-        if (email.isEmpty() || !email.contains("@")) {
+        if (normalizedEmail.isEmpty() || !normalizedEmail.contains("@")) {
             return AuthResult.Error("Email inválido")
         }
         
@@ -142,30 +110,26 @@ object LocalAuthManager {
             return AuthResult.Error("Senha é obrigatória")
         }
         
-        // DESENVOLVIMENTO: Aceitar qualquer email e senha válidos
         // Primeiro verificar se é um prestador
-        val existingProvider = mockProviders[email]
+        val existingProvider = mockProviders[normalizedEmail]
         if (existingProvider != null) {
-            currentProvider = existingProvider
-            return AuthResult.Success
+            return if (passwordMatches(password, existingProvider.password)) {
+                currentProvider = existingProvider
+                AuthResult.Success
+            } else {
+                AuthResult.Error("Senha incorreta")
+            }
         }
         
         // Depois verificar se é um usuário cliente
-        val existingUser = mockUsers[email]
-        if (existingUser != null) {
+        val existingUser = mockUsers[normalizedEmail] ?: return AuthResult.Error("Usuário não encontrado")
+
+        return if (passwordMatches(password, existingUser.password)) {
             currentUser = existingUser
+            AuthResult.Success
         } else {
-            // Criar um usuário temporário para o email fornecido
-            val tempUser = UserData(
-                id = "temp_${System.currentTimeMillis()}",
-                email = email,
-                fullName = email.split("@")[0].replaceFirstChar { it.uppercase() }, // Usar parte do email como nome
-                password = password
-            )
-            currentUser = tempUser
+            AuthResult.Error("Senha incorreta")
         }
-        
-        return AuthResult.Success
     }
     
     /**
@@ -178,23 +142,25 @@ object LocalAuthManager {
     ): AuthResult {
         // Simular delay de rede
         delay(1500)
+        val normalizedEmail = normalizeEmail(email)
         
         return when {
-            email.isEmpty() || !email.contains("@") -> AuthResult.Error("Email inválido")
-            password.length < 1 -> AuthResult.Error("Senha deve ter pelo menos 1 caractere")
+            normalizedEmail.isEmpty() || !normalizedEmail.contains("@") -> AuthResult.Error("Email inválido")
+            password.length < 6 -> AuthResult.Error("Senha deve ter pelo menos 6 caracteres")
             fullName.isEmpty() -> AuthResult.Error("Nome é obrigatório")
-            mockUsers.containsKey(email) -> AuthResult.Error("Email já está em uso")
-            mockProviders.containsKey(email) -> AuthResult.Error("Email já está em uso por um prestador")
+            mockUsers.containsKey(normalizedEmail) -> AuthResult.Error("Email já está em uso")
+            mockProviders.containsKey(normalizedEmail) -> AuthResult.Error("Email já está em uso por um prestador")
             else -> {
                 val newUser = UserData(
                     id = "user_${System.currentTimeMillis()}",
-                    email = email,
+                    email = normalizedEmail,
                     fullName = fullName,
-                    password = password
+                    password = hashPassword(password)
                 )
                 
-                mockUsers[email] = newUser
+                mockUsers[normalizedEmail] = newUser
                 currentUser = newUser
+                currentProvider = null
                 AuthResult.Success
             }
         }
@@ -218,25 +184,27 @@ object LocalAuthManager {
     ): AuthResult {
         // Simular delay de rede
         delay(2000)
+        val normalizedEmail = normalizeEmail(email)
         
         return when {
-            email.isEmpty() || !email.contains("@") -> AuthResult.Error("Email inválido")
+            normalizedEmail.isEmpty() || !normalizedEmail.contains("@") -> AuthResult.Error("Email inválido")
             fullName.isEmpty() -> AuthResult.Error("Nome é obrigatório")
+            password.length < 6 -> AuthResult.Error("Senha deve ter pelo menos 6 caracteres")
             cpf.isEmpty() -> AuthResult.Error("CPF é obrigatório")
             phone.isEmpty() -> AuthResult.Error("Telefone é obrigatório")
             cep.isEmpty() -> AuthResult.Error("CEP é obrigatório")
             address.isEmpty() -> AuthResult.Error("Endereço é obrigatório")
             services.isEmpty() -> AuthResult.Error("Selecione pelo menos um serviço")
             // Campos de banco são opcionais - serão preenchidos posteriormente
-            mockUsers.containsKey(email) -> AuthResult.Error("Email já está em uso por um cliente")
-            mockProviders.containsKey(email) -> AuthResult.Error("Email já está em uso")
+            mockUsers.containsKey(normalizedEmail) -> AuthResult.Error("Email já está em uso por um cliente")
+            mockProviders.containsKey(normalizedEmail) -> AuthResult.Error("Email já está em uso")
             mockProviders.values.any { it.cpf == cpf } -> AuthResult.Error("CPF já cadastrado")
             else -> {
                 val newProvider = ProviderData(
                     id = "provider_${System.currentTimeMillis()}",
-                    email = email,
+                    email = normalizedEmail,
                     fullName = fullName,
-                    password = password,
+                    password = hashPassword(password),
                     cpf = cpf,
                     phone = phone,
                     cep = cep,
@@ -248,8 +216,9 @@ object LocalAuthManager {
                     isVerified = false
                 )
                 
-                mockProviders[email] = newProvider
+                mockProviders[normalizedEmail] = newProvider
                 currentProvider = newProvider
+                currentUser = null
                 AuthResult.Success
             }
         }
@@ -269,30 +238,33 @@ object LocalAuthManager {
     ): AuthResult {
         // Simular delay de rede
         delay(1500)
+        val normalizedEmail = normalizeEmail(email)
         
         return when {
-            email.isEmpty() || !email.contains("@") -> AuthResult.Error("Email inválido")
+            normalizedEmail.isEmpty() || !normalizedEmail.contains("@") -> AuthResult.Error("Email inválido")
             fullName.isEmpty() -> AuthResult.Error("Nome é obrigatório")
+            password.length < 6 -> AuthResult.Error("Senha deve ter pelo menos 6 caracteres")
             phone.isEmpty() -> AuthResult.Error("Telefone é obrigatório")
             cep.isEmpty() -> AuthResult.Error("CEP é obrigatório")
             address.isEmpty() -> AuthResult.Error("Endereço é obrigatório")
-            mockUsers.containsKey(email) -> AuthResult.Error("Email já está em uso")
-            mockProviders.containsKey(email) -> AuthResult.Error("Email já está em uso por um prestador")
+            mockUsers.containsKey(normalizedEmail) -> AuthResult.Error("Email já está em uso")
+            mockProviders.containsKey(normalizedEmail) -> AuthResult.Error("Email já está em uso por um prestador")
             cpf.isNotEmpty() && mockUsers.values.any { it.cpf == cpf } -> AuthResult.Error("CPF já cadastrado")
             else -> {
                 val newUser = UserData(
                     id = "client_${System.currentTimeMillis()}",
-                    email = email,
+                    email = normalizedEmail,
                     fullName = fullName,
-                    password = password,
+                    password = hashPassword(password),
                     cpf = if (cpf.isNotEmpty()) cpf else null,
                     phone = phone,
                     cep = cep,
                     address = address
                 )
                 
-                mockUsers[email] = newUser
+                mockUsers[normalizedEmail] = newUser
                 currentUser = newUser
+                currentProvider = null
                 AuthResult.Success
             }
         }
@@ -302,8 +274,7 @@ object LocalAuthManager {
      * Faz logout
      */
     fun signOut() {
-        currentUser = null
-        currentProvider = null
+        clearSession()
     }
     
     /**
@@ -404,7 +375,7 @@ object LocalAuthManager {
      * Obtém prestador por email
      */
     fun getProviderByEmail(email: String): ProviderData? {
-        return mockProviders[email]
+        return mockProviders[normalizeEmail(email)]
     }
     
     /**
@@ -438,4 +409,24 @@ object LocalAuthManager {
         return currentProvider
     }
 
-} 
+    private fun clearSession() {
+        currentUser = null
+        currentProvider = null
+    }
+
+    private fun normalizeEmail(email: String): String {
+        return email.trim().lowercase()
+    }
+
+    private fun passwordMatches(rawPassword: String, storedPassword: String): Boolean {
+        val hashedPassword = hashPassword(rawPassword)
+        return storedPassword == rawPassword || storedPassword == hashedPassword
+    }
+
+    private fun hashPassword(password: String): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val hash = digest.digest(password.toByteArray(Charsets.UTF_8))
+        return hash.joinToString("") { "%02x".format(it) }
+    }
+
+}

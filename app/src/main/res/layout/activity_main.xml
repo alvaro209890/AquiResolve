@@ -56,12 +56,11 @@
                 android:elevation="8dp">
 
                 <ImageView
-                    android:layout_width="80dp"
-                    android:layout_height="80dp"
+                    android:layout_width="100dp"
+                    android:layout_height="100dp"
                     android:layout_gravity="center"
-                    android:src="@drawable/ic_app_logo"
-                    android:contentDescription="@string/app_logo"
-                    app:tint="@color/white" />
+                    android:src="@drawable/logo"
+                    android:contentDescription="@string/app_logo" />
 
             </FrameLayout>
 
@@ -87,7 +86,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/login_subtitle"
+                 android:text="@string/login_subtitle"
                 android:textSize="16sp"
                 android:textColor="@color/white_70" />
 
@@ -197,54 +196,6 @@
                     app:cornerRadius="12dp"
                     app:backgroundTint="@color/primary_color" />
 
-                <!-- Divider -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginBottom="24dp">
-
-                    <View
-                        android:layout_width="0dp"
-                        android:layout_height="1dp"
-                        android:layout_weight="1"
-                        android:background="@color/gray_300" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="ou"
-                        android:textSize="14sp"
-                        android:textColor="@color/text_secondary"
-                        android:paddingHorizontal="16dp" />
-
-                    <View
-                        android:layout_width="0dp"
-                        android:layout_height="1dp"
-                        android:layout_weight="1"
-                        android:background="@color/gray_300" />
-
-                </LinearLayout>
-
-                <!-- Google Login Button -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnGoogleLogin"
-                    android:layout_width="match_parent"
-                    android:layout_height="48dp"
-                    android:layout_marginBottom="32dp"
-                    android:text="Continuar com Google"
-                    android:textSize="14sp"
-                    app:icon="@drawable/ic_google"
-                    app:iconGravity="textStart"
-                    app:iconPadding="8dp"
-                    app:cornerRadius="12dp"
-                    app:backgroundTint="@color/white"
-                    app:strokeColor="@color/gray_300"
-                    app:strokeWidth="1dp"
-                    android:textColor="@color/text_primary"
-                    style="@style/Widget.Material3.Button.OutlinedButton" />
-
                 <!-- Sign Up Section -->
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -258,7 +209,20 @@
                         android:text="Não tem uma conta de cliente?"
                         android:textSize="16sp"
                         android:textColor="@color/text_secondary"
-                        android:layout_marginBottom="16dp" />
+                        android:layout_marginBottom="8dp" />
+
+                    <TextView
+                        android:id="@+id/tvReadTermsClient"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Ler Termos de Uso do Cliente"
+                        android:textSize="14sp"
+                        android:textColor="@color/primary_color"
+                        android:textStyle="bold"
+                        android:padding="8dp"
+                        android:layout_marginBottom="8dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Ler Termos de Uso do Cliente" />
 
                     <!-- Sign Up Button -->
                     <com.google.android.material.button.MaterialButton

@@ -92,6 +92,17 @@
                     app:tint="@android:color/white"
                     android:contentDescription="Notificações" />
 
+                <!-- Botão de carrinho -->
+                <ImageButton
+                    android:id="@+id/btnCart"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="@drawable/circle_background_primary"
+                    android:src="@drawable/ic_cart"
+                    app:tint="@android:color/white"
+                    android:contentDescription="Carrinho" />
+
                 <!-- Botão de perfil -->
                 <ImageButton
                     android:id="@+id/btnProfile"
@@ -148,271 +159,40 @@
 
             </LinearLayout>
 
-            <!-- Seção de categorias principais -->
+            <!-- Botão centralizado para fazer pedido -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:layout_marginBottom="24dp">
+                android:layout_marginBottom="32dp"
+                android:gravity="center">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnMakeOrder"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Ver Serviços"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:paddingHorizontal="32dp"
+                    android:paddingVertical="16dp"
+                    app:cornerRadius="24dp"
+                    app:backgroundTint="@color/primary_color"
+                    android:textColor="@android:color/white"
+                    app:icon="@drawable/ic_add"
+                    app:iconGravity="textStart"
+                    app:iconTint="@android:color/white"
+                    app:iconSize="24dp"
+                    android:elevation="6dp"
+                    app:strokeWidth="0dp" />
 
                 <TextView
-                    android:id="@+id/tvCategoriesTitle"
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Serviços Disponíveis"
-                    android:textSize="20sp"
-                    android:textColor="@color/text_primary"
-                    android:textStyle="bold"
-                    android:layout_marginBottom="16dp" />
-
-                <!-- Grid de categorias -->
-                <GridLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:columnCount="2"
-                    android:rowCount="3"
-                    android:alignmentMode="alignMargins"
-                    android:useDefaultMargins="true">
-
-                    <!-- Elétrica -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:id="@+id/cardElectrician"
-                        android:layout_width="0dp"
-                        android:layout_height="120dp"
-                        android:layout_columnWeight="1"
-                        app:cardCornerRadius="16dp"
-                        app:cardElevation="4dp"
-                        app:cardBackgroundColor="@color/white"
-                        android:clickable="true"
-                        android:focusable="true"
-                        app:strokeWidth="1dp"
-                        app:strokeColor="@color/gray_300">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:orientation="vertical"
-                            android:gravity="center"
-                            android:padding="16dp">
-
-                            <ImageView
-                                android:layout_width="48dp"
-                                android:layout_height="48dp"
-                                android:src="@drawable/ic_electrician"
-                                app:tint="@color/electrical_color"
-                                android:layout_marginBottom="8dp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Elétrica"
-                                android:textSize="16sp"
-                                android:textColor="@color/text_primary"
-                                android:textStyle="bold" />
-
-                        </LinearLayout>
-
-                    </com.google.android.material.card.MaterialCardView>
-
-                    <!-- Hidráulica -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:id="@+id/cardPlumber"
-                        android:layout_width="0dp"
-                        android:layout_height="120dp"
-                        android:layout_columnWeight="1"
-                        app:cardCornerRadius="16dp"
-                        app:cardElevation="4dp"
-                        app:cardBackgroundColor="@color/white"
-                        android:clickable="true"
-                        android:focusable="true"
-                        app:strokeWidth="1dp"
-                        app:strokeColor="@color/gray_300">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:orientation="vertical"
-                            android:gravity="center"
-                            android:padding="16dp">
-
-                            <ImageView
-                                android:layout_width="48dp"
-                                android:layout_height="48dp"
-                                android:src="@drawable/ic_plumber"
-                                app:tint="@color/plumbing_color"
-                                android:layout_marginBottom="8dp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Hidráulica"
-                                android:textSize="16sp"
-                                android:textColor="@color/text_primary"
-                                android:textStyle="bold" />
-
-                        </LinearLayout>
-
-                    </com.google.android.material.card.MaterialCardView>
-
-                    <!-- Pintura -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:id="@+id/cardPainter"
-                        android:layout_width="0dp"
-                        android:layout_height="120dp"
-                        android:layout_columnWeight="1"
-                        app:cardCornerRadius="16dp"
-                        app:cardElevation="4dp"
-                        app:cardBackgroundColor="@color/white"
-                        android:clickable="true"
-                        android:focusable="true"
-                        app:strokeWidth="1dp"
-                        app:strokeColor="@color/gray_300">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:orientation="vertical"
-                            android:gravity="center"
-                            android:padding="16dp">
-
-                            <ImageView
-                                android:layout_width="48dp"
-                                android:layout_height="48dp"
-                                android:src="@drawable/ic_painter"
-                                app:tint="@color/painting_color"
-                                android:layout_marginBottom="8dp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Pintura"
-                                android:textSize="16sp"
-                                android:textColor="@color/text_primary"
-                                android:textStyle="bold" />
-
-                        </LinearLayout>
-
-                    </com.google.android.material.card.MaterialCardView>
-
-                    <!-- Limpeza -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:id="@+id/cardCleaning"
-                        android:layout_width="0dp"
-                        android:layout_height="120dp"
-                        android:layout_columnWeight="1"
-                        app:cardCornerRadius="16dp"
-                        app:cardElevation="4dp"
-                        app:cardBackgroundColor="@color/white"
-                        android:clickable="true"
-                        android:focusable="true"
-                        app:strokeWidth="1dp"
-                        app:strokeColor="@color/gray_300">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:orientation="vertical"
-                            android:gravity="center"
-                            android:padding="16dp">
-
-                            <ImageView
-                                android:layout_width="48dp"
-                                android:layout_height="48dp"
-                                android:src="@drawable/ic_cleaning"
-                                app:tint="@color/cleaning_color"
-                                android:layout_marginBottom="8dp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Limpeza"
-                                android:textSize="16sp"
-                                android:textColor="@color/text_primary"
-                                android:textStyle="bold" />
-
-                        </LinearLayout>
-
-                    </com.google.android.material.card.MaterialCardView>
-
-                    <!-- Jardinagem -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:id="@+id/cardGardening"
-                        android:layout_width="0dp"
-                        android:layout_height="120dp"
-                        android:layout_columnWeight="1"
-                        app:cardCornerRadius="16dp"
-                        app:cardElevation="4dp"
-                        app:cardBackgroundColor="@color/white"
-                        android:clickable="true"
-                        android:focusable="true"
-                        app:strokeWidth="1dp"
-                        app:strokeColor="@color/gray_300">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:orientation="vertical"
-                            android:gravity="center"
-                            android:padding="16dp">
-
-                            <ImageView
-                                android:layout_width="48dp"
-                                android:layout_height="48dp"
-                                android:src="@drawable/ic_gardening"
-                                app:tint="@color/gardening_color"
-                                android:layout_marginBottom="8dp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Jardinagem"
-                                android:textSize="16sp"
-                                android:textColor="@color/text_primary"
-                                android:textStyle="bold" />
-
-                        </LinearLayout>
-
-                    </com.google.android.material.card.MaterialCardView>
-
-                    <!-- Ver mais -->
-                    <com.google.android.material.card.MaterialCardView
-                        android:id="@+id/cardMore"
-                        android:layout_width="0dp"
-                        android:layout_height="120dp"
-                        android:layout_columnWeight="1"
-                        app:cardCornerRadius="16dp"
-                        app:cardElevation="4dp"
-                        app:cardBackgroundColor="@color/primary_color"
-                        android:clickable="true"
-                        android:focusable="true">
-
-                        <LinearLayout
-                            android:layout_width="match_parent"
-                            android:layout_height="match_parent"
-                            android:orientation="vertical"
-                            android:gravity="center"
-                            android:padding="16dp">
-
-                            <ImageView
-                                android:layout_width="48dp"
-                                android:layout_height="48dp"
-                                android:src="@drawable/ic_more"
-                                app:tint="@android:color/white"
-                                android:layout_marginBottom="8dp" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Ver Mais"
-                                android:textSize="16sp"
-                                android:textColor="@android:color/white"
-                                android:textStyle="bold" />
-
-                        </LinearLayout>
-
-                    </com.google.android.material.card.MaterialCardView>
-
-                </GridLayout>
+                    android:text="Acesse a aba Serviços para solicitar um pedido"
+                    android:textSize="14sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginTop="8dp" />
 
             </LinearLayout>
 
@@ -433,66 +213,24 @@
                     android:textStyle="bold"
                     android:layout_marginBottom="16dp" />
 
-                <!-- Card de pedido recente -->
-                <com.google.android.material.card.MaterialCardView
+                <!-- Container dinâmico para pedidos recentes -->
+                <LinearLayout
+                    android:id="@+id/containerRecentOrders"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="2dp"
-                    app:cardBackgroundColor="@color/white"
-                    app:strokeWidth="1dp"
-                    app:strokeColor="@color/gray_300"
-                    android:layout_marginBottom="12dp">
+                    android:orientation="vertical" />
 
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:padding="16dp"
-                        android:gravity="center_vertical">
-
-                        <ImageView
-                            android:layout_width="48dp"
-                            android:layout_height="48dp"
-                            android:src="@drawable/ic_electrician"
-                            app:tint="@color/electrical_color"
-                            android:layout_marginEnd="16dp" />
-
-                        <LinearLayout
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:orientation="vertical">
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Reparo Elétrico"
-                                android:textSize="16sp"
-                                android:textColor="@color/text_primary"
-                                android:textStyle="bold" />
-
-                            <TextView
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="Status: Em andamento"
-                                android:textSize="14sp"
-                                android:textColor="@color/text_secondary"
-                                android:layout_marginTop="4dp" />
-
-                        </LinearLayout>
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="R$ 150,00"
-                            android:textSize="16sp"
-                            android:textColor="@color/primary_color"
-                            android:textStyle="bold" />
-
-                    </LinearLayout>
-
-                </com.google.android.material.card.MaterialCardView>
+                <!-- Estado vazio (sem pedidos) -->
+                <TextView
+                    android:id="@+id/tvEmptyOrders"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Nenhum pedido ainda. Acesse a aba Serviços para solicitar um pedido."
+                    android:textSize="14sp"
+                    android:textColor="@color/text_secondary"
+                    android:gravity="center"
+                    android:padding="24dp"
+                    android:visibility="visible" />
 
             </LinearLayout>
 

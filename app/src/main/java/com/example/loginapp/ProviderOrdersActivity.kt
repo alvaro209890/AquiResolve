@@ -9,6 +9,8 @@ import androidx.activity.viewModels
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.loginapp.adapters.OrdersViewPagerAdapter
+import com.example.loginapp.utils.NewOrderSoundHelper
+import com.example.loginapp.utils.ServiceNicheCatalog
 import com.example.loginapp.databinding.ActivityProviderOrdersBinding
 import com.example.loginapp.models.OrderData
 import com.google.android.material.tabs.TabLayoutMediator
@@ -43,9 +45,23 @@ class ProviderOrdersActivity : AppCompatActivity() {
     private lateinit var viewPagerAdapter: OrdersViewPagerAdapter
     private val fragments = mutableListOf<OrdersTabFragment>()
     private val ordersViewModel: OrdersViewModel by viewModels()
+    
+    // Listeners em tempo real
+    private var assignedOrdersListener: com.google.firebase.firestore.ListenerRegistration? = null
+    private var availableOrdersListener: com.google.firebase.firestore.ListenerRegistration? = null
+    
+    // IDs de pedidos disponíveis já conhecidos (detecção robusta de novos pedidos)
+    private val knownAvailableOrderIds = mutableSetOf<String>()
+    private var providerServices = emptyList<String>()
+    private var providerServicesNormalized = emptySet<String>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Garantir Firebase inicializado
+        if (!FirebaseConfig.isInitialized()) {
+            FirebaseConfig.initialize(this)
+        }
         
         // Inicializar ViewBinding
         binding = ActivityProviderOrdersBinding.inflate(layoutInflater)
@@ -59,11 +75,19 @@ class ProviderOrdersActivity : AppCompatActivity() {
         setupClickListeners()
         setupViewPager()
         
-        // Carregar dados
+        // Carregar dados (setupRealtimeListener será chamado dentro de loadOrders apenas se aprovado)
         loadOrders()
-        
-        // Configurar listener em tempo real
-        setupRealtimeListener()
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        // Remover listeners ao destruir a activity
+        removeRealtimeListeners()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        ProviderNewOrderAlertManager.refreshMonitoring()
     }
 
     /**
@@ -140,11 +164,40 @@ class ProviderOrdersActivity : AppCompatActivity() {
                 // Verificar status de verificação do prestador
                 val verificationManager = ProviderVerificationManager()
                 val verificationStatus = verificationManager.getVerificationStatus(currentUser.uid)
-                // A PARTIR DE AGORA: NÃO BLOQUEAR MAIS O ACESSO POR FALTA DE APROVAÇÃO
-                // Apenas informar ao usuário que a verificação não está aprovada, mas continuar carregando os pedidos
+                
+                // BLOQUEAR ACESSO SE NÃO ESTIVER APROVADO
                 if (verificationStatus == null || verificationStatus.status != ProviderVerificationManager.VerificationStatus.APPROVED) {
-                    showSuccessMessage("⚠️ Sua verificação ainda não está aprovada. Você pode visualizar/aceitar pedidos assim mesmo.")
+                    setLoadingState(false)
+                    // Remover listeners se não estiver aprovado
+                    removeRealtimeListeners()
+                    // Limpar lista de pedidos
+                    allOrders = emptyList()
+                    ordersViewModel.setOrders(emptyList())
+                    updateStatistics()
+                    // Mostrar mensagem apropriada
+                    when (verificationStatus?.status) {
+                        ProviderVerificationManager.VerificationStatus.PENDING -> {
+                            showDocumentsPendingMessage(verificationStatus.status)
+                        }
+                        ProviderVerificationManager.VerificationStatus.UNDER_REVIEW -> {
+                            showDocumentsPendingMessage(verificationStatus.status)
+                        }
+                        ProviderVerificationManager.VerificationStatus.REJECTED -> {
+                            showDocumentsPendingMessage(verificationStatus.status)
+                        }
+                        ProviderVerificationManager.VerificationStatus.EXPIRED -> {
+                            showDocumentsPendingMessage(verificationStatus.status)
+                        }
+                        else -> {
+                            showDocumentsPendingMessage(null)
+                        }
+                    }
+                    return@launch
                 }
+
+                providerServices = loadProviderServices(currentUser.uid)
+                providerServicesNormalized = ServiceNicheCatalog.normalizeProviderServices(providerServices)
+
                 // Buscar pedidos atribuídos AO prestador + pedidos disponíveis (distributing/pending)
                 val assignedSnap = db.collection("orders")
                     .whereEqualTo("assignedProvider", currentUser.uid)
@@ -154,7 +207,9 @@ class ProviderOrdersActivity : AppCompatActivity() {
                 val availableSnap = db.collection("orders")
                     .whereIn("status", listOf(
                         OrderData.STATUS_DISTRIBUTING,
-                        OrderData.STATUS_PENDING
+                        OrderData.STATUS_PENDING,
+                        OrderData.STATUS_DISTRIBUTING.uppercase(),
+                        OrderData.STATUS_PENDING.uppercase()
                     ))
                     .get()
                     .await()
@@ -175,10 +230,17 @@ class ProviderOrdersActivity : AppCompatActivity() {
                         doc.toObject(OrderData::class.java)?.copy(id = doc.id)
                     } catch (e: Exception) { null }
                 }
+                val filteredAvailableOrders = availableOrders.filter { order ->
+                    ServiceNicheCatalog.matchesProviderServices(providerServicesNormalized, order)
+                }
 
                 // Merge e dedup por id
-                val merged = (assignedOrders + availableOrders)
+                val merged = (assignedOrders + filteredAvailableOrders)
                 allOrders = merged.distinctBy { it.id }
+                
+                // Inicializar baseline dos IDs disponíveis para detectar somente entradas novas
+                knownAvailableOrderIds.clear()
+                knownAvailableOrderIds.addAll(filteredAvailableOrders.map { it.id })
                 
                 android.util.Log.d("ProviderOrders", "✅ Total de pedidos carregados: ${allOrders.size}")
                 android.util.Log.d("ProviderOrders", "📊 Status dos pedidos: ${allOrders.map { it.status }}")
@@ -186,6 +248,9 @@ class ProviderOrdersActivity : AppCompatActivity() {
                 updateStatistics()
                 ordersViewModel.setOrders(allOrders)
                 setLoadingState(false)
+                
+                // Configurar listener em tempo real APENAS se prestador estiver aprovado
+                setupRealtimeListener()
                 
                 // Mostrar mensagem de sucesso se houver pedidos
                 if (allOrders.isNotEmpty()) {
@@ -205,18 +270,14 @@ class ProviderOrdersActivity : AppCompatActivity() {
      * Atualiza as estatísticas
      */
     private fun updateStatistics() {
-        val availableOrders = allOrders.count { 
-            it.status == OrderData.STATUS_DISTRIBUTING || 
-            it.status == OrderData.STATUS_PENDING
-        }
-
         val acceptedOrders = allOrders.count { 
-            it.status == OrderData.STATUS_ASSIGNED || 
-            it.status == OrderData.STATUS_IN_PROGRESS
+            val status = it.status.lowercase()
+            status == OrderData.STATUS_ASSIGNED || 
+            status == OrderData.STATUS_IN_PROGRESS
         }
         
         val completedOrders = allOrders.count { 
-            it.status == OrderData.STATUS_COMPLETED 
+            it.status.lowercase() == OrderData.STATUS_COMPLETED 
         }
 
         binding.tvActiveOrders.text = acceptedOrders.toString()
@@ -291,49 +352,169 @@ class ProviderOrdersActivity : AppCompatActivity() {
 
     /**
      * Configura listener em tempo real para atualizações
+     * IMPORTANTE: Só configura listeners se prestador estiver APROVADO
      */
     private fun setupRealtimeListener() {
         val currentUser = auth.currentUser ?: return
-
-        // Listener 1: pedidos atribuídos ao prestador
-        db.collection("orders")
-            .whereEqualTo("assignedProvider", currentUser.uid)
-            .addSnapshotListener { snapshot, error ->
-                if (error != null) {
-                    android.util.Log.e("ProviderOrders", "❌ Erro no listener (assigned): ${error.message}")
-                    return@addSnapshotListener
+        
+        // VERIFICAR STATUS DE VERIFICAÇÃO ANTES DE CONFIGURAR LISTENERS
+        lifecycleScope.launch setup@{
+            try {
+                val verificationManager = ProviderVerificationManager()
+                val verificationStatus = verificationManager.getVerificationStatus(currentUser.uid)
+                
+                // SÓ CONFIGURAR LISTENERS SE PRESTADOR ESTIVER APROVADO
+                if (verificationStatus == null || verificationStatus.status != ProviderVerificationManager.VerificationStatus.APPROVED) {
+                    android.util.Log.w("ProviderOrders", "⚠️ Prestador não aprovado - não configurando listeners de pedidos")
+                    // Remover listeners anteriores se existirem
+                    removeRealtimeListeners()
+                    return@setup
                 }
+                
+                android.util.Log.d("ProviderOrders", "✅ Prestador aprovado - configurando listeners de pedidos")
+                
+                // Remover listeners anteriores se existirem
+                removeRealtimeListeners()
 
-                lifecycleScope.launch {
-                    val assigned = snapshot?.documents?.mapNotNull { doc ->
-                        try { doc.toObject(OrderData::class.java)?.copy(id = doc.id) } catch (_: Exception) { null }
-                    } ?: emptyList()
-
-                    // Listener 2: pedidos disponíveis (distributing/pending)
-                    db.collection("orders")
-                        .whereIn("status", listOf(
-                            OrderData.STATUS_DISTRIBUTING,
-                            OrderData.STATUS_PENDING
-                        ))
-                        .addSnapshotListener { availSnap, availErr ->
-                            if (availErr != null) {
-                                android.util.Log.e("ProviderOrders", "❌ Erro no listener (available): ${availErr.message}")
-                                return@addSnapshotListener
-                            }
-
-                            lifecycleScope.launch {
-                                val available = availSnap?.documents?.mapNotNull { doc ->
-                                    try { doc.toObject(OrderData::class.java)?.copy(id = doc.id) } catch (_: Exception) { null }
-                                } ?: emptyList()
-
-                                allOrders = (assigned + available).distinctBy { it.id }
-                                updateStatistics()
-                                ordersViewModel.setOrders(allOrders)
-                                android.util.Log.d("ProviderOrders", "🔄 Realtime merge: ${allOrders.size} pedidos")
-                            }
+                // Listener 1: pedidos atribuídos ao prestador
+                assignedOrdersListener = db.collection("orders")
+                    .whereEqualTo("assignedProvider", currentUser.uid)
+                    .addSnapshotListener { snapshot, error ->
+                        if (error != null) {
+                            android.util.Log.e("ProviderOrders", "❌ Erro no listener (assigned): ${error.message}")
+                            return@addSnapshotListener
                         }
-                }
+
+                        lifecycleScope.launch assignedUpdate@{
+                            // Verificar novamente o status antes de processar (pode ter mudado)
+                            val currentVerificationStatus = verificationManager.getVerificationStatus(currentUser.uid)
+                            if (currentVerificationStatus == null || currentVerificationStatus.status != ProviderVerificationManager.VerificationStatus.APPROVED) {
+                                android.util.Log.w("ProviderOrders", "⚠️ Status mudou - ignorando atualização de pedidos")
+                                return@assignedUpdate
+                            }
+                            
+                            val assigned = snapshot?.documents?.mapNotNull { doc ->
+                                try { doc.toObject(OrderData::class.java)?.copy(id = doc.id) } catch (_: Exception) { null }
+                            } ?: emptyList()
+
+                            // Atualizar lista de pedidos atribuídos
+                            val currentAssigned = assigned
+                            
+                            // Buscar pedidos disponíveis também
+                            val availableSnap = db.collection("orders")
+                                .whereIn("status", listOf(
+                                    OrderData.STATUS_DISTRIBUTING,
+                                    OrderData.STATUS_PENDING
+                                ))
+                                .get()
+                                .await()
+                            
+                            val available = availableSnap.documents.mapNotNull { doc ->
+                                try { doc.toObject(OrderData::class.java)?.copy(id = doc.id) } catch (_: Exception) { null }
+                            }
+                            val filteredAvailable = available.filter { order ->
+                                ServiceNicheCatalog.matchesProviderServices(providerServicesNormalized, order)
+                            }
+
+                            allOrders = (currentAssigned + filteredAvailable).distinctBy { it.id }
+                            updateStatistics()
+                            ordersViewModel.setOrders(allOrders)
+                            android.util.Log.d("ProviderOrders", "🔄 Realtime update: ${allOrders.size} pedidos")
+                        }
+                    }
+
+                // Listener 2: pedidos disponíveis (distributing/pending)
+                availableOrdersListener = db.collection("orders")
+                    .whereIn("status", listOf(
+                        OrderData.STATUS_DISTRIBUTING,
+                        OrderData.STATUS_PENDING,
+                        OrderData.STATUS_DISTRIBUTING.uppercase(),
+                        OrderData.STATUS_PENDING.uppercase()
+                    ))
+                    .addSnapshotListener { availSnap, availErr ->
+                        if (availErr != null) {
+                            android.util.Log.e("ProviderOrders", "❌ Erro no listener (available): ${availErr.message}")
+                            return@addSnapshotListener
+                        }
+
+                        lifecycleScope.launch availableUpdate@{
+                            // Verificar novamente o status antes de processar
+                            val currentVerificationStatus = verificationManager.getVerificationStatus(currentUser.uid)
+                            if (currentVerificationStatus == null || currentVerificationStatus.status != ProviderVerificationManager.VerificationStatus.APPROVED) {
+                                android.util.Log.w("ProviderOrders", "⚠️ Status mudou - ignorando atualização de pedidos disponíveis")
+                                return@availableUpdate
+                            }
+                            
+                            val available = availSnap?.documents?.mapNotNull { doc ->
+                                try { doc.toObject(OrderData::class.java)?.copy(id = doc.id) } catch (_: Exception) { null }
+                            } ?: emptyList()
+                            val filteredAvailable = available.filter { order ->
+                                ServiceNicheCatalog.matchesProviderServices(providerServicesNormalized, order)
+                            }
+
+                            // Detectar novos pedidos disponíveis por diferença de IDs
+                            val currentAvailableIds = filteredAvailable.map { it.id }.toSet()
+                            val newOrderIds = currentAvailableIds - knownAvailableOrderIds
+                            if (newOrderIds.isNotEmpty()) {
+                                val newCount = newOrderIds.size
+                                NewOrderSoundHelper.playNewOrderSound(this@ProviderOrdersActivity)
+                                val msg = if (newCount == 1) "🆕 Novo pedido disponível!" else "🆕 $newCount novos pedidos disponíveis!"
+                                runOnUiThread { Toast.makeText(this@ProviderOrdersActivity, msg, Toast.LENGTH_SHORT).show() }
+                            }
+                            knownAvailableOrderIds.clear()
+                            knownAvailableOrderIds.addAll(currentAvailableIds)
+
+                            // Buscar pedidos atribuídos também
+                            val assignedSnap = db.collection("orders")
+                                .whereEqualTo("assignedProvider", currentUser.uid)
+                                .get()
+                                .await()
+                            
+                            val assigned = assignedSnap.documents.mapNotNull { doc ->
+                                try { doc.toObject(OrderData::class.java)?.copy(id = doc.id) } catch (_: Exception) { null }
+                            }
+
+                            allOrders = (assigned + filteredAvailable).distinctBy { it.id }
+                            updateStatistics()
+                            ordersViewModel.setOrders(allOrders)
+                            android.util.Log.d("ProviderOrders", "🔄 Realtime update (available): ${allOrders.size} pedidos")
+                        }
+                    }
+                    
+            } catch (e: Exception) {
+                android.util.Log.e("ProviderOrders", "❌ Erro ao configurar listeners: ${e.message}")
             }
+        }
+    }
+    
+    /**
+     * Remove listeners em tempo real
+     */
+    private fun removeRealtimeListeners() {
+        assignedOrdersListener?.remove()
+        assignedOrdersListener = null
+        availableOrdersListener?.remove()
+        availableOrdersListener = null
+        knownAvailableOrderIds.clear()
+        android.util.Log.d("ProviderOrders", "🗑️ Listeners removidos")
+    }
+
+    private suspend fun loadProviderServices(providerId: String): List<String> {
+        return try {
+            val providerDoc = db.collection("providers")
+                .document(providerId)
+                .get()
+                .await()
+
+            val rawServices = (providerDoc.get("services") as? List<*>)
+                ?.mapNotNull { it as? String }
+                ?: emptyList()
+
+            ServiceNicheCatalog.canonicalizeProviderServices(rawServices)
+        } catch (e: Exception) {
+            android.util.Log.e("ProviderOrders", "Erro ao carregar serviços do prestador: ${e.message}")
+            emptyList()
+        }
     }
 
     /**

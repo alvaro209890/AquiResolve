@@ -68,6 +68,14 @@ data class OrderData(
     @PropertyName("distributionStartedAt")
     val distributionStartedAt: Timestamp = Timestamp.now(), // Quando começou a distribuição
     
+    // Códigos de Verificação para Finalização
+    @PropertyName("clientVerificationCode")
+    val clientVerificationCode: String? = null, // Código do cliente (6 dígitos)
+    @PropertyName("providerVerificationCode")
+    val providerVerificationCode: String? = null, // Código do prestador (6 dígitos)
+    @PropertyName("verificationCodesGeneratedAt")
+    val verificationCodesGeneratedAt: Timestamp? = null, // Quando os códigos foram gerados
+    
     // Cancelamento
     @PropertyName("cancelledAt")
     val cancelledAt: Timestamp? = null,
@@ -75,18 +83,32 @@ data class OrderData(
     val cancelledBy: String? = null, // "client" ou "provider"
     @PropertyName("cancellationReason")
     val cancellationReason: String? = null,
+    @PropertyName("refundStatus")
+    val refundStatus: String? = null, // "pending", "processing", "completed", "failed"
+    @PropertyName("refundRequestedAt")
+    val refundRequestedAt: Timestamp? = null,
     
     // Preços
     @PropertyName("estimatedPrice")
     val estimatedPrice: Double = 0.0,
     @PropertyName("finalPrice")
     val finalPrice: Double? = null,
+    @PropertyName("providerCommission")
+    val providerCommission: Double = 0.0, // 50% do valor do pedido para o prestador
+
+    // Pagamento
+    @PropertyName("paymentStatus")
+    val paymentStatus: String? = null,
+    @PropertyName("transactionId")
+    val transactionId: String? = null,
     
     // Metadados
     @PropertyName("createdAt")
     val createdAt: Timestamp = Timestamp.now(),
     @PropertyName("updatedAt")
     val updatedAt: Timestamp = Timestamp.now(),
+    @PropertyName("confirmedAt")
+    val confirmedAt: Timestamp? = null, // Timestamp de quando o pedido foi confirmado após pagamento
     @PropertyName("adminNotes")
     val adminNotes: String = "",
     

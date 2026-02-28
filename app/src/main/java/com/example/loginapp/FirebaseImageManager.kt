@@ -35,7 +35,7 @@ class FirebaseImageManager {
         const val FOLDER_ORDER_IMAGES = "order_images"
         const val FOLDER_DOCUMENTS = "documents"
         const val FOLDER_DOCUMENTOS = "Documentos"
-        const val FOLDER_CHAT_IMAGES = "chat_images"
+        const val FOLDER_CHAT_IMAGES = "chats"
         const val FOLDER_SERVICE_IMAGES = "service_images"
         const val FOLDER_PEDIDOS = "Pedidos"
         const val FOLDER_SELFIE = "Selfie"

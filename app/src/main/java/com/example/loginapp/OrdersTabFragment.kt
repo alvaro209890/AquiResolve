@@ -13,6 +13,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.loginapp.adapters.DetailedOrdersAdapter
 import com.example.loginapp.databinding.FragmentOrdersTabBinding
 import com.example.loginapp.models.OrderData
+import com.example.loginapp.utils.VerificationCodeDialog
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
@@ -25,10 +26,11 @@ class OrdersTabFragment : Fragment() {
         private const val ARG_TAB_TYPE = "tab_type"
         private const val ARG_IS_PROVIDER_CONTEXT = "is_provider_context"
         
-        fun newInstance(tabType: TabType): OrdersTabFragment {
+        fun newInstance(tabType: TabType, isProviderContext: Boolean = false): OrdersTabFragment {
             return OrdersTabFragment().apply {
                 arguments = Bundle().apply {
                     putString(ARG_TAB_TYPE, tabType.name)
+                    putBoolean(ARG_IS_PROVIDER_CONTEXT, isProviderContext)
                 }
             }
         }
@@ -90,14 +92,8 @@ class OrdersTabFragment : Fragment() {
     }
     
     private fun setupClickListeners() {
-        // Exibir botão "Novo Pedido" apenas no contexto de cliente
-        binding.btnNewOrder.visibility = if (isProviderContext) View.GONE else View.VISIBLE
-        binding.btnNewOrder.setOnClickListener {
-            if (!isProviderContext) {
-                val intent = Intent(requireContext(), CreateOrderActivity::class.java)
-                startActivity(intent)
-            }
-        }
+        // Botão "Novo Pedido" removido: pedidos só podem ser feitos pela aba Serviços
+        binding.btnNewOrder.visibility = View.GONE
     }
     
     private fun setupEmptyState() {
@@ -109,7 +105,7 @@ class OrdersTabFragment : Fragment() {
                     binding.tvEmptyMessage.text = "Aceite um pedido disponível para começar a atender."
                 } else {
                     binding.tvEmptyTitle.text = "Nenhum pedido em andamento"
-                    binding.tvEmptyMessage.text = "Você não tem pedidos sendo executados no momento."
+                    binding.tvEmptyMessage.text = "Você não tem pedidos sendo executados no momento. Acesse a aba Serviços para solicitar um novo pedido."
                 }
             }
             TabType.DISTRIBUTING -> {
@@ -118,16 +114,16 @@ class OrdersTabFragment : Fragment() {
                     binding.tvEmptyMessage.text = "Novos pedidos aparecerão aqui para você aceitar."
                 } else {
                     binding.tvEmptyTitle.text = "Nenhum pedido em distribuição"
-                    binding.tvEmptyMessage.text = "Você não tem pedidos aguardando prestadores."
+                    binding.tvEmptyMessage.text = "Você não tem pedidos aguardando prestadores. Acesse a aba Serviços para solicitar um novo pedido."
                 }
             }
             TabType.COMPLETED -> {
                 binding.tvEmptyTitle.text = "Nenhum pedido concluído"
-                binding.tvEmptyMessage.text = "Você ainda não concluiu nenhum pedido."
+                binding.tvEmptyMessage.text = "Você ainda não concluiu nenhum pedido. Acesse a aba Serviços para solicitar um novo pedido."
             }
             TabType.CANCELLED -> {
                 binding.tvEmptyTitle.text = "Nenhum pedido cancelado"
-                binding.tvEmptyMessage.text = "Você não tem pedidos cancelados."
+                binding.tvEmptyMessage.text = "Você não tem pedidos cancelados. Acesse a aba Serviços para solicitar um novo pedido."
             }
         }
     }
@@ -141,8 +137,9 @@ class OrdersTabFragment : Fragment() {
         orders = when (tabType) {
             TabType.IN_PROGRESS -> {
                 val filtered = allOrders.filter { 
-                    it.status == OrderData.STATUS_IN_PROGRESS || 
-                    it.status == OrderData.STATUS_ASSIGNED 
+                    val status = it.status.lowercase()
+                    status == OrderData.STATUS_IN_PROGRESS || 
+                    status == OrderData.STATUS_ASSIGNED 
                 }
                 android.util.Log.d("OrdersTabFragment", "🟢 Filtro IN_PROGRESS: ${filtered.size} pedidos")
                 android.util.Log.d("OrdersTabFragment", "📋 Status filtrados: ${filtered.map { it.status }}")
@@ -150,8 +147,9 @@ class OrdersTabFragment : Fragment() {
             }
             TabType.DISTRIBUTING -> {
                 val filtered = allOrders.filter { 
-                    it.status == OrderData.STATUS_DISTRIBUTING || 
-                    it.status == OrderData.STATUS_PENDING 
+                    val status = it.status.lowercase()
+                    status == OrderData.STATUS_DISTRIBUTING || 
+                    status == OrderData.STATUS_PENDING 
                 }
                 android.util.Log.d("OrdersTabFragment", "🟡 Filtro DISTRIBUTING: ${filtered.size} pedidos")
                 android.util.Log.d("OrdersTabFragment", "📋 Status filtrados: ${filtered.map { it.status }}")
@@ -159,7 +157,7 @@ class OrdersTabFragment : Fragment() {
             }
             TabType.COMPLETED -> {
                 val filtered = allOrders.filter { 
-                    it.status == OrderData.STATUS_COMPLETED 
+                    it.status.lowercase() == OrderData.STATUS_COMPLETED 
                 }
                 android.util.Log.d("OrdersTabFragment", "🟢 Filtro COMPLETED: ${filtered.size} pedidos")
                 android.util.Log.d("OrdersTabFragment", "📋 Status filtrados: ${filtered.map { it.status }}")
@@ -167,8 +165,9 @@ class OrdersTabFragment : Fragment() {
             }
             TabType.CANCELLED -> {
                 val filtered = allOrders.filter { 
-                    it.status == OrderData.STATUS_CANCELLED || 
-                    it.status == OrderData.STATUS_EXPIRED 
+                    val status = it.status.lowercase()
+                    status == OrderData.STATUS_CANCELLED || 
+                    status == OrderData.STATUS_EXPIRED 
                 }
                 android.util.Log.d("OrdersTabFragment", "🔴 Filtro CANCELLED: ${filtered.size} pedidos")
                 android.util.Log.d("OrdersTabFragment", "📋 Status filtrados: ${filtered.map { it.status }}")
@@ -204,17 +203,7 @@ class OrdersTabFragment : Fragment() {
     }
     
     private fun onOrderClick(order: OrderData) {
-        // Cliente: se já estiver atribuído/em andamento, abrir chat direto com o prestador
-        if (!isProviderContext && (order.status == OrderData.STATUS_ASSIGNED || order.status == OrderData.STATUS_IN_PROGRESS)) {
-            val intent = Intent(requireContext(), ClientChatActivity::class.java)
-            intent.putExtra("order_id", order.id)
-            intent.putExtra("provider_id", order.assignedProvider)
-            intent.putExtra("provider_name", order.assignedProviderName)
-            intent.putExtra("order_title", order.serviceName.ifEmpty { order.description })
-            startActivity(intent)
-            return
-        }
-
+        // Sempre abrir detalhes do pedido (não ir direto para o chat)
         val intent = Intent(requireContext(), OrderDetailsActivity::class.java)
         intent.putExtra("order_id", order.id)
         intent.putExtra("is_provider_view", isProviderContext)
@@ -226,29 +215,87 @@ class OrdersTabFragment : Fragment() {
             when (order.status) {
                 OrderData.STATUS_DISTRIBUTING, OrderData.STATUS_PENDING -> acceptOrder(order)
                 OrderData.STATUS_ASSIGNED, OrderData.STATUS_IN_PROGRESS -> {
-                    val intent = Intent(requireContext(), ProviderChatActivity::class.java)
-                    intent.putExtra("order_id", order.id)
-                    intent.putExtra("client_id", order.clientId)
-                    intent.putExtra("client_name", order.clientName)
-                    intent.putExtra("order_title", order.serviceName.ifEmpty { order.description })
-                    startActivity(intent)
+                    // Verificar se o chat pode ser acessado (5 minutos após aceitação)
+                    val (canAccess, message) = com.example.loginapp.utils.ChatAccessHelper.canAccessChat(order)
+                    
+                    if (!canAccess) {
+                        AlertDialog.Builder(requireContext())
+                            .setTitle("Chat Indisponível")
+                            .setMessage(message ?: "O chat ainda não está disponível.")
+                            .setPositiveButton("OK", null)
+                            .show()
+                        return
+                    }
+                    
+                    // Buscar foto do cliente antes de abrir o chat
+                    lifecycleScope.launch {
+                        val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        val clientPhotoUrl = try {
+                            db.collection("users").document(order.clientId)
+                                .get().await()
+                                .getString("profileImageUrl")
+                        } catch (e: Exception) {
+                            null
+                        }
+                        
+                        val intent = Intent(requireContext(), ProviderChatActivity::class.java)
+                        intent.putExtra("order_id", order.id)
+                        intent.putExtra("client_id", order.clientId)
+                        intent.putExtra("client_name", order.clientName)
+                        intent.putExtra("client_photo", clientPhotoUrl)
+                        intent.putExtra("order_title", order.serviceName.ifEmpty { order.description })
+                        startActivity(intent)
+                    }
                 }
                 else -> onOrderClick(order)
             }
         } else {
             when (order.status) {
                 OrderData.STATUS_ASSIGNED, OrderData.STATUS_IN_PROGRESS -> {
-                    val intent = Intent(requireContext(), ClientChatActivity::class.java)
-                    intent.putExtra("order_id", order.id)
-                    intent.putExtra("provider_id", order.assignedProvider)
-                    intent.putExtra("provider_name", order.assignedProviderName)
-                    intent.putExtra("order_title", order.serviceName.ifEmpty { order.description })
-                    startActivity(intent)
+                    // Verificar se o chat pode ser acessado (5 minutos após aceitação)
+                    val (canAccess, message) = com.example.loginapp.utils.ChatAccessHelper.canAccessChat(order)
+                    
+                    if (!canAccess) {
+                        AlertDialog.Builder(requireContext())
+                            .setTitle("Chat Indisponível")
+                            .setMessage(message ?: "O chat ainda não está disponível.")
+                            .setPositiveButton("OK", null)
+                            .show()
+                        return
+                    }
+                    
+                    // Buscar foto do prestador antes de abrir o chat
+                    lifecycleScope.launch {
+                        val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        val providerId = order.assignedProvider ?: ""
+                        val providerPhotoUrl = try {
+                            // Tentar buscar de providers primeiro, fallback para users
+                            db.collection("providers").document(providerId)
+                                .get().await()
+                                .getString("profileImageUrl")
+                                ?: db.collection("users").document(providerId)
+                                    .get().await()
+                                    .getString("profileImageUrl")
+                        } catch (e: Exception) {
+                            null
+                        }
+                        
+                        val intent = Intent(requireContext(), ClientChatActivity::class.java)
+                        intent.putExtra("order_id", order.id)
+                        intent.putExtra("provider_id", order.assignedProvider)
+                        intent.putExtra("provider_name", order.assignedProviderName)
+                        intent.putExtra("provider_photo", providerPhotoUrl)
+                        intent.putExtra("order_title", order.serviceName.ifEmpty { order.description })
+                        startActivity(intent)
+                    }
                 }
                 OrderData.STATUS_COMPLETED -> {
-                    val intent = Intent(requireContext(), RatingActivity::class.java)
-                    intent.putExtra("order_id", order.id)
-                    startActivity(intent)
+                    // Pedido completado - abrir detalhes
+                    onOrderClick(order)
+                }
+                OrderData.STATUS_CANCELLED, OrderData.STATUS_EXPIRED -> {
+                    // Pedidos cancelados/expirados: ir para aba Serviços (único local para fazer pedido)
+                    startActivity(Intent(requireContext(), ServicesActivity::class.java))
                 }
                 else -> onOrderClick(order)
             }
@@ -278,13 +325,20 @@ class OrdersTabFragment : Fragment() {
                     return@launch
                 }
 
+                // Buscar nome real do prestador da coleção providers
+                val providerDoc = db.collection("providers").document(current.uid).get().await()
+                val providerName = if (providerDoc.exists()) {
+                    providerDoc.getString("fullName") ?: auth.currentUser?.displayName ?: "Prestador"
+                } else {
+                    auth.currentUser?.displayName ?: "Prestador"
+                }
+
                 // Tentar atribuir ao prestador atual com condição (evitar corrida)
                 com.google.firebase.firestore.FirebaseFirestore.getInstance().runTransaction { tx ->
                     val snap = tx.get(docRef)
                     val currentStatus = snap.getString("status") ?: OrderData.STATUS_DISTRIBUTING
                     val assigned = snap.getString("assignedProvider")
                     if ((currentStatus == OrderData.STATUS_DISTRIBUTING || currentStatus == OrderData.STATUS_PENDING) && assigned.isNullOrEmpty()) {
-                        val providerName = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.displayName ?: "Prestador"
                         tx.update(docRef, mapOf(
                             "assignedProvider" to current.uid,
                             // Garantir persistência do nome do prestador que aceitou
@@ -298,7 +352,14 @@ class OrdersTabFragment : Fragment() {
                     }
                 }.await()
 
-                showToast("✅ Pedido aceito com sucesso!")
+                // Gerar códigos de verificação (sem mostrar para o prestador)
+                val orderManager = FirebaseOrderManager()
+                val codesResult = orderManager.generateVerificationCodes(order.id)
+                if (codesResult.isSuccess) {
+                    showToast("✅ Pedido aceito com sucesso!")
+                } else {
+                    showToast("✅ Pedido aceito com sucesso!")
+                }
 
             } catch (e: Exception) {
                 showToast("❌ Não foi possível aceitar: ${e.message}")

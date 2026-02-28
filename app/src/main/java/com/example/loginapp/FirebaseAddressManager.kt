@@ -2,6 +2,7 @@ package com.example.loginapp
 
 import android.util.Log
 import com.example.loginapp.models.SavedAddress
+import com.example.loginapp.utils.awaitCurrentUser
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -18,17 +19,17 @@ class FirebaseAddressManager {
     companion object {
         private const val TAG = "FirebaseAddressManager"
     }
-    
+
     /**
      * Salva um novo endereço para o cliente
      */
     suspend fun saveAddress(address: SavedAddress): Result<String> {
         return try {
-            val user = auth.currentUser
+            val user = auth.awaitCurrentUser()
             if (user == null) {
                 return Result.failure(Exception("Usuário não autenticado"))
             }
-            
+
             // Gerar ID único para o endereço
             val addressId = db.collection(SavedAddress.COLLECTION_NAME).document().id
             
@@ -60,20 +61,21 @@ class FirebaseAddressManager {
     }
     
     /**
-     * Busca todos os endereços salvos do cliente
+     * Busca todos os endereços salvos do usuário, filtrados por tipo
      */
-    suspend fun getUserAddresses(): Result<List<SavedAddress>> {
+    suspend fun getUserAddresses(userType: String = SavedAddress.USER_TYPE_CLIENT): Result<List<SavedAddress>> {
         return try {
-            val user = auth.currentUser
+            val user = auth.awaitCurrentUser()
             if (user == null) {
-                Log.e(TAG, "❌ Usuário não autenticado")
+                Log.e(TAG, "Usuário não autenticado")
                 return Result.failure(Exception("Usuário não autenticado"))
             }
-            
-            Log.d(TAG, "🔍 Buscando endereços para usuário: ${user.uid}")
-            
+
+            Log.d(TAG, "Buscando endereços para usuário: ${user.uid} tipo: $userType")
+
             val snapshot = db.collection(SavedAddress.COLLECTION_NAME)
                 .whereEqualTo("clientId", user.uid)
+                .whereEqualTo("userType", userType)
                 .get()
                 .await()
             
@@ -105,7 +107,7 @@ class FirebaseAddressManager {
      */
     suspend fun updateAddress(address: SavedAddress): Result<Unit> {
         return try {
-            val user = auth.currentUser
+            val user = auth.awaitCurrentUser()
             if (user == null) {
                 return Result.failure(Exception("Usuário não autenticado"))
             }
@@ -136,7 +138,7 @@ class FirebaseAddressManager {
      */
     suspend fun deleteAddress(addressId: String): Result<Unit> {
         return try {
-            val user = auth.currentUser
+            val user = auth.awaitCurrentUser()
             if (user == null) {
                 return Result.failure(Exception("Usuário não autenticado"))
             }
@@ -160,7 +162,7 @@ class FirebaseAddressManager {
      */
     suspend fun setDefaultAddress(addressId: String): Result<Unit> {
         return try {
-            val user = auth.currentUser
+            val user = auth.awaitCurrentUser()
             if (user == null) {
                 return Result.failure(Exception("Usuário não autenticado"))
             }
@@ -210,7 +212,7 @@ class FirebaseAddressManager {
      */
     suspend fun getDefaultAddress(): Result<SavedAddress?> {
         return try {
-            val user = auth.currentUser
+            val user = auth.awaitCurrentUser()
             if (user == null) {
                 return Result.failure(Exception("Usuário não autenticado"))
             }

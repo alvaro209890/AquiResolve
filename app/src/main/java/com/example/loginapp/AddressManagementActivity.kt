@@ -1,64 +1,37 @@
 package com.example.loginapp
 
-import android.Manifest
-import android.content.Intent
-import android.content.pm.PackageManager
-import android.location.Geocoder
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
-import androidx.activity.result.contract.ActivityResultContracts
+import android.location.Geocoder
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
-import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.loginapp.adapters.SavedAddressAdapter
 import com.example.loginapp.databinding.ActivityAddressManagementBinding
 import com.example.loginapp.models.SavedAddress
-import com.google.android.gms.common.ConnectionResult
-import com.google.android.gms.common.GoogleApiAvailability
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.maps.CameraUpdateFactory
-import com.google.android.gms.maps.GoogleMap
-import com.google.android.gms.maps.OnMapReadyCallback
-import com.google.android.gms.maps.SupportMapFragment
-import com.google.android.gms.maps.model.LatLng
-import com.google.android.gms.maps.model.MarkerOptions
 import com.google.firebase.firestore.GeoPoint
 import kotlinx.coroutines.launch
-import java.util.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.util.Locale
+import android.app.Activity
+import android.content.Intent
 
 /**
  * Activity para gerenciar endereços salvos do cliente
  */
-class AddressManagementActivity : AppCompatActivity(), OnMapReadyCallback {
+class AddressManagementActivity : AppCompatActivity() {
     
     private lateinit var binding: ActivityAddressManagementBinding
     private lateinit var addressAdapter: SavedAddressAdapter
-    private lateinit var fusedLocationClient: FusedLocationProviderClient
-    private lateinit var googleMap: GoogleMap
     private var savedAddresses = mutableListOf<SavedAddress>()
+    private var pendingCoordinates: GeoPoint? = null
+    private var currentDialogBinding: com.example.loginapp.databinding.DialogAddAddressBinding? = null
     
-    private val locationPermissionRequest = registerForActivityResult(
-        ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        when {
-            permissions.getOrDefault(Manifest.permission.ACCESS_FINE_LOCATION, false) -> {
-                // Precise location access granted.
-                getCurrentLocation()
-            }
-            permissions.getOrDefault(Manifest.permission.ACCESS_COARSE_LOCATION, false) -> {
-                // Only approximate location access granted.
-                getCurrentLocation()
-            }
-            else -> {
-                // No location access granted.
-                showToast("Permissão de localização necessária para usar esta funcionalidade")
-            }
-        }
+    companion object {
+        private const val MAP_PICKER_REQUEST = 2001
     }
     
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -66,20 +39,12 @@ class AddressManagementActivity : AppCompatActivity(), OnMapReadyCallback {
         binding = ActivityAddressManagementBinding.inflate(layoutInflater)
         setContentView(binding.root)
         
-        // Verificar se Google Play Services está disponível
-        if (!isGooglePlayServicesAvailable()) {
-            showToast("Google Play Services não está disponível")
-            finish()
-            return
-        }
+        // Google Play Services não é mais obrigatório
+        // O app funciona sem Google Maps/Localização
         
         setupToolbar()
         setupRecyclerView()
-        setupMapFragment()
         setupClickListeners()
-        
-        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
-        
         loadSavedAddresses()
     }
     
@@ -116,96 +81,9 @@ class AddressManagementActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
     
-    private fun setupMapFragment() {
-        val mapFragment = supportFragmentManager
-            .findFragmentById(R.id.mapFragment) as SupportMapFragment
-        mapFragment.getMapAsync(this)
-    }
-    
     private fun setupClickListeners() {
         binding.fabAddAddress.setOnClickListener {
             showAddAddressDialog()
-        }
-        
-        binding.btnCurrentLocation.setOnClickListener {
-            requestLocationPermission()
-        }
-    }
-    
-    override fun onMapReady(map: GoogleMap) {
-        googleMap = map
-        
-        // Configurar o mapa
-        googleMap.uiSettings.isZoomControlsEnabled = true
-        googleMap.uiSettings.isMyLocationButtonEnabled = false
-        
-        // Adicionar listener para cliques no mapa
-        googleMap.setOnMapClickListener { latLng ->
-            showAddAddressFromMapDialog(latLng)
-        }
-    }
-    
-    private fun requestLocationPermission() {
-        when {
-            ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) == PackageManager.PERMISSION_GRANTED -> {
-                getCurrentLocation()
-            }
-            else -> {
-                locationPermissionRequest.launch(
-                    arrayOf(
-                        Manifest.permission.ACCESS_FINE_LOCATION,
-                        Manifest.permission.ACCESS_COARSE_LOCATION
-                    )
-                )
-            }
-        }
-    }
-    
-    private fun getCurrentLocation() {
-        if (ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_FINE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
-                this,
-                Manifest.permission.ACCESS_COARSE_LOCATION
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
-        
-        fusedLocationClient.lastLocation.addOnSuccessListener { location ->
-            if (location != null) {
-                val latLng = LatLng(location.latitude, location.longitude)
-                googleMap.animateCamera(CameraUpdateFactory.newLatLngZoom(latLng, 15f))
-                showAddAddressFromMapDialog(latLng)
-            } else {
-                showToast("Não foi possível obter sua localização atual")
-            }
-        }
-    }
-    
-    private fun showAddAddressFromMapDialog(latLng: LatLng) {
-        // Obter endereço a partir das coordenadas
-        val geocoder = Geocoder(this, Locale.getDefault())
-        
-        try {
-            val addresses = geocoder.getFromLocation(latLng.latitude, latLng.longitude, 1)
-            if (addresses?.isNotEmpty() == true) {
-                val address = addresses[0]
-                val fullAddress = address.getAddressLine(0) ?: ""
-                
-                showAddAddressDialog(
-                    address = fullAddress,
-                    coordinates = GeoPoint(latLng.latitude, latLng.longitude)
-                )
-            } else {
-                showToast("Não foi possível obter o endereço desta localização")
-            }
-        } catch (e: Exception) {
-            showToast("Erro ao obter endereço: ${e.message}")
         }
     }
     
@@ -216,11 +94,7 @@ class AddressManagementActivity : AppCompatActivity(), OnMapReadyCallback {
         val states = com.example.loginapp.utils.BrazilianStates.getFormattedStates()
         val adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, states)
         dialogBinding.spinnerState.setAdapter(adapter)
-        
-        // Configurar para mostrar a lista ao clicar
-        dialogBinding.spinnerState.setOnClickListener {
-            dialogBinding.spinnerState.showDropDown()
-        }
+        dialogBinding.spinnerState.keyListener = null
         
         // Listener para quando um estado for selecionado
         dialogBinding.spinnerState.setOnItemClickListener { _, _, position, _ ->
@@ -228,25 +102,82 @@ class AddressManagementActivity : AppCompatActivity(), OnMapReadyCallback {
             android.util.Log.d("AddressManagement", "Estado selecionado: $selectedState")
         }
         
-        // Configurar threshold para mostrar sugestões
+        // Mostrar o dropdown imediatamente no primeiro toque/foco
         dialogBinding.spinnerState.threshold = 1
+        dialogBinding.spinnerState.setOnClickListener {
+            dialogBinding.spinnerState.showDropDown()
+        }
+        dialogBinding.spinnerState.setOnTouchListener { view, _ ->
+            view.performClick()
+            dialogBinding.spinnerState.showDropDown()
+            false
+        }
+        
+        // Configurar para mostrar dropdown quando ganhar foco
+        dialogBinding.spinnerState.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                dialogBinding.spinnerState.showDropDown()
+            }
+        }
+    }
+
+    private fun setupCepFormatting(editText: com.google.android.material.textfield.TextInputEditText) {
+        editText.addTextChangedListener(object : android.text.TextWatcher {
+            private var isUpdating = false
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (isUpdating) return
+                val digits = s.toString().replace(Regex("[^\\d]"), "")
+                val formatted = when {
+                    digits.length <= 5 -> digits
+                    else -> "${digits.substring(0, 5)}-${digits.substring(5, minOf(digits.length, 8))}"
+                }
+                isUpdating = true
+                editText.setText(formatted)
+                editText.setSelection(formatted.length)
+                isUpdating = false
+            }
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
     }
 
     private fun showAddAddressDialog(address: String = "", coordinates: GeoPoint? = null) {
         val dialogBinding = com.example.loginapp.databinding.DialogAddAddressBinding.inflate(layoutInflater)
-        
+        currentDialogBinding = dialogBinding
+        pendingCoordinates = coordinates
+
         // Configurar spinner de estados
         setupStateSpinner(dialogBinding)
+
+        // Configurar máscara de CEP
+        setupCepFormatting(dialogBinding.etZipCode)
         
         // Preencher campos se fornecidos
         if (address.isNotEmpty()) {
             dialogBinding.etAddress.setText(address)
         }
         
+        updateSelectedCoordsLabel(dialogBinding, pendingCoordinates)
+        dialogBinding.btnPickOnMap.setOnClickListener {
+            openMapPicker()
+        }
+        
         val dialog = AlertDialog.Builder(this)
             .setTitle("Adicionar Endereço")
             .setView(dialogBinding.root)
-            .setPositiveButton("Salvar") { _, _ ->
+            .setPositiveButton("Salvar", null)
+            .setNegativeButton("Cancelar", null)
+            .create()
+
+        dialog.show()
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            if (pendingCoordinates == null) {
+                showToast("Selecione a localização no mapa antes de salvar")
+                return@setOnClickListener
+            }
+
+            lifecycleScope.launch {
                 val name = dialogBinding.etName.text.toString().trim()
                 val fullAddress = dialogBinding.etAddress.text.toString().trim()
                 val complement = dialogBinding.etComplement.text.toString().trim()
@@ -255,19 +186,14 @@ class AddressManagementActivity : AppCompatActivity(), OnMapReadyCallback {
                 val stateText = dialogBinding.spinnerState.text.toString().trim()
                 val zipCode = dialogBinding.etZipCode.text.toString().trim()
                 val isDefault = dialogBinding.cbDefault.isChecked
-                
+
                 if (name.isEmpty() || fullAddress.isEmpty()) {
                     showToast("Nome e endereço são obrigatórios")
-                    return@setPositiveButton
+                    return@launch
                 }
-                
-                // Extrair sigla do estado se necessário
-                val state = if (stateText.contains(" - ")) {
-                    stateText.substring(0, 2) // Extrair sigla do formato "SP - São Paulo"
-                } else {
-                    stateText
-                }
-                
+
+                val state = if (stateText.contains(" - ")) stateText.substring(0, 2) else stateText
+
                 val newAddress = SavedAddress(
                     name = name,
                     address = fullAddress,
@@ -276,16 +202,14 @@ class AddressManagementActivity : AppCompatActivity(), OnMapReadyCallback {
                     city = city,
                     state = state,
                     zipCode = zipCode,
-                    coordinates = coordinates,
+                    coordinates = pendingCoordinates,
                     isDefault = isDefault
                 )
-                
+
                 saveAddress(newAddress)
+                dialog.dismiss()
             }
-            .setNegativeButton("Cancelar", null)
-            .create()
-        
-        dialog.show()
+        }
     }
     
     private fun showAddressDetails(address: SavedAddress) {
@@ -306,7 +230,12 @@ class AddressManagementActivity : AppCompatActivity(), OnMapReadyCallback {
     
     private fun editAddress(address: SavedAddress) {
         val dialogBinding = com.example.loginapp.databinding.DialogAddAddressBinding.inflate(layoutInflater)
-        
+        currentDialogBinding = dialogBinding
+        pendingCoordinates = address.coordinates
+
+        // Configurar máscara de CEP
+        setupCepFormatting(dialogBinding.etZipCode)
+
         // Preencher campos com dados existentes
         dialogBinding.etName.setText(address.name)
         dialogBinding.etAddress.setText(address.address)
@@ -316,11 +245,27 @@ class AddressManagementActivity : AppCompatActivity(), OnMapReadyCallback {
         dialogBinding.spinnerState.setText(address.state)
         dialogBinding.etZipCode.setText(address.zipCode)
         dialogBinding.cbDefault.isChecked = address.isDefault
+        updateSelectedCoordsLabel(dialogBinding, pendingCoordinates)
+        dialogBinding.btnPickOnMap.setOnClickListener {
+            openMapPicker()
+        }
         
         val dialog = AlertDialog.Builder(this)
             .setTitle("Editar Endereço")
             .setView(dialogBinding.root)
-            .setPositiveButton("Salvar") { _, _ ->
+            .setPositiveButton("Salvar", null)
+            .setNegativeButton("Cancelar", null)
+            .create()
+
+        dialog.show()
+
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+            if (pendingCoordinates == null) {
+                showToast("Selecione a localização no mapa antes de salvar")
+                return@setOnClickListener
+            }
+
+            lifecycleScope.launch {
                 val name = dialogBinding.etName.text.toString().trim()
                 val fullAddress = dialogBinding.etAddress.text.toString().trim()
                 val complement = dialogBinding.etComplement.text.toString().trim()
@@ -329,12 +274,12 @@ class AddressManagementActivity : AppCompatActivity(), OnMapReadyCallback {
                 val state = dialogBinding.spinnerState.text.toString().trim()
                 val zipCode = dialogBinding.etZipCode.text.toString().trim()
                 val isDefault = dialogBinding.cbDefault.isChecked
-                
+
                 if (name.isEmpty() || fullAddress.isEmpty()) {
                     showToast("Nome e endereço são obrigatórios")
-                    return@setPositiveButton
+                    return@launch
                 }
-                
+
                 val updatedAddress = address.copy(
                     name = name,
                     address = fullAddress,
@@ -343,15 +288,14 @@ class AddressManagementActivity : AppCompatActivity(), OnMapReadyCallback {
                     city = city,
                     state = state,
                     zipCode = zipCode,
+                    coordinates = pendingCoordinates,
                     isDefault = isDefault
                 )
-                
+
                 updateAddress(updatedAddress)
+                dialog.dismiss()
             }
-            .setNegativeButton("Cancelar", null)
-            .create()
-        
-        dialog.show()
+        }
     }
     
     private fun deleteAddress(address: SavedAddress) {
@@ -419,9 +363,6 @@ class AddressManagementActivity : AppCompatActivity(), OnMapReadyCallback {
                 savedAddresses.addAll(result.getOrNull() ?: emptyList())
                 addressAdapter.notifyDataSetChanged()
                 
-                // Atualizar marcadores no mapa
-                updateMapMarkers()
-                
                 if (savedAddresses.isEmpty()) {
                     binding.layoutEmpty.visibility = View.VISIBLE
                     binding.recyclerViewAddresses.visibility = View.GONE
@@ -437,35 +378,63 @@ class AddressManagementActivity : AppCompatActivity(), OnMapReadyCallback {
         }
     }
     
-    private fun updateMapMarkers() {
-        if (::googleMap.isInitialized) {
-            googleMap.clear()
-            
-            savedAddresses.forEach { address ->
-                address.coordinates?.let { geoPoint ->
-                    val latLng = LatLng(geoPoint.latitude, geoPoint.longitude)
-                    val marker = googleMap.addMarker(
-                        MarkerOptions()
-                            .position(latLng)
-                            .title(address.name)
-                            .snippet(address.getShortAddress())
-                    )
-                }
-            }
-        }
-    }
-    
     private fun showToast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
     
+    private fun openMapPicker() {
+        val intent = Intent(this, AddressMapPickerActivity::class.java)
+        startActivityForResult(intent, MAP_PICKER_REQUEST)
+    }
+    
+    private fun updateSelectedCoordsLabel(dialogBinding: com.example.loginapp.databinding.DialogAddAddressBinding?, coords: GeoPoint?) {
+        dialogBinding ?: return
+        dialogBinding.tvSelectedCoords.text = coords?.let {
+            "Lat: %.5f, Lng: %.5f".format(it.latitude, it.longitude)
+        } ?: "Selecione a localização no mapa (obrigatório)"
+    }
+    
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == MAP_PICKER_REQUEST && resultCode == Activity.RESULT_OK && data != null) {
+            val lat = data.getDoubleExtra(AddressMapPickerActivity.EXTRA_LAT, Double.NaN)
+            val lng = data.getDoubleExtra(AddressMapPickerActivity.EXTRA_LNG, Double.NaN)
+            if (!lat.isNaN() && !lng.isNaN()) {
+                pendingCoordinates = GeoPoint(lat, lng)
+                updateSelectedCoordsLabel(currentDialogBinding, pendingCoordinates)
+            }
+        }
+    }
+    
+    /**
+     * Geocodifica um endereço textual em coordenadas (GeoPoint).
+     * Usa Geocoder local; salva null se não encontrar.
+     */
+    private suspend fun geocodeAddress(query: String): GeoPoint? = withContext(Dispatchers.IO) {
+        try {
+            val geocoder = Geocoder(this@AddressManagementActivity, Locale("pt", "BR"))
+            val results = geocoder.getFromLocationName(query, 1)
+            if (!results.isNullOrEmpty()) {
+                val loc = results.first()
+                return@withContext GeoPoint(loc.latitude, loc.longitude)
+            }
+            null
+        } catch (e: Exception) {
+            android.util.Log.e("AddressManagement", "Geocode falhou: ${e.message}")
+            null
+        }
+    }
+    
     /**
      * Verifica se o Google Play Services está disponível
+     * Função desabilitada - não é mais necessária
      */
+    /*
     private fun isGooglePlayServicesAvailable(): Boolean {
         val googleApiAvailability = GoogleApiAvailability.getInstance()
         val resultCode = googleApiAvailability.isGooglePlayServicesAvailable(this)
         return resultCode == ConnectionResult.SUCCESS
     }
+    */
 }
 

@@ -30,6 +30,7 @@ class SignUpActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
         
         // Inicializar ViewBinding
         binding = ActivitySignupBinding.inflate(layoutInflater)
@@ -64,16 +65,6 @@ class SignUpActivity : AppCompatActivity() {
         // Botão de cadastro principal
         binding.btnSignUp.setOnClickListener {
             performSignUp()
-        }
-        
-        // Botão de cadastro com Google
-        binding.btnGoogleSignup.setOnClickListener {
-            handleGoogleSignUp()
-        }
-        
-        // Botão de cadastro com Facebook
-        binding.btnFacebookSignup.setOnClickListener {
-            handleFacebookSignUp()
         }
         
         // Link "Entrar" (voltar para login)
@@ -157,7 +148,10 @@ class SignUpActivity : AppCompatActivity() {
                 binding.tilPassword.error = getString(R.string.password_required)
                 isValid = false
             }
-            // DESENVOLVIMENTO: Removida validação de comprimento mínimo
+            password.length < 6 -> {
+                binding.tilPassword.error = getString(R.string.weak_password)
+                isValid = false
+            }
         }
         
         // Validar confirmação de senha
@@ -272,58 +266,8 @@ class SignUpActivity : AppCompatActivity() {
         }
         
         // Desabilitar outros botões durante o carregamento
-        binding.btnGoogleSignup.isEnabled = !loading
-        binding.btnFacebookSignup.isEnabled = !loading
         binding.tvSignIn.isEnabled = !loading
         binding.cbTerms.isEnabled = !loading
-    }
-
-    /**
-     * Manipula o cadastro com Google
-     */
-    private fun handleGoogleSignUp() {
-        showToast("🔄 Conectando com Google...")
-        
-        lifecycleScope.launch {
-            try {
-                val result = LocalAuthManager.signInWithGoogle()
-                when (result) {
-                    is LocalAuthManager.AuthResult.Success -> {
-                        showSuccessMessage("✅ Cadastro com Google realizado com sucesso!")
-                        // Aqui você navegaria para a próxima tela
-                    }
-                    is LocalAuthManager.AuthResult.Error -> {
-                        showErrorMessage("❌ ${result.message}")
-                    }
-                }
-            } catch (e: Exception) {
-                showErrorMessage("❌ Falha no cadastro com Google. Tente novamente.")
-            }
-        }
-    }
-
-    /**
-     * Manipula o cadastro com Facebook
-     */
-    private fun handleFacebookSignUp() {
-        showToast("🔄 Conectando com Facebook...")
-        
-        lifecycleScope.launch {
-            try {
-                val result = LocalAuthManager.signInWithFacebook()
-                when (result) {
-                    is LocalAuthManager.AuthResult.Success -> {
-                        showSuccessMessage("✅ Cadastro com Facebook realizado com sucesso!")
-                        // Aqui você navegaria para a próxima tela
-                    }
-                    is LocalAuthManager.AuthResult.Error -> {
-                        showErrorMessage("❌ ${result.message}")
-                    }
-                }
-            } catch (e: Exception) {
-                showErrorMessage("❌ Falha no cadastro com Facebook. Tente novamente.")
-            }
-        }
     }
 
     /**
@@ -369,4 +313,3 @@ class SignUpActivity : AppCompatActivity() {
         // Limpar recursos se necessário
     }
 }
-

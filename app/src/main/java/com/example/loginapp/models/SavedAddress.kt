@@ -12,6 +12,8 @@ data class SavedAddress(
     val id: String = "",
     @PropertyName("clientId")
     val clientId: String = "",
+    @PropertyName("userType")
+    val userType: String = USER_TYPE_CLIENT,
     @PropertyName("name")
     val name: String = "", // Nome personalizado do endereço (ex: "Casa", "Trabalho")
     @PropertyName("address")
@@ -66,6 +68,8 @@ data class SavedAddress(
     
     companion object {
         const val COLLECTION_NAME = "saved_addresses"
+        const val USER_TYPE_CLIENT = "CLIENT"
+        const val USER_TYPE_PROVIDER = "PROVIDER"
     }
 }
 

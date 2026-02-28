@@ -34,6 +34,14 @@
             android:padding="12dp"
             android:maxWidth="280dp">
 
+            <ImageView
+                android:id="@+id/ivAttachment"
+                android:layout_width="240dp"
+                android:layout_height="240dp"
+                android:scaleType="centerCrop"
+                android:visibility="gone"
+                android:contentDescription="Imagem anexada" />
+
             <TextView
                 android:id="@+id/tvMessage"
                 android:layout_width="wrap_content"
@@ -41,7 +49,8 @@
                 android:text="Esta é uma mensagem recebida"
                 android:textSize="14sp"
                 android:textColor="@color/text_primary"
-                android:lineSpacingExtra="2dp" />
+                android:lineSpacingExtra="2dp"
+                android:visibility="visible" />
 
         </LinearLayout>
 

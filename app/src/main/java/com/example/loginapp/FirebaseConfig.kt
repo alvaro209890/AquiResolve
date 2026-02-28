@@ -4,9 +4,10 @@ import android.content.Context
 import android.util.Log
 // import com.google.android.gms.common.GoogleApiAvailability
 import com.google.firebase.FirebaseApp
-import com.google.firebase.appcheck.FirebaseAppCheck
+// Firebase App Check temporariamente desabilitado
+// import com.google.firebase.appcheck.FirebaseAppCheck
 // import com.google.firebase.appcheck.debug.DebugAppCheckProviderFactory
-import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
+// import com.google.firebase.appcheck.playintegrity.PlayIntegrityAppCheckProviderFactory
 import android.content.pm.ApplicationInfo
 import com.google.firebase.analytics.FirebaseAnalytics
 import com.google.firebase.auth.FirebaseAuth
@@ -66,25 +67,9 @@ object FirebaseConfig {
             
             Log.d(TAG, "Firebase initialization completed successfully")
             
-            // Inicializar Firebase App Check
-            try {
-                val appCheck = FirebaseAppCheck.getInstance()
-                val isDebuggable = (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-                if (isDebuggable) {
-                    // Debug App Check temporariamente desabilitado
-                    // appCheck.installAppCheckProviderFactory(
-                    //     DebugAppCheckProviderFactory.getInstance()
-                    // )
-                    Log.d(TAG, "Firebase App Check (Debug) skipped in debug mode")
-                } else {
-                    appCheck.installAppCheckProviderFactory(
-                        PlayIntegrityAppCheckProviderFactory.getInstance()
-                    )
-                    Log.d(TAG, "Firebase App Check (PlayIntegrity) initialized")
-                }
-            } catch (appCheckError: Exception) {
-                Log.w(TAG, "App Check initialization skipped: ${appCheckError.message}")
-            }
+            // Firebase App Check desabilitado para evitar problemas com Google Play Services
+            // em builds de debug. Pode ser habilitado em produção se necessário.
+            Log.d(TAG, "Firebase App Check disabled for debug builds")
 
         } catch (e: Exception) {
             Log.e(TAG, "Error initializing Firebase: ${e.message}", e)

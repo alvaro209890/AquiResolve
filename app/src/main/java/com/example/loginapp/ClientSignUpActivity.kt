@@ -33,6 +33,12 @@ class ClientSignUpActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        
+        // Garantir Firebase inicializado
+        if (!FirebaseConfig.isInitialized()) {
+            FirebaseConfig.initialize(this)
+        }
         
         // Inicializar AuthManager
         authManager = FirebaseAuthManager(this)
@@ -81,6 +87,12 @@ class ClientSignUpActivity : AppCompatActivity() {
         binding.btnBack.setOnClickListener {
             finish()
         }
+        
+        // Ler Termos de Uso do Cliente
+        binding.tvReadTerms.setOnClickListener {
+            startActivity(Intent(this, TermsOfServiceActivity::class.java))
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+        }
     }
 
     /**
@@ -99,12 +111,6 @@ class ClientSignUpActivity : AppCompatActivity() {
         val password = binding.etPassword.text.toString().trim()
         val confirmPassword = binding.etConfirmPassword.text.toString().trim()
         val termsAccepted = binding.cbTerms.isChecked
-        
-        android.util.Log.d("ClientSignUp", "Dados coletados:")
-        android.util.Log.d("ClientSignUp", "- Nome Completo: $fullName")
-        android.util.Log.d("ClientSignUp", "- Nome de Usuário: $username")
-        android.util.Log.d("ClientSignUp", "- Email: $email")
-        android.util.Log.d("ClientSignUp", "- Termos aceitos: $termsAccepted")
         
         // Validar dados de entrada
         if (!validateInputs(fullName, username, email, password, confirmPassword, termsAccepted)) {
@@ -149,12 +155,6 @@ class ClientSignUpActivity : AppCompatActivity() {
         fullName: String, username: String, email: String, password: String, confirmPassword: String, termsAccepted: Boolean
     ): Boolean {
         android.util.Log.d("ClientSignUp", "=== INICIANDO VALIDAÇÃO ===")
-        android.util.Log.d("ClientSignUp", "Nome Completo: '$fullName' (vazio: ${fullName.isEmpty()})")
-        android.util.Log.d("ClientSignUp", "Nome de Usuário: '$username' (vazio: ${username.isEmpty()})")
-        android.util.Log.d("ClientSignUp", "Email: '$email' (vazio: ${email.isEmpty()})")
-        android.util.Log.d("ClientSignUp", "Senha: '${password.take(3)}***' (vazio: ${password.isEmpty()}, tamanho: ${password.length})")
-        android.util.Log.d("ClientSignUp", "Confirmação: '${confirmPassword.take(3)}***' (vazio: ${confirmPassword.isEmpty()})")
-        android.util.Log.d("ClientSignUp", "Termos aceitos: $termsAccepted")
         
         var isValid = true
         
@@ -255,12 +255,12 @@ class ClientSignUpActivity : AppCompatActivity() {
                 
                 // Verificar se o nome de usuário já existe
                 if (authManager.isUsernameTaken(username)) {
-                    android.util.Log.e("ClientSignUp", "❌ NOME DE USUÁRIO JÁ EXISTE: $username")
+                    android.util.Log.e("ClientSignUp", "❌ NOME DE USUÁRIO JÁ EXISTE")
                     handleSignUpError("Nome de usuário '$username' já está em uso. Escolha outro nome.")
                     return@launch
                 }
                 
-                android.util.Log.d("ClientSignUp", "✅ NOME DE USUÁRIO DISPONÍVEL: $username")
+                android.util.Log.d("ClientSignUp", "✅ NOME DE USUÁRIO DISPONÍVEL")
                 android.util.Log.d("ClientSignUp", "🔄 CRIANDO DADOS DO USUÁRIO...")
                 
                 // Criar dados do usuário
@@ -273,12 +273,6 @@ class ClientSignUpActivity : AppCompatActivity() {
                     userType = FirebaseAuthManager.USER_TYPE_CLIENT,
                     isVerified = false
                 )
-                
-                android.util.Log.d("ClientSignUp", "✅ Dados do usuário criados:")
-                android.util.Log.d("ClientSignUp", "- Email: ${userData.email}")
-                android.util.Log.d("ClientSignUp", "- Nome Completo: ${userData.fullName}")
-                android.util.Log.d("ClientSignUp", "- Nome de Usuário: ${userData.username}")
-                android.util.Log.d("ClientSignUp", "- Tipo: ${userData.userType}")
                 
                 android.util.Log.d("ClientSignUp", "🔄 CHAMANDO FIREBASE AUTH MANAGER...")
                 
@@ -328,9 +322,15 @@ class ClientSignUpActivity : AppCompatActivity() {
         setLoadingState(false)
         
         when {
-            errorMessage.contains("já está em uso") -> {
+            errorMessage.contains("nome de usuário já está em uso", ignoreCase = true) -> {
+                binding.tilUsername.error = "Nome de usuário já está em uso"
+                showErrorMessage("❌ Este nome de usuário já está em uso. Escolha outro.")
+                binding.etUsername.requestFocus()
+            }
+            errorMessage.contains("e-mail já está em uso", ignoreCase = true) || 
+            errorMessage.contains("email address is already in use", ignoreCase = true) -> {
                 binding.tilEmail.error = "E-mail já está em uso"
-                showErrorMessage("❌ E-mail já está em uso")
+                showErrorMessage("❌ Este e-mail já está em uso")
                 binding.etEmail.requestFocus()
             }
             errorMessage.contains("Senha inválida") -> {
@@ -432,7 +432,6 @@ class ClientSignUpActivity : AppCompatActivity() {
 
             // Configurar texto do email
             dialogView.findViewById<android.widget.TextView>(R.id.tvEmail).text = email
-            android.util.Log.d("ClientSignUp", "📧 EMAIL CONFIGURADO: $email")
             
         } catch (e: Exception) {
             android.util.Log.e("ClientSignUp", "❌ ERRO AO MOSTRAR DIÁLOGO:", e)

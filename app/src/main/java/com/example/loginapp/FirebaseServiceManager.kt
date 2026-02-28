@@ -90,7 +90,7 @@ class FirebaseServiceManager {
             ),
             ServiceCategory(
                 name = "Encanamento",
-                description = "Serviços de encanamento e hidráulica",
+                description = "Serviços de encanamento para encanador",
                 icon = "ic_plumber",
                 color = "#2196F3",
                 order = 4
@@ -232,7 +232,7 @@ class FirebaseServiceManager {
             ),
             ServiceType(
                 categoryId = "encanamento",
-                name = "Instalação Hidráulica",
+                name = "Instalação de encanamento",
                 description = "Instalação completa de sistema hidráulico",
                 icon = "ic_plumber",
                 isComplex = true,
@@ -650,5 +650,4 @@ class FirebaseServiceManager {
         }
     }
 }
-
 

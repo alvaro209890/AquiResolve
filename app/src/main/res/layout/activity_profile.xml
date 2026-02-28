@@ -60,18 +60,32 @@
                         android:gravity="center_vertical"
                         android:layout_marginBottom="20dp">
 
-                        <!-- Avatar -->
-                        <com.google.android.material.imageview.ShapeableImageView
-                            android:id="@+id/ivAvatar"
+                        <!-- Avatar com overlay de loading -->
+                        <FrameLayout
                             android:layout_width="80dp"
-                            android:layout_height="80dp"
-                            android:src="@drawable/ic_person"
-                            android:background="@color/gray_200"
-                            android:padding="16dp"
-                            app:tint="@color/gray_600"
-                            app:shapeAppearanceOverlay="@style/CircleImageView"
-                            android:clickable="true"
-                            android:focusable="true" />
+                            android:layout_height="80dp">
+
+                            <com.google.android.material.imageview.ShapeableImageView
+                                android:id="@+id/ivAvatar"
+                                android:layout_width="80dp"
+                                android:layout_height="80dp"
+                                android:src="@drawable/ic_person"
+                                android:background="@color/gray_200"
+                                android:padding="16dp"
+                                app:shapeAppearanceOverlay="@style/CircleImageView"
+                                android:clickable="true"
+                                android:focusable="true" />
+
+                            <com.google.android.material.progressindicator.CircularProgressIndicator
+                                android:id="@+id/profileImageProgress"
+                                android:layout_width="40dp"
+                                android:layout_height="40dp"
+                                android:layout_gravity="center"
+                                android:indeterminate="true"
+                                android:visibility="gone"
+                                app:indicatorColor="@color/primary_color"
+                                app:trackColor="@color/gray_300" />
+                        </FrameLayout>
 
                         <!-- Informações do usuário -->
                         <LinearLayout
@@ -298,7 +312,7 @@
                         android:layout_height="1dp"
                         android:background="@color/gray_200" />
 
-                    <!-- Dados Bancários (apenas para prestadores) -->
+                    <!-- Chave PIX (apenas para prestadores) -->
                     <LinearLayout
                         android:id="@+id/llBankData"
                         android:layout_width="match_parent"
@@ -322,46 +336,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="Dados Bancários"
-                            android:textSize="16sp"
-                            android:textColor="@color/text_primary" />
-
-                        <ImageView
-                            android:layout_width="16dp"
-                            android:layout_height="16dp"
-                            android:src="@drawable/ic_arrow_right"
-                            app:tint="@color/gray_400" />
-
-                    </LinearLayout>
-
-                    <View
-                        android:layout_width="match_parent"
-                        android:layout_height="1dp"
-                        android:background="@color/gray_200" />
-
-                    <LinearLayout
-                        android:id="@+id/llDashboard"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:padding="12dp"
-                        android:background="?attr/selectableItemBackground"
-                        android:clickable="true"
-                        android:focusable="true">
-
-                        <ImageView
-                            android:layout_width="24dp"
-                            android:layout_height="24dp"
-                            android:src="@drawable/ic_analytics"
-                            app:tint="@color/gray_600"
-                            android:layout_marginEnd="16dp" />
-
-                        <TextView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="Dashboard"
+                            android:text="Chave PIX"
                             android:textSize="16sp"
                             android:textColor="@color/text_primary" />
 

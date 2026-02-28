@@ -266,7 +266,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Anexar Imagens (Opcional)"
+                    android:text="Anexar Imagens (Obrigatório)"
                     android:textSize="18sp"
                     android:textStyle="bold"
                     android:textColor="@color/text_primary"
@@ -275,7 +275,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Adicione fotos do problema para ajudar os prestadores a entenderem melhor o serviço"
+                    android:text="Adicione pelo menos uma foto do problema para que os prestadores entendam o serviço"
                     android:textSize="14sp"
                     android:textColor="@color/text_secondary"
                     android:layout_marginBottom="16dp" />
@@ -388,12 +388,27 @@
                 android:id="@+id/btnSubmitOrder"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Enviar Pedido"
+                android:text="Pagar e Enviar Pedido"
                 android:textSize="16sp"
                 app:cornerRadius="8dp"
                 android:backgroundTint="@color/primary_color"
                 android:textColor="@color/white"
                 android:padding="16dp"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Botão Adicionar ao Carrinho -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAddToCart"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Adicionar ao Carrinho"
+                android:textSize="16sp"
+                app:cornerRadius="8dp"
+                android:backgroundTint="@color/secondary_color"
+                android:textColor="@color/white"
+                app:icon="@drawable/ic_cart"
+                app:iconTint="@color/white"
+                android:padding="14dp"
                 android:layout_marginBottom="12dp" />
 
             <!-- Botão Salvar Rascunho -->

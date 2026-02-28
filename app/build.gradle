@@ -68,20 +68,35 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0'
     implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.7.0'
     
+    // Retrofit para API calls
+    implementation 'com.squareup.retrofit2:retrofit:2.9.0'
+    implementation 'com.squareup.retrofit2:converter-gson:2.9.0'
+    implementation 'com.squareup.okhttp3:okhttp:4.12.0'
+    implementation 'com.squareup.okhttp3:logging-interceptor:4.12.0'
+    
+    // Gson
+    implementation 'com.google.code.gson:gson:2.10.1'
+    
+    // ZXing para geração de QR Code
+    implementation 'com.google.zxing:core:3.5.2'
+    
     // Glide para carregamento de imagens
     implementation 'com.github.bumptech.glide:glide:4.16.0'
     
     // PhotoView para zoom em imagens
     implementation 'com.github.chrisbanes:PhotoView:2.3.0'
+
+    // uCrop para recorte de imagem (foto de perfil estilo WhatsApp)
+    implementation 'com.github.yalantis:ucrop:2.2.8'
     
     // ViewPager2
     implementation 'androidx.viewpager2:viewpager2:1.0.0'
     
-    // Google Maps
-    implementation 'com.google.android.gms:play-services-maps:18.2.0'
+    // Google Play Services Location
     implementation 'com.google.android.gms:play-services-location:21.0.1'
-    implementation 'com.google.android.gms:play-services-places:17.0.0'
-    implementation 'com.google.android.gms:play-services-base:18.2.0'
+
+    // Mapas (OSMDroid - OpenStreetMap)
+    implementation 'org.osmdroid:osmdroid-android:6.1.18'
 
     // Firebase
     implementation platform('com.google.firebase:firebase-bom:32.7.0')
@@ -90,15 +105,7 @@ dependencies {
     implementation 'com.google.firebase:firebase-firestore'
     implementation 'com.google.firebase:firebase-storage'
     implementation 'com.google.firebase:firebase-messaging'
-    // Firebase App Check (protege acesso ao Storage/Firestore)
-    implementation 'com.google.firebase:firebase-appcheck'
-    implementation 'com.google.firebase:firebase-appcheck-playintegrity'
-    debugImplementation 'com.google.firebase:firebase-appcheck-debug'
-    
-    // Google Play Services - Temporariamente desabilitado para evitar erros
-    // implementation 'com.google.android.gms:play-services-auth:20.7.0'
-    // implementation 'com.google.android.gms:play-services-base:18.2.0'
-    // implementation 'com.google.android.gms:play-services-tasks:18.0.2'
+    implementation 'com.google.firebase:firebase-database'
 
     // Testes
     testImplementation 'junit:junit:4.13.2'

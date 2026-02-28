@@ -3,6 +3,8 @@ package com.example.loginapp
 import android.util.Log
 import com.example.loginapp.models.OrderData
 import com.example.loginapp.utils.ProtocolGenerator
+import com.example.loginapp.utils.VerificationCodeGenerator
+import com.example.loginapp.utils.awaitCurrentUser
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -23,7 +25,7 @@ class FirebaseOrderManager {
      */
     suspend fun createOrder(orderData: OrderData): Result<String> {
         return try {
-            val user = auth.currentUser
+            val user = auth.awaitCurrentUser()
             if (user == null) {
                 return Result.failure(Exception("Usuário não autenticado"))
             }
@@ -63,20 +65,20 @@ class FirebaseOrderManager {
      */
     suspend fun getUserOrders(): Result<List<OrderData>> {
         return try {
-            val user = auth.currentUser
+            val user = auth.awaitCurrentUser()
             if (user == null) {
                 return Result.failure(Exception("Usuário não autenticado"))
             }
             
+            // Buscar pedidos (SEM orderBy para evitar índice composto)
             val snapshot = db.collection(ORDERS_COLLECTION)
                 .whereEqualTo("clientId", user.uid)
-                .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
                 .get()
                 .await()
             
             val orders = snapshot.documents.mapNotNull { doc ->
                 doc.toObject(OrderData::class.java)?.copy(id = doc.id)
-            }
+            }.sortedByDescending { it.createdAt?.toDate()?.time ?: 0L } // Ordenar manualmente
             
             Log.d(TAG, "Pedidos carregados: ${orders.size}")
             Result.success(orders)
@@ -155,16 +157,145 @@ class FirebaseOrderManager {
     }
 
     /**
+     * Gera códigos de verificação quando o prestador aceita um pedido
+     */
+    suspend fun generateVerificationCodes(orderId: String): Result<Pair<String, String>> {
+        return try {
+            val clientCode = VerificationCodeGenerator.generateCode()
+            val providerCode = VerificationCodeGenerator.generateCode()
+            
+            val updates = mapOf(
+                "clientVerificationCode" to clientCode,
+                "providerVerificationCode" to providerCode,
+                "verificationCodesGeneratedAt" to Timestamp.now(),
+                "updatedAt" to Timestamp.now()
+            )
+            
+            db.collection(ORDERS_COLLECTION)
+                .document(orderId)
+                .update(updates)
+                .await()
+            
+            Log.d(TAG, "Códigos de verificação gerados para pedido: $orderId")
+            Log.d(TAG, "Código do cliente: $clientCode | Código do prestador: $providerCode")
+            
+            Result.success(Pair(clientCode, providerCode))
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao gerar códigos de verificação: ${e.message}")
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Finaliza um pedido verificando o código do cliente
+     * O prestador deve fornecer o código do cliente para finalizar
+     */
+    suspend fun completeOrderWithVerification(orderId: String, clientCode: String): Result<Unit> {
+        return try {
+            val docRef = db.collection(ORDERS_COLLECTION).document(orderId)
+            
+            db.runTransaction { tx ->
+                // TODAS AS LEITURAS PRIMEIRO
+                val snap = tx.get(docRef)
+                
+                // Verificar se o pedido existe e está em andamento
+                val status = snap.getString("status") ?: ""
+                if (status != OrderData.STATUS_IN_PROGRESS && status != OrderData.STATUS_ASSIGNED) {
+                    throw IllegalStateException("Pedido não está em andamento")
+                }
+                
+                // Verificar o código do cliente
+                val storedClientCode = snap.getString("clientVerificationCode")
+                if (storedClientCode == null) {
+                    throw IllegalStateException("Código de verificação não encontrado")
+                }
+                
+                val cleanedCode = VerificationCodeGenerator.cleanCode(clientCode)
+                if (cleanedCode != storedClientCode) {
+                    throw IllegalArgumentException("Código de verificação incorreto")
+                }
+                
+                // Obter comissão do prestador e ID do prestador
+                val providerCommission = snap.getDouble("providerCommission") ?: 0.0
+                val assignedProvider = snap.getString("assignedProvider")
+                
+                // Ler dados do prestador ANTES de fazer qualquer escrita
+                var currentEarnings = 0.0
+                if (assignedProvider != null && providerCommission > 0) {
+                    val providerRef = db.collection("providers").document(assignedProvider)
+                    val providerSnap = tx.get(providerRef)
+                    currentEarnings = providerSnap.getDouble("totalEarnings") ?: 0.0
+                }
+                
+                // AGORA TODAS AS ESCRITAS
+                // Código correto! Finalizar o pedido
+                val updates = mapOf(
+                    "status" to OrderData.STATUS_COMPLETED,
+                    "completedAt" to Timestamp.now(),
+                    "providerCompletionConfirmed" to true,
+                    "clientCompletionConfirmed" to true,
+                    "updatedAt" to Timestamp.now()
+                )
+                
+                tx.update(docRef, updates)
+                
+                // Adicionar comissão ao lucro total do prestador
+                if (assignedProvider != null && providerCommission > 0) {
+                    val providerRef = db.collection("providers").document(assignedProvider)
+                    val newEarnings = currentEarnings + providerCommission
+                    
+                    tx.update(providerRef, mapOf(
+                        "totalEarnings" to newEarnings,
+                        "completedJobs" to com.google.firebase.firestore.FieldValue.increment(1),
+                        "updatedAt" to com.google.firebase.Timestamp.now()
+                    ))
+                    
+                    Log.d(TAG, "💰 Comissão de R$ $providerCommission adicionada ao prestador $assignedProvider. Novo total: R$ $newEarnings")
+                }
+            }.await()
+            
+            Log.d(TAG, "✅ Pedido finalizado com sucesso: $orderId")
+            Result.success(Unit)
+        } catch (e: IllegalStateException) {
+            Log.e(TAG, "Erro ao finalizar pedido: ${e.message}")
+            Result.failure(e)
+        } catch (e: IllegalArgumentException) {
+            Log.e(TAG, "Código de verificação incorreto: ${e.message}")
+            Result.failure(e)
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao finalizar pedido: ${e.message}")
+            Result.failure(e)
+        }
+    }
+    
+    /**
      * Confirma a conclusão pelo ator ("client" ou "provider"). Fecha o pedido quando ambos confirmarem
+     * (Método antigo mantido para compatibilidade)
      */
     suspend fun confirmCompletion(orderId: String, actor: String): Result<Unit> {
         return try {
             val docRef = db.collection(ORDERS_COLLECTION).document(orderId)
             db.runTransaction { tx ->
+                // TODAS AS LEITURAS PRIMEIRO
                 val snap = tx.get(docRef)
                 val clientConfirmed = snap.getBoolean("clientCompletionConfirmed") ?: false
                 val providerConfirmed = snap.getBoolean("providerCompletionConfirmed") ?: false
 
+                val newClient = if (actor == "client") true else clientConfirmed
+                val newProvider = if (actor == "provider") true else providerConfirmed
+
+                // Ler dados do prestador ANTES de fazer qualquer escrita
+                var currentEarnings = 0.0
+                val providerCommission = snap.getDouble("providerCommission") ?: 0.0
+                val assignedProvider = snap.getString("assignedProvider")
+                
+                if (newClient && newProvider && assignedProvider != null && providerCommission > 0) {
+                    val providerRef = db.collection("providers").document(assignedProvider)
+                    val providerSnap = tx.get(providerRef)
+                    currentEarnings = providerSnap.getDouble("totalEarnings") ?: 0.0
+                }
+
+                // AGORA TODAS AS ESCRITAS
                 val updates = mutableMapOf<String, Any>(
                     "updatedAt" to Timestamp.now()
                 )
@@ -175,12 +306,23 @@ class FirebaseOrderManager {
                     updates["providerCompletionConfirmed"] = true
                 }
 
-                val newClient = if (actor == "client") true else clientConfirmed
-                val newProvider = if (actor == "provider") true else providerConfirmed
-
                 if (newClient && newProvider) {
                     updates["status"] = OrderData.STATUS_COMPLETED
                     updates["completedAt"] = Timestamp.now()
+                    
+                    // Adicionar comissão ao lucro total do prestador quando ambos confirmarem
+                    if (assignedProvider != null && providerCommission > 0) {
+                        val providerRef = db.collection("providers").document(assignedProvider)
+                        val newEarnings = currentEarnings + providerCommission
+                        
+                        tx.update(providerRef, mapOf(
+                            "totalEarnings" to newEarnings,
+                            "completedJobs" to com.google.firebase.firestore.FieldValue.increment(1),
+                            "updatedAt" to com.google.firebase.Timestamp.now()
+                        ))
+                        
+                        Log.d(TAG, "💰 Comissão de R$ $providerCommission adicionada ao prestador $assignedProvider. Novo total: R$ $newEarnings")
+                    }
                 }
 
                 tx.update(docRef, updates)
@@ -289,7 +431,7 @@ class FirebaseOrderManager {
         priority: String = OrderData.PRIORITY_NORMAL,
         estimatedPrice: Double = 0.0
     ): Result<String> {
-        val user = auth.currentUser
+        val user = auth.awaitCurrentUser()
         if (user == null) {
             return Result.failure(Exception("Usuário não autenticado"))
         }
@@ -332,15 +474,22 @@ class FirebaseOrderManager {
                 return Result.failure(Exception("Pedido não encontrado"))
             }
             
-            orderRef.update(
-                mapOf(
-                    "status" to "cancelled",
-                    "cancelledAt" to Timestamp.now(),
-                    "cancelledBy" to cancelledBy,
-                    "cancellationReason" to reason,
-                    "updatedAt" to Timestamp.now()
-                )
-            ).await()
+            // Se cancelado pelo cliente, adicionar status de reembolso
+            val updates = mutableMapOf<String, Any>(
+                "status" to OrderData.STATUS_CANCELLED,
+                "cancelledAt" to Timestamp.now(),
+                "cancelledBy" to cancelledBy,
+                "cancellationReason" to reason,
+                "updatedAt" to Timestamp.now()
+            )
+            
+            // Se cancelado pelo cliente, marcar como aguardando reembolso
+            if (cancelledBy == "client") {
+                updates["refundStatus"] = "pending"
+                updates["refundRequestedAt"] = Timestamp.now()
+            }
+            
+            orderRef.update(updates).await()
             
             Log.d(TAG, "Pedido cancelado com sucesso: $orderId por $cancelledBy")
             Result.success(Unit)
@@ -358,7 +507,7 @@ class FirebaseOrderManager {
      */
     suspend fun getOrdersByStatus(status: String? = null): Result<List<OrderData>> {
         return try {
-            val user = auth.currentUser
+            val user = auth.awaitCurrentUser()
             if (user == null) {
                 return Result.failure(Exception("Usuário não autenticado"))
             }
@@ -382,6 +531,26 @@ class FirebaseOrderManager {
             
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao carregar pedidos filtrados: ${e.message}")
+            Result.failure(e)
+        }
+    }
+    
+    /**
+     * Conta quantos pedidos um prestador completou
+     */
+    suspend fun countCompletedOrdersByProvider(providerId: String): Result<Int> {
+        return try {
+            val snapshot = db.collection(ORDERS_COLLECTION)
+                .whereEqualTo("assignedProvider", providerId)
+                .whereEqualTo("status", OrderData.STATUS_COMPLETED)
+                .get()
+                .await()
+            
+            val count = snapshot.size()
+            Log.d(TAG, "Pedidos completados pelo prestador $providerId: $count")
+            Result.success(count)
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao contar pedidos completados: ${e.message}")
             Result.failure(e)
         }
     }

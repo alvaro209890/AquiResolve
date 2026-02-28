@@ -3,9 +3,13 @@ package com.example.loginapp.adapters
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.example.loginapp.R
+import com.example.loginapp.models.AttachmentType
 import com.example.loginapp.models.ChatMessage
 import com.example.loginapp.models.MessageType
 import java.text.SimpleDateFormat
@@ -72,9 +76,23 @@ class ChatAdapter(
         private val tvMessage: TextView = itemView.findViewById(R.id.tvMessage)
         private val tvTime: TextView = itemView.findViewById(R.id.tvTime)
         private val tvStatus: TextView = itemView.findViewById(R.id.tvStatus)
+        private val ivAttachment: ImageView = itemView.findViewById(R.id.ivAttachment)
 
         fun bind(message: ChatMessage) {
-            tvMessage.text = message.message
+            val hasImage = !message.attachmentUrl.isNullOrEmpty() && message.attachmentType == AttachmentType.IMAGE
+            if (hasImage) {
+                ivAttachment.visibility = View.VISIBLE
+                tvMessage.visibility = View.GONE
+                Glide.with(itemView.context)
+                    .load(message.attachmentUrl)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .centerCrop()
+                    .into(ivAttachment)
+            } else {
+                ivAttachment.visibility = View.GONE
+                tvMessage.visibility = View.VISIBLE
+                tvMessage.text = message.message
+            }
             tvTime.text = formatTime(message.timestamp)
             tvStatus.text = if (message.isRead) "✓✓" else "✓"
             tvStatus.setTextColor(
@@ -92,10 +110,24 @@ class ChatAdapter(
         private val tvSenderName: TextView = itemView.findViewById(R.id.tvSenderName)
         private val tvMessage: TextView = itemView.findViewById(R.id.tvMessage)
         private val tvTime: TextView = itemView.findViewById(R.id.tvTime)
+        private val ivAttachment: ImageView = itemView.findViewById(R.id.ivAttachment)
 
         fun bind(message: ChatMessage) {
             tvSenderName.text = message.senderName
-            tvMessage.text = message.message
+            val hasImage = !message.attachmentUrl.isNullOrEmpty() && message.attachmentType == AttachmentType.IMAGE
+            if (hasImage) {
+                ivAttachment.visibility = View.VISIBLE
+                tvMessage.visibility = View.GONE
+                Glide.with(itemView.context)
+                    .load(message.attachmentUrl)
+                    .diskCacheStrategy(DiskCacheStrategy.ALL)
+                    .centerCrop()
+                    .into(ivAttachment)
+            } else {
+                ivAttachment.visibility = View.GONE
+                tvMessage.visibility = View.VISIBLE
+                tvMessage.text = message.message
+            }
             tvTime.text = formatTime(message.timestamp)
         }
     }

@@ -19,7 +19,7 @@
             android:layout_width="100dp"
             android:layout_height="100dp"
             android:layout_marginTop="40dp"
-            android:src="@drawable/ic_login_logo"
+            android:src="@drawable/logo"
             android:contentDescription="@string/app_logo"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
@@ -199,77 +199,6 @@
                     android:textSize="16sp"
                     android:textStyle="bold"
                     app:cornerRadius="12dp" />
-
-                <!-- Divider -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginVertical="16dp"
-                    android:gravity="center_vertical"
-                    android:orientation="horizontal">
-
-                    <View
-                        android:layout_width="0dp"
-                        android:layout_height="1dp"
-                        android:layout_weight="1"
-                        android:background="@color/divider_color" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginHorizontal="16dp"
-                        android:text="@string/or_continue_with"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="14sp" />
-
-                    <View
-                        android:layout_width="0dp"
-                        android:layout_height="1dp"
-                        android:layout_weight="1"
-                        android:background="@color/divider_color" />
-
-                </LinearLayout>
-
-                <!-- Social Login Buttons -->
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="16dp"
-                    android:orientation="horizontal">
-
-                    <!-- Google -->
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnGoogleSignup"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                        android:layout_width="0dp"
-                        android:layout_height="48dp"
-                        android:layout_marginEnd="8dp"
-                        android:layout_weight="1"
-                        android:text="@string/google"
-                        android:textColor="@color/text_primary"
-                        app:cornerRadius="12dp"
-                        app:icon="@drawable/ic_google"
-                        app:iconGravity="textStart"
-                        app:iconTint="@null"
-                        app:strokeColor="@color/divider_color" />
-
-                    <!-- Facebook -->
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnFacebookSignup"
-                        style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                        android:layout_width="0dp"
-                        android:layout_height="48dp"
-                        android:layout_marginStart="8dp"
-                        android:layout_weight="1"
-                        android:text="@string/facebook"
-                        android:textColor="@color/text_primary"
-                        app:cornerRadius="12dp"
-                        app:icon="@drawable/ic_facebook"
-                        app:iconGravity="textStart"
-                        app:iconTint="@null"
-                        app:strokeColor="@color/divider_color" />
-
-                </LinearLayout>
 
             </LinearLayout>
 

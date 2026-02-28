@@ -1,6 +1,7 @@
 package com.example.loginapp
 
 import android.util.Log
+import com.example.loginapp.utils.awaitCurrentUser
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -41,7 +42,7 @@ class FirebaseProviderDocumentManager {
      */
     suspend fun saveDocument(document: ProviderDocument): Result<String> {
         return try {
-            val user = auth.currentUser
+            val user = auth.awaitCurrentUser()
             if (user == null) {
                 return Result.failure(Exception("Usuário não autenticado"))
             }
@@ -76,7 +77,7 @@ class FirebaseProviderDocumentManager {
      */
     suspend fun loadUserDocuments(): Result<List<ProviderDocument>> {
         return try {
-            val user = auth.currentUser
+            val user = auth.awaitCurrentUser()
             if (user == null) {
                 return Result.failure(Exception("Usuário não autenticado"))
             }
@@ -163,7 +164,7 @@ class FirebaseProviderDocumentManager {
      */
     suspend fun checkRequiredDocuments(): Result<Map<String, Boolean>> {
         return try {
-            val user = auth.currentUser
+            val user = auth.awaitCurrentUser()
             if (user == null) {
                 return Result.failure(Exception("Usuário não autenticado"))
             }

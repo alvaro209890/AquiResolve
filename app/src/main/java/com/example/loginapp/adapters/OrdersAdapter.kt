@@ -90,7 +90,7 @@ class OrdersAdapter(
     private fun setServiceIcon(imageView: ImageView, serviceNiche: String) {
         val iconRes = when (serviceNiche.lowercase()) {
             "elétrica" -> R.drawable.ic_electrician
-            "hidráulica" -> R.drawable.ic_plumber
+            "encanador", "hidráulica" -> R.drawable.ic_plumber
             "pintura" -> R.drawable.ic_painter
             "limpeza" -> R.drawable.ic_cleaning
             "jardinagem" -> R.drawable.ic_gardening

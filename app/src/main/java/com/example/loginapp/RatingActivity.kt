@@ -9,6 +9,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.loginapp.databinding.ActivityRatingBinding
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 /**
  * RatingActivity - Tela de avaliação de prestadores
@@ -196,32 +197,29 @@ class RatingActivity : AppCompatActivity() {
         
         lifecycleScope.launch {
             try {
-                // Simular delay de rede
-                kotlinx.coroutines.delay(1500)
-                
-                // Enviar avaliação para o servidor
-                val result = RatingManager.submitRating(
+                val orderManager = FirebaseOrderManager()
+
+                // 1. Salvar avaliação no pedido
+                val rateResult = orderManager.rateOrder(
                     orderId = orderId ?: "",
-                    providerId = providerId ?: "",
-                    overallRating = currentRating,
-                    qualityRating = qualityRating,
-                    punctualityRating = punctualityRating,
-                    communicationRating = communicationRating,
-                    cleanlinessRating = cleanlinessRating,
-                    comment = comment
+                    rating = currentRating,
+                    review = comment.ifEmpty { null }
                 )
-                
-                when (result) {
-                    is RatingManager.RatingResult.Success -> {
-                        showToast("✅ Avaliação enviada com sucesso!")
-                        setResult(RESULT_OK)
-                        finish()
-                    }
-                    is RatingManager.RatingResult.Error -> {
-                        showToast("❌ ${result.message}")
-                    }
+
+                if (rateResult.isFailure) {
+                    showToast("❌ Erro ao salvar avaliação")
+                    return@launch
                 }
-                
+
+                // 2. Atualizar nota média do prestador
+                if (!providerId.isNullOrEmpty()) {
+                    updateProviderAverageRating(providerId!!)
+                }
+
+                showToast("✅ Avaliação enviada com sucesso!")
+                setResult(RESULT_OK)
+                finish()
+
             } catch (e: Exception) {
                 showToast("❌ Erro ao enviar avaliação: ${e.message}")
             } finally {
@@ -229,6 +227,48 @@ class RatingActivity : AppCompatActivity() {
                 binding.btnSubmitRating.isEnabled = true
                 binding.progressBar.visibility = View.GONE
             }
+        }
+    }
+
+    /**
+     * Calcula e atualiza a nota média do prestador no Firebase
+     */
+    private suspend fun updateProviderAverageRating(providerId: String) {
+        try {
+            val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+
+            // Buscar todos os pedidos avaliados deste prestador
+            val ratedOrders = db.collection("orders")
+                .whereEqualTo("assignedProvider", providerId)
+                .whereGreaterThan("rating", 0)
+                .get()
+                .await()
+
+            if (ratedOrders.isEmpty) return
+
+            var totalRating = 0.0
+            var count = 0
+            for (doc in ratedOrders.documents) {
+                val r = doc.getLong("rating")?.toDouble() ?: continue
+                totalRating += r
+                count++
+            }
+
+            if (count == 0) return
+            val average = totalRating / count
+
+            // Salvar nota média e total de avaliações no perfil do prestador
+            db.collection("providers").document(providerId)
+                .update(
+                    mapOf(
+                        "rating" to average,
+                        "totalRatings" to count,
+                        "updatedAt" to java.util.Date()
+                    )
+                )
+                .await()
+        } catch (e: Exception) {
+            android.util.Log.e("RatingActivity", "Erro ao atualizar média: ${e.message}")
         }
     }
 

@@ -1,8 +1,7 @@
 package com.example.loginapp
 
-import android.Manifest
+import android.app.Activity
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
@@ -13,7 +12,6 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -25,6 +23,7 @@ import com.example.loginapp.models.AttachmentType
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -35,7 +34,6 @@ import java.util.*
  * - Design mais elegante e focado no cliente
  * - Botões de ação específicos para clientes
  * - Informações do prestador em destaque
- * - Opções de avaliação e feedback
  */
 class ClientChatActivity : AppCompatActivity() {
 
@@ -62,10 +60,24 @@ class ClientChatActivity : AppCompatActivity() {
     companion object {
         private const val REQUEST_CAMERA = 1001
         private const val REQUEST_GALLERY = 1002
-        private const val REQUEST_DOCUMENT = 1003
-        private const val REQUEST_CAMERA_PERMISSION = 1004
+        private const val REQUEST_CAMERA_PERMISSION = 1003
+    }
+    
+    // Launcher para seleção/upload de imagem no chat
+    private val chatImagePickerLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val imageUrl = result.data?.getStringExtra(ImagePickerActivity.EXTRA_IMAGE_URL)
+            if (!imageUrl.isNullOrEmpty()) {
+                sendChatImageMessage(imageUrl)
+            } else {
+                showErrorMessage("Erro ao obter a imagem enviada")
+            }
+        }
     }
     private val auth by lazy { com.google.firebase.auth.FirebaseAuth.getInstance() }
+    private var cameraPhotoUri: android.net.Uri? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -85,6 +97,9 @@ class ClientChatActivity : AppCompatActivity() {
             finish()
             return
         }
+        
+        // Verificar acesso ao chat (5 minutos após aceitação)
+        checkChatAccess()
         
         setupUI()
         setupClickListeners()
@@ -110,12 +125,19 @@ class ClientChatActivity : AppCompatActivity() {
         // Status online/offline
         updateProviderStatus(true)
         
-        // Configurar foto do prestador (se disponível)
+        // Carregar foto do prestador
+        binding.ivProviderPhoto.visibility = View.VISIBLE
+        // Remover tint para que a foto carregue com cores corretas (evita aparência cinza)
+        binding.ivProviderPhoto.imageTintList = null
         if (!providerPhoto.isNullOrEmpty()) {
-            // TODO: Carregar imagem com Glide
-            binding.ivProviderPhoto.visibility = View.VISIBLE
+            com.bumptech.glide.Glide.with(this)
+                .load(providerPhoto)
+                .circleCrop()
+                .placeholder(R.drawable.ic_person)
+                .error(R.drawable.ic_person)
+                .into(binding.ivProviderPhoto)
         } else {
-            binding.ivProviderPhoto.visibility = View.GONE
+            binding.ivProviderPhoto.setImageResource(R.drawable.ic_person)
         }
         
         // Mostrar informações específicas do cliente
@@ -136,20 +158,6 @@ class ClientChatActivity : AppCompatActivity() {
             showProviderInfoDialog()
         }
         
-        // Botão de avaliação
-        binding.btnRate.setOnClickListener {
-            showRatingDialog()
-        }
-        
-        // Botão de denúncia
-        binding.btnReport.setOnClickListener {
-            showReportDialog()
-        }
-        
-        // Botão de finalizar serviço
-        binding.btnFinishService.setOnClickListener {
-            showFinishServiceDialog()
-        }
     }
 
     /**
@@ -189,30 +197,41 @@ class ClientChatActivity : AppCompatActivity() {
     /**
      * Carrega os dados do chat
      */
+    /**
+     * Verifica se o chat pode ser acessado
+     */
+    private fun checkChatAccess() {
+        orderId?.let { oId ->
+            lifecycleScope.launch {
+                try {
+                    val orderDoc = db.collection("orders").document(oId).get().await()
+                    val order = orderDoc.toObject(com.example.loginapp.models.OrderData::class.java)
+                        ?.copy(id = orderDoc.id)
+                    
+                    if (order != null) {
+                        val (canAccess, message) = com.example.loginapp.utils.ChatAccessHelper.canAccessChat(order)
+                        if (!canAccess) {
+                            AlertDialog.Builder(this@ClientChatActivity)
+                                .setTitle("Chat Indisponível")
+                                .setMessage(message ?: "O chat ainda não está disponível.")
+                                .setPositiveButton("OK") { _, _ ->
+                                    finish()
+                                }
+                                .setCancelable(false)
+                                .show()
+                        }
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("ClientChatActivity", "Erro ao verificar acesso ao chat: ${e.message}")
+                }
+            }
+        }
+    }
+    
     private fun loadChatData() {
         loadMessagesFromFirestore()
     }
 
-    /**
-     * Adiciona mensagem de boas-vindas
-     */
-    private fun addWelcomeMessage() {
-        val welcomeMessage = ChatMessage(
-            id = "welcome_${System.currentTimeMillis()}",
-            orderId = orderId ?: "unknown",
-            senderId = "system",
-            senderName = "Sistema",
-            message = "Olá! Você está conversando com ${providerName ?: "o prestador"}. " +
-                     "Aqui você pode esclarecer dúvidas sobre o serviço.",
-            timestamp = Date(),
-            type = MessageType.RECEIVED,
-            isRead = true
-        )
-        
-        messages.add(welcomeMessage)
-        chatAdapter.notifyItemInserted(messages.size - 1)
-        scrollToBottom()
-    }
 
     /**
      * Envia uma mensagem
@@ -253,46 +272,91 @@ class ClientChatActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        updateOwnPresence(isOnline = true)
+        setupPresence()
     }
 
     override fun onPause() {
         super.onPause()
-        updateOwnPresence(isOnline = false)
+        setOffline()
     }
 
-    private fun updateOwnPresence(isOnline: Boolean) {
+    private val rtdb by lazy { com.google.firebase.database.FirebaseDatabase.getInstance() }
+    private var presenceListener: com.google.firebase.database.ValueEventListener? = null
+    private var connectedListener: com.google.firebase.database.ValueEventListener? = null
+
+    private fun setupPresence() {
         val current = auth.currentUser ?: return
-        val now = com.google.firebase.Timestamp.now()
-        val brt = formatBrt(now.toDate())
-        val data = mapOf(
-            "isOnline" to isOnline,
-            "lastSeenAt" to now,
-            "lastSeenAtBRT" to brt
-        )
-        db.collection("users").document(current.uid).set(data, com.google.firebase.firestore.SetOptions.merge())
+        val myRef = rtdb.getReference("presence").child(current.uid)
+
+        // Detectar conexão e configurar onDisconnect
+        val connectedRef = rtdb.getReference(".info/connected")
+        connectedListener = object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                val connected = snapshot.getValue(Boolean::class.java) ?: false
+                if (connected) {
+                    val data = mapOf<String, Any>(
+                        "online" to true,
+                        "lastSeen" to com.google.firebase.database.ServerValue.TIMESTAMP
+                    )
+                    myRef.setValue(data)
+                    myRef.onDisconnect().setValue(mapOf<String, Any>(
+                        "online" to false,
+                        "lastSeen" to com.google.firebase.database.ServerValue.TIMESTAMP
+                    ))
+                }
+            }
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
+        }
+        connectedRef.addValueEventListener(connectedListener!!)
+    }
+
+    private fun setOffline() {
+        val current = auth.currentUser ?: return
+        val myRef = rtdb.getReference("presence").child(current.uid)
+        myRef.setValue(mapOf<String, Any>(
+            "online" to false,
+            "lastSeen" to com.google.firebase.database.ServerValue.TIMESTAMP
+        ))
     }
 
     private fun observeUserPresence(userId: String) {
-        db.collection("users").document(userId)
-            .addSnapshotListener { doc, _ ->
-                val isOnline = doc?.getBoolean("isOnline") ?: false
-                val lastSeenBrt = doc?.getString("lastSeenAtBRT")
-                if (isOnline) {
-                    binding.tvProviderStatus.text = "🟢 Online"
-                    binding.tvProviderStatus.setTextColor(ContextCompat.getColor(this, R.color.success_color))
-                } else {
-                    val text = if (!lastSeenBrt.isNullOrEmpty()) "Visto às $lastSeenBrt" else "Offline"
-                    binding.tvProviderStatus.text = text
-                    binding.tvProviderStatus.setTextColor(ContextCompat.getColor(this, R.color.gray_500))
+        val userRef = rtdb.getReference("presence").child(userId)
+        presenceListener = object : com.google.firebase.database.ValueEventListener {
+            override fun onDataChange(snapshot: com.google.firebase.database.DataSnapshot) {
+                val online = snapshot.child("online").getValue(Boolean::class.java) ?: false
+                val lastSeenTs = snapshot.child("lastSeen").getValue(Long::class.java)
+                runOnUiThread {
+                    if (online) {
+                        binding.tvProviderStatus.text = "Online"
+                        binding.tvProviderStatus.setTextColor(ContextCompat.getColor(this@ClientChatActivity, R.color.success_color))
+                    } else {
+                        val text = if (lastSeenTs != null) {
+                            "Visto às ${formatBrt(java.util.Date(lastSeenTs))}"
+                        } else "Offline"
+                        binding.tvProviderStatus.text = text
+                        binding.tvProviderStatus.setTextColor(ContextCompat.getColor(this@ClientChatActivity, R.color.gray_500))
+                    }
                 }
             }
+            override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
+        }
+        userRef.addValueEventListener(presenceListener!!)
     }
 
     private fun formatBrt(date: java.util.Date): String {
         val fmt = java.text.SimpleDateFormat("dd/MM HH:mm", java.util.Locale("pt", "BR"))
         fmt.timeZone = java.util.TimeZone.getTimeZone("America/Sao_Paulo")
         return fmt.format(date)
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        presenceListener?.let { listener ->
+            providerId?.let { rtdb.getReference("presence").child(it).removeEventListener(listener) }
+        }
+        connectedListener?.let { listener ->
+            rtdb.getReference(".info/connected").removeEventListener(listener)
+        }
     }
 
     /**
@@ -304,7 +368,6 @@ class ClientChatActivity : AppCompatActivity() {
             .setMessage("""
                 Nome: ${providerName ?: "Não informado"}
                 Status: ${if (isProviderOnline) "Online" else "Offline"}
-                Avaliação: ⭐⭐⭐⭐⭐ (4.8)
                 Serviços realizados: 127
                 
                 Especialidades:
@@ -319,74 +382,87 @@ class ClientChatActivity : AppCompatActivity() {
             .show()
     }
 
-    /**
-     * Mostra diálogo de avaliação
-     */
-    private fun showRatingDialog() {
-        // TODO: Implementar tela de avaliação
-        Toast.makeText(this, "Avaliação será implementada em breve", Toast.LENGTH_SHORT).show()
-    }
-
-    /**
-     * Mostra diálogo de denúncia
-     */
-    private fun showReportDialog() {
-        val options = arrayOf("Comportamento inadequado", "Serviço de baixa qualidade", "Não compareceu", "Outro")
-        
-        AlertDialog.Builder(this)
-            .setTitle("Denunciar Prestador")
-            .setItems(options) { _, which ->
-                val reason = options[which]
-                // TODO: Implementar denúncia
-                Toast.makeText(this, "Denúncia registrada: $reason", Toast.LENGTH_SHORT).show()
-            }
-            .setNegativeButton("Cancelar", null)
-            .show()
-    }
-
-    /**
-     * Mostra diálogo de finalizar serviço
-     */
-    private fun showFinishServiceDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Finalizar Serviço")
-            .setMessage("Tem certeza que deseja finalizar este serviço? Esta ação não pode ser desfeita.")
-            .setPositiveButton("Sim, Finalizar") { _, _ ->
-                finishService()
-            }
-            .setNegativeButton("Cancelar", null)
-            .show()
-    }
-
-    /**
-     * Finaliza o serviço
-     */
-    private fun finishService() {
-        // TODO: Implementar finalização do serviço
-        Toast.makeText(this, "Serviço finalizado com sucesso!", Toast.LENGTH_SHORT).show()
-        
-        // Voltar para a tela anterior
-        finish()
-    }
 
     /**
      * Mostra opções de anexo
      */
     private fun showAttachmentOptions() {
-        val options = arrayOf("📷 Tirar Foto", "🖼️ Galeria", "📄 Documento", "📍 Localização")
-        
+        val options = arrayOf("📷 Tirar Foto", "🖼️ Galeria")
+
         AlertDialog.Builder(this)
             .setTitle("Anexar Arquivo")
             .setItems(options) { _, which ->
                 when (which) {
-                    0 -> takePhoto()
-                    1 -> selectFromGallery()
-                    2 -> selectDocument()
-                    3 -> shareLocation()
+                    0 -> takePhotoForChat()
+                    1 -> openChatImagePicker()
                 }
             }
             .setNegativeButton("Cancelar", null)
             .show()
+    }
+
+    private fun takePhotoForChat() {
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA)
+            != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            androidx.core.app.ActivityCompat.requestPermissions(
+                this, arrayOf(android.Manifest.permission.CAMERA), REQUEST_CAMERA_PERMISSION)
+            return
+        }
+        try {
+            val photoFile = java.io.File(cacheDir, "chat_camera_${System.currentTimeMillis()}.jpg")
+            cameraPhotoUri = androidx.core.content.FileProvider.getUriForFile(
+                this, "$packageName.fileprovider", photoFile)
+            val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+                putExtra(MediaStore.EXTRA_OUTPUT, cameraPhotoUri)
+                addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            }
+            startActivityForResult(intent, REQUEST_CAMERA)
+        } catch (e: Exception) {
+            showErrorMessage("Erro ao abrir câmera: ${e.message}")
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_CAMERA && resultCode == RESULT_OK) {
+            val uri = cameraPhotoUri ?: return
+            cameraPhotoUri = null
+            uploadAndSendImage(uri)
+        }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode == REQUEST_CAMERA_PERMISSION &&
+            grantResults.isNotEmpty() && grantResults[0] == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            takePhotoForChat()
+        }
+    }
+
+    private fun uploadAndSendImage(uri: android.net.Uri) {
+        lifecycleScope.launch {
+            try {
+                val imageManager = FirebaseImageManager()
+                val uploadData = FirebaseImageManager.ImageUploadData(
+                    uri = uri,
+                    fileName = "chat_${System.currentTimeMillis()}.jpg",
+                    folder = FirebaseImageManager.FOLDER_CHAT_IMAGES,
+                    userId = getCurrentUserId()
+                )
+                val result = imageManager.uploadImage(this@ClientChatActivity, uploadData)
+                when (result) {
+                    is FirebaseImageManager.UploadResult.Success -> {
+                        sendChatImageMessage(result.downloadUrl)
+                    }
+                    is FirebaseImageManager.UploadResult.Error -> {
+                        showErrorMessage("Erro ao enviar imagem: ${result.message}")
+                    }
+                    else -> {}
+                }
+            } catch (e: Exception) {
+                showErrorMessage("Erro ao enviar imagem: ${e.message}")
+            }
+        }
     }
 
     /**
@@ -416,6 +492,7 @@ class ClientChatActivity : AppCompatActivity() {
         lifecycleScope.launch {
             chatManager.getMessagesFlow(oId).collectLatest { remoteMessages ->
                 val currentUserId = getCurrentUserId()
+                val hasUnreadFromOther = remoteMessages.any { !it.isRead && it.senderId != currentUserId }
                 messages.clear()
                 messages.addAll(remoteMessages.map { rm ->
                     ChatMessage(
@@ -425,163 +502,61 @@ class ClientChatActivity : AppCompatActivity() {
                         senderName = rm.senderName,
                         message = rm.message,
                         timestamp = rm.timestamp.toDate(),
-                        // Exibir do ponto de vista do CLIENTE
                         type = if (rm.senderType == "client") MessageType.SENT else MessageType.RECEIVED,
-                        isRead = rm.isRead
+                        isRead = rm.isRead,
+                        attachmentUrl = rm.imageUrl,
+                        attachmentType = if (!rm.imageUrl.isNullOrEmpty()) AttachmentType.IMAGE else null
                     )
                 })
                 chatAdapter.notifyDataSetChanged()
                 scrollToBottom()
-                chatManager.markMessagesAsRead(oId, currentUserId)
-            }
-        }
-    }
-    private fun takePhoto() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.CAMERA), REQUEST_CAMERA_PERMISSION)
-            return
-        }
-        
-        val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
-        if (intent.resolveActivity(packageManager) != null) {
-            startActivityForResult(intent, REQUEST_CAMERA)
-        } else {
-            showErrorMessage("Câmera não disponível")
-        }
-    }
-    
-    private fun selectFromGallery() {
-        val intent = Intent(Intent.ACTION_GET_CONTENT)
-        intent.type = "image/*"
-        intent.putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
-        startActivityForResult(Intent.createChooser(intent, "Selecionar Imagem"), REQUEST_GALLERY)
-    }
-    
-    private fun selectDocument() {
-        val intent = Intent(Intent.ACTION_GET_CONTENT)
-        intent.type = "*/*"
-        startActivityForResult(Intent.createChooser(intent, "Selecionar Documento"), REQUEST_DOCUMENT)
-    }
-    
-    private fun shareLocation() {
-        // TODO: Implementar compartilhamento de localização
-        showErrorMessage("Funcionalidade de localização em desenvolvimento")
-    }
-    
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        
-        if (resultCode == RESULT_OK) {
-            when (requestCode) {
-                REQUEST_CAMERA -> {
-                    val imageUri = data?.data
-                    if (imageUri != null) {
-                        uploadImageToChat(imageUri, "camera_${System.currentTimeMillis()}.jpg")
-                    }
-                }
-                REQUEST_GALLERY -> {
-                    val imageUri = data?.data
-                    if (imageUri != null) {
-                        val fileName = getFileNameFromUri(imageUri) ?: "gallery_${System.currentTimeMillis()}.jpg"
-                        uploadImageToChat(imageUri, fileName)
-                    }
-                }
-                REQUEST_DOCUMENT -> {
-                    val documentUri = data?.data
-                    if (documentUri != null) {
-                        val fileName = getFileNameFromUri(documentUri) ?: "document_${System.currentTimeMillis()}"
-                        uploadDocumentToChat(documentUri, fileName)
-                    }
+                // Marcar como lido apenas se há mensagens não lidas do outro usuário
+                if (hasUnreadFromOther) {
+                    chatManager.markMessagesAsRead(oId, currentUserId)
                 }
             }
         }
     }
-    
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == REQUEST_CAMERA_PERMISSION) {
-            if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                takePhoto()
-            } else {
-                showErrorMessage("Permissão da câmera negada")
-            }
-        }
+    private fun openChatImagePicker() {
+        val intent = ImagePickerActivity.createIntent(
+            context = this,
+            folder = FirebaseImageManager.FOLDER_CHAT_IMAGES,
+            userId = getCurrentUserId(),
+            orderId = orderId,
+            maxImages = 1
+        )
+        chatImagePickerLauncher.launch(intent)
     }
-    
-    private fun uploadImageToChat(imageUri: Uri, fileName: String) {
+
+    private fun sendChatImageMessage(imageUrl: String) {
+        val message = ChatMessage(
+            id = "img_${System.currentTimeMillis()}",
+            orderId = orderId ?: "unknown",
+            senderId = getCurrentUserId(),
+            senderName = getCurrentUserName(),
+            message = "📷 Imagem enviada",
+            timestamp = Date(),
+            type = MessageType.SENT,
+            isRead = false,
+            attachmentUrl = imageUrl,
+            attachmentType = AttachmentType.IMAGE
+        )
+
         lifecycleScope.launch {
-            try {
-                val imageManager = FirebaseImageManager()
-                val uploadData = FirebaseImageManager.ImageUploadData(
-                    uri = imageUri,
-                    fileName = fileName,
-                    folder = FirebaseImageManager.FOLDER_CHAT_IMAGES,
-                    userId = getCurrentUserId(),
-                    orderId = orderId ?: "unknown"
+            val result = chatManager.sendMessage(
+                FirebaseChatManager.ChatMessage(
+                    orderId = message.orderId,
+                    senderId = message.senderId,
+                    senderName = message.senderName,
+                    senderType = "client",
+                    message = message.message,
+                    imageUrl = message.attachmentUrl
                 )
-                
-                when (val result = imageManager.uploadImage(this@ClientChatActivity, uploadData)) {
-                    is FirebaseImageManager.UploadResult.Success -> {
-                        // Enviar mensagem com imagem
-                        val message = ChatMessage(
-                            id = "img_${System.currentTimeMillis()}",
-                            orderId = orderId ?: "unknown",
-                            senderId = getCurrentUserId(),
-                            senderName = getCurrentUserName(),
-                            message = "📷 Imagem enviada",
-                            timestamp = Date(),
-                            type = MessageType.SENT,
-                            isRead = false,
-                            attachmentUrl = result.downloadUrl,
-                            attachmentType = AttachmentType.IMAGE
-                        )
-                        
-                        // Enviar para o Firebase
-                        chatManager.sendMessage(
-                            FirebaseChatManager.ChatMessage(
-                                orderId = message.orderId,
-                                senderId = message.senderId,
-                                senderName = message.senderName,
-                                senderType = "client",
-                                message = message.message,
-                                imageUrl = message.attachmentUrl
-                            )
-                        )
-                        
-                        // Adicionar à lista local
-                        messages.add(message)
-                        chatAdapter.notifyItemInserted(messages.size - 1)
-                        scrollToBottom()
-                    }
-                    is FirebaseImageManager.UploadResult.Error -> {
-                        showErrorMessage("Erro ao enviar imagem: ${result.message}")
-                    }
-                    else -> {
-                        // Progress já é tratado no callback
-                    }
-                }
-            } catch (e: Exception) {
-                showErrorMessage("Erro ao processar imagem: ${e.message}")
+            )
+            if (result.isFailure) {
+                showErrorMessage("Erro ao enviar imagem: ${result.exceptionOrNull()?.message}")
             }
-        }
-    }
-    
-    private fun uploadDocumentToChat(documentUri: Uri, fileName: String) {
-        // TODO: Implementar upload de documentos
-        showErrorMessage("Upload de documentos em desenvolvimento")
-    }
-    
-    private fun getFileNameFromUri(uri: Uri): String? {
-        return try {
-            val cursor = contentResolver.query(uri, null, null, null, null)
-            cursor?.use {
-                if (it.moveToFirst()) {
-                    val nameIndex = it.getColumnIndex(MediaStore.Images.Media.DISPLAY_NAME)
-                    if (nameIndex >= 0) it.getString(nameIndex) else null
-                } else null
-            }
-        } catch (e: Exception) {
-            null
+            // Não adicionar localmente - o listener do Firestore já atualiza a lista automaticamente
         }
     }
 }

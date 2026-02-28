@@ -4,10 +4,13 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.MenuItem
 import android.view.View
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
 import com.example.loginapp.databinding.ActivityPrivacySettingsBinding
+import com.example.loginapp.utils.PermissionHelper
 import com.google.android.material.switchmaterial.SwitchMaterial
 import kotlinx.coroutines.launch
 
@@ -18,8 +21,25 @@ class PrivacySettingsActivity : AppCompatActivity() {
     private lateinit var privacyManager: FirebasePrivacyManager
     private var currentSettings: FirebasePrivacyManager.PrivacySettings? = null
 
+    private val requestNotificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (isGranted) {
+            updatePrivacySetting("notifications_enabled", true)
+        } else {
+            Toast.makeText(this, "Permissão negada. Habilite nas configurações do app para receber notificações.", Toast.LENGTH_LONG).show()
+            binding.switchNotifications.isChecked = false
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Garantir Firebase inicializado
+        if (!FirebaseConfig.isInitialized()) {
+            FirebaseConfig.initialize(this)
+        }
+        
         binding = ActivityPrivacySettingsBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -41,8 +61,13 @@ class PrivacySettingsActivity : AppCompatActivity() {
     }
 
     private fun setupClickListeners() {
-        // Notificações
+        // Notificações - solicitar permissão ao ativar (Android 13+)
         binding.switchNotifications.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked && PermissionHelper.needsNotificationPermission() && !PermissionHelper.isNotificationPermissionGranted(this)) {
+                requestNotificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                // Salvar será feito no callback do launcher se concedido
+                return@setOnCheckedChangeListener
+            }
             updatePrivacySetting("notifications_enabled", isChecked)
         }
 
@@ -82,6 +107,12 @@ class PrivacySettingsActivity : AppCompatActivity() {
                     currentSettings = result.getOrNull()
                     updateUI(currentSettings!!)
                     showToast("✅ Configurações carregadas")
+                    // Solicitar permissão se notificações habilitadas mas permissão negada (Android 13+)
+                    if (currentSettings!!.notificationsEnabled &&
+                        PermissionHelper.needsNotificationPermission() &&
+                        !PermissionHelper.isNotificationPermissionGranted(this@PrivacySettingsActivity)) {
+                        requestNotificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    }
                 } else {
                     showToast("⚠️ Erro ao carregar configurações: ${result.exceptionOrNull()?.message}")
                 }
@@ -206,28 +237,34 @@ class PrivacySettingsActivity : AppCompatActivity() {
     }
 
     private fun showDeleteAccountDialog() {
+        val editText = android.widget.EditText(this).apply {
+            hint = "Digite EXCLUIR para confirmar"
+            setTextColor(resources.getColor(com.example.loginapp.R.color.text_primary, null))
+            setHintTextColor(resources.getColor(com.example.loginapp.R.color.text_secondary, null))
+            setPadding(48, 32, 48, 16)
+        }
+
         AlertDialog.Builder(this)
             .setTitle("🗑️ Excluir Conta")
             .setMessage("""
                 Tem certeza que deseja excluir sua conta?
-                
+
                 ⚠️ ATENÇÃO: Esta ação é IRREVERSÍVEL!
-                
+
                 Serão excluídos permanentemente:
                 • Todos os seus dados pessoais
                 • Histórico de pedidos
                 • Configurações de privacidade
                 • Dados de uso do aplicativo
-                
+
                 Se você tem pedidos em andamento, eles serão cancelados automaticamente.
-                
+
                 Digite "EXCLUIR" para confirmar:
             """.trimIndent())
-            .setView(createDeleteConfirmationView())
-            .setPositiveButton("Excluir Conta") { dialog, _ ->
-                val confirmationText = (dialog as AlertDialog)
-                    .findViewById<android.widget.EditText>(android.R.id.text1)?.text.toString()
-                
+            .setView(editText)
+            .setPositiveButton("Excluir Conta") { _, _ ->
+                val confirmationText = editText.text.toString().trim()
+
                 if (confirmationText == "EXCLUIR") {
                     deleteUserAccount()
                 } else {
@@ -237,14 +274,6 @@ class PrivacySettingsActivity : AppCompatActivity() {
             .setNegativeButton("Cancelar", null)
             .setIcon(android.R.drawable.ic_dialog_alert)
             .show()
-    }
-
-    private fun createDeleteConfirmationView(): android.widget.EditText {
-        return android.widget.EditText(this).apply {
-            hint = "Digite EXCLUIR para confirmar"
-            setTextColor(resources.getColor(com.example.loginapp.R.color.text_primary, null))
-            setHintTextColor(resources.getColor(com.example.loginapp.R.color.text_secondary, null))
-        }
     }
 
     private fun deleteUserAccount() {

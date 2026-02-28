@@ -1,13 +1,16 @@
 package com.example.loginapp
 
+import android.app.Activity
 import android.app.TimePickerDialog
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.example.loginapp.databinding.ActivityNotificationSettingsBinding
+import com.example.loginapp.utils.PermissionHelper
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
@@ -19,7 +22,6 @@ class NotificationSettingsActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityNotificationSettingsBinding
     private lateinit var privacyManager: FirebasePrivacyManager
-    private lateinit var notificationManager: PrivacyAwareNotificationManager
     
     // Formato de hora
     private val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
@@ -34,6 +36,16 @@ class NotificationSettingsActivity : AppCompatActivity() {
         set(Calendar.HOUR_OF_DAY, 7)
         set(Calendar.MINUTE, 0)
     }
+    
+    // Launcher para permissão de notificações (Android 13+)
+    private val requestNotificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        if (!isGranted) {
+            Toast.makeText(this, "Permissão negada. Habilite nas configurações do app para receber notificações.", Toast.LENGTH_LONG).show()
+            binding.switchNotifications.isChecked = false
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,7 +56,6 @@ class NotificationSettingsActivity : AppCompatActivity() {
         
         // Inicializar managers
         privacyManager = FirebasePrivacyManager(this)
-        notificationManager = PrivacyAwareNotificationManager(this)
         
         // Configurar a interface
         setupUI()
@@ -75,6 +86,13 @@ class NotificationSettingsActivity : AppCompatActivity() {
         // Botão voltar da toolbar
         binding.toolbar.setNavigationOnClickListener {
             finish()
+        }
+        
+        // Switch principal de notificações - solicitar permissão ao ativar
+        binding.switchNotifications.setOnCheckedChangeListener { _, isChecked ->
+            if (isChecked && PermissionHelper.needsNotificationPermission() && !PermissionHelper.isNotificationPermissionGranted(this)) {
+                requestNotificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+            }
         }
         
         // Switch de modo silencioso
@@ -118,6 +136,19 @@ class NotificationSettingsActivity : AppCompatActivity() {
                 val chatNotifications = privacyManager.isSettingEnabled("chat_notifications_enabled")
                 val paymentNotifications = privacyManager.isSettingEnabled("payment_notifications_enabled")
                 val quietHoursEnabled = privacyManager.isSettingEnabled("quiet_hours_enabled")
+                val quietHoursStartStr = privacyManager.getSettingString("quiet_hours_start", "22:00")
+                val quietHoursEndStr = privacyManager.getSettingString("quiet_hours_end", "07:00")
+                
+                // Aplicar horários de silêncio
+                try {
+                    val (startH, startM) = quietHoursStartStr.split(":").map { it.toIntOrNull() ?: 0 }
+                    quietHoursStart.set(Calendar.HOUR_OF_DAY, startH)
+                    quietHoursStart.set(Calendar.MINUTE, startM)
+                    val (endH, endM) = quietHoursEndStr.split(":").map { it.toIntOrNull() ?: 0 }
+                    quietHoursEnd.set(Calendar.HOUR_OF_DAY, endH)
+                    quietHoursEnd.set(Calendar.MINUTE, endM)
+                    updateQuietHoursTexts()
+                } catch (_: Exception) { }
                 
                 // Aplicar configurações aos switches
                 binding.switchNotifications.isChecked = notificationsEnabled
@@ -127,6 +158,11 @@ class NotificationSettingsActivity : AppCompatActivity() {
                 binding.switchChatNotifications.isChecked = chatNotifications
                 binding.switchPaymentNotifications.isChecked = paymentNotifications
                 binding.switchQuietHours.isChecked = quietHoursEnabled
+                
+                // Solicitar permissão ao carregar se notificações habilitadas mas permissão negada (Android 13+)
+                if (notificationsEnabled && PermissionHelper.needsNotificationPermission() && !PermissionHelper.isNotificationPermissionGranted(this@NotificationSettingsActivity)) {
+                    requestNotificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                }
                 
                 // Atualizar visibilidade dos horários
                 if (quietHoursEnabled) {
@@ -155,12 +191,12 @@ class NotificationSettingsActivity : AppCompatActivity() {
                 privacyManager.updatePrivacySetting("payment_notifications_enabled", binding.switchPaymentNotifications.isChecked)
                 privacyManager.updatePrivacySetting("quiet_hours_enabled", binding.switchQuietHours.isChecked)
                 
-                // Salvar horários se habilitado
+                // Salvar horários de silêncio se habilitado
                 if (binding.switchQuietHours.isChecked) {
                     val startTime = timeFormat.format(quietHoursStart.time)
                     val endTime = timeFormat.format(quietHoursEnd.time)
-                    // Para horários, precisamos usar um método diferente ou salvar como string
-                    // Por enquanto, vamos pular essa parte
+                    privacyManager.updatePrivacySettingString("quiet_hours_start", startTime)
+                    privacyManager.updatePrivacySettingString("quiet_hours_end", endTime)
                 }
                 
                 showToast("✅ Configurações salvas com sucesso!")

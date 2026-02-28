@@ -12,16 +12,15 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.VIBRATE" />
     
-    <!-- Permissões para Google Maps -->
+    <!-- Permissões de Localização -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    
-    <!-- Permissões para Google Play Services -->
-    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 
     <application
-        android:allowBackup="true"
+        android:name=".AppApplication"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -30,16 +29,6 @@
         android:theme="@style/Theme.LoginApp"
         tools:targetApi="31">
         
-        <!-- Google Play Services Version -->
-        <meta-data
-            android:name="com.google.android.gms.version"
-            android:value="@integer/google_play_services_version" />
-        
-        <!-- Google Maps API Key -->
-        <meta-data
-            android:name="com.google.android.geo.API_KEY"
-            android:value="@string/google_maps_key" />
-            
         <!-- Firebase Configuration -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
@@ -69,6 +58,10 @@
             android:theme="@style/Theme.LoginApp" />
         <activity
             android:name=".ProfileActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LoginApp" />
+        <activity
+            android:name=".HelpSupportActivity"
             android:exported="false"
             android:theme="@style/Theme.LoginApp" />
         <activity
@@ -156,6 +149,11 @@
             android:theme="@style/Theme.LoginApp"
             android:screenOrientation="portrait" />
         <activity
+            android:name=".ClientCartActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LoginApp"
+            android:screenOrientation="portrait" />
+        <activity
             android:name=".ProviderHomeActivity"
             android:exported="false"
             android:theme="@style/Theme.LoginApp"
@@ -180,6 +178,12 @@
             android:screenOrientation="portrait" />
         
         <activity
+            android:name=".CancellationRefundActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LoginApp"
+            android:screenOrientation="portrait" />
+        
+        <activity
             android:name=".PrivacySettingsActivity"
             android:exported="false"
             android:theme="@style/Theme.LoginApp"
@@ -196,12 +200,38 @@
             android:theme="@style/Theme.LoginApp"
             android:screenOrientation="portrait" />
         <activity
+            android:name="com.yalantis.ucrop.UCropActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.AppCompat.Light.NoActionBar" />
+        <activity
             android:name=".DocumentUploadActivity"
             android:exported="false"
             android:theme="@style/Theme.LoginApp"
             android:screenOrientation="portrait" />
         <activity
+            android:name=".AddressMapPickerActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LoginApp"
+            android:screenOrientation="portrait" />
+        <activity
             android:name=".ProviderDashboardActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LoginApp"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".PaymentActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LoginApp"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize" />
+        <activity
+            android:name=".PixPaymentActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LoginApp"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".PaymentConfirmationActivity"
             android:exported="false"
             android:theme="@style/Theme.LoginApp"
             android:screenOrientation="portrait" />

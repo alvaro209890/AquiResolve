@@ -92,6 +92,18 @@
 
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- Link para Política de Cancelamento -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnCancellationPolicy"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:text="Ver Política de Cancelamento e Reembolso"
+                android:textSize="14sp"
+                app:cornerRadius="8dp"
+                app:backgroundTint="@color/secondary_color"
+                android:textColor="@color/white" />
+
             <!-- Contact Section -->
             <LinearLayout
                 android:layout_width="match_parent"

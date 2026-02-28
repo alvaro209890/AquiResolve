@@ -67,6 +67,15 @@ class ClientOrdersActivity : AppCompatActivity() {
         setupClickListeners()
         setupViewPager()
         
+        // Verificar se deve abrir em uma aba específica
+        val openTab = intent.getStringExtra("open_tab")
+        if (openTab == "distributing") {
+            // Abrir na aba "Em Distribuição" (índice 1)
+            binding.viewPager.post {
+                binding.viewPager.setCurrentItem(1, false)
+            }
+        }
+        
         // Carregar dados
         loadOrders()
         
@@ -96,11 +105,8 @@ class ClientOrdersActivity : AppCompatActivity() {
             showFilterDialog()
         }
         
-        // FAB para novo pedido
-        binding.fabNewOrder.setOnClickListener {
-            val intent = Intent(this, CreateOrderActivity::class.java)
-            startActivity(intent)
-        }
+        // FAB removido: pedidos só podem ser feitos pela aba Serviços
+        binding.fabNewOrder.visibility = View.GONE
     }
 
     /**
@@ -162,10 +168,9 @@ class ClientOrdersActivity : AppCompatActivity() {
         
         lifecycleScope.launch {
             try {
-                // Buscar pedidos do Firebase
+                // Buscar pedidos do Firebase (SEM orderBy para evitar índice composto)
                 val snapshot = db.collection("orders")
                     .whereEqualTo("clientId", currentUser.uid)
-                    .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
                     .get()
                     .await()
                 
@@ -181,6 +186,9 @@ class ClientOrdersActivity : AppCompatActivity() {
                         null
                     }
                 }
+                
+                // Ordenar manualmente por createdAt (DESCENDING)
+                allOrders = allOrders.sortedByDescending { it.createdAt?.toDate()?.time ?: 0L }
                 
                 android.util.Log.d("ClientOrders", "✅ Total de pedidos carregados: ${allOrders.size}")
                 android.util.Log.d("ClientOrders", "📊 Status dos pedidos: ${allOrders.map { it.status }}")

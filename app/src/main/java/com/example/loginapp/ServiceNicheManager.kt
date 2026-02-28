@@ -44,11 +44,11 @@ object ServiceNicheManager {
             basePrice = 80.0
         ),
         
-        // 2. Hidráulica
+        // 2. Encanador
         ServiceNiche(
             id = "plumbing",
-            name = "Hidráulica", 
-            displayName = "Hidráulica",
+            name = "Encanador", 
+            displayName = "Encanador",
             description = "Desentupimentos, troca de torneiras, reparos hidráulicos",
             iconRes = R.drawable.ic_plumber,
             colorRes = R.color.plumbing_color,

@@ -34,7 +34,7 @@ object OrderManager {
             "Reparo de disjuntores" to 60.0,
             "Instalação de ventilador" to 70.0
         ),
-        "Hidráulica" to mapOf(
+        "Encanador" to mapOf(
             "Troca de torneira" to 65.0,
             "Desentupimento de pia" to 55.0,
             "Reparo de vazamento" to 75.0,
@@ -146,8 +146,8 @@ object OrderManager {
         return when {
             niche == "Elétrica" && description.contains("chuveiro") -> 80.0
             niche == "Elétrica" && description.contains("tomada") -> 45.0
-            niche == "Hidráulica" && description.contains("torneira") -> 65.0
-            niche == "Hidráulica" && description.contains("desentupimento") -> 55.0
+            niche == "Encanador" && description.contains("torneira") -> 65.0
+            niche == "Encanador" && description.contains("desentupimento") -> 55.0
             niche == "Limpeza" -> 120.0
             niche == "Jardinagem" -> 90.0
             else -> 100.0 // Preço padrão

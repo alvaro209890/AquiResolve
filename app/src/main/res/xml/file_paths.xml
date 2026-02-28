@@ -5,10 +5,7 @@
     
     <!-- Caminho para cache -->
     <cache-path name="cache" path="." />
-    
-    <!-- Caminho para arquivos internos -->
-    <files-path name="files" path="." />
-    
+
     <!-- Caminho para Pictures -->
     <external-files-path name="pictures" path="Pictures/" />
 </paths>

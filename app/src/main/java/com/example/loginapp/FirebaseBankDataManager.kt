@@ -1,6 +1,7 @@
 package com.example.loginapp
 
 import android.util.Log
+import com.example.loginapp.utils.awaitCurrentUser
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -44,7 +45,7 @@ class FirebaseBankDataManager {
      */
     suspend fun saveBankData(bankData: BankData): Result<String> {
         return try {
-            val user = auth.currentUser
+            val user = auth.awaitCurrentUser()
             if (user == null) {
                 return Result.failure(Exception("Usuário não autenticado"))
             }
@@ -84,7 +85,7 @@ class FirebaseBankDataManager {
      */
     suspend fun loadBankData(): Result<BankData?> {
         return try {
-            val user = auth.currentUser
+            val user = auth.awaitCurrentUser()
             if (user == null) {
                 return Result.failure(Exception("Usuário não autenticado"))
             }
@@ -115,7 +116,7 @@ class FirebaseBankDataManager {
      */
     suspend fun updateBankData(bankData: BankData): Result<Unit> {
         return try {
-            val user = auth.currentUser
+            val user = auth.awaitCurrentUser()
             if (user == null) {
                 return Result.failure(Exception("Usuário não autenticado"))
             }

@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
 
 class FirebaseAuthManager(private val context: Context) {
@@ -30,22 +31,46 @@ class FirebaseAuthManager(private val context: Context) {
         val lastUsernameEdit: Long = 0L
     )
     
+    /**
+     * Verifica se um username já está em uso
+     */
+    suspend fun isUsernameAvailable(username: String): Boolean {
+        return try {
+            android.util.Log.d("FirebaseAuthManager", "Verificando disponibilidade do username")
+            
+            val snapshot = firestore.collection("users")
+                .whereEqualTo("username", username)
+                .get()
+                .await()
+            
+            val available = snapshot.isEmpty
+            android.util.Log.d("FirebaseAuthManager", if (available) "✅ Username disponível" else "❌ Username já em uso")
+            
+            available
+        } catch (e: Exception) {
+            android.util.Log.e("FirebaseAuthManager", "Erro ao verificar username", e)
+            true // Em caso de erro, permitir continuar
+        }
+    }
+    
     suspend fun signUp(email: String, password: String, userData: UserData): Result<FirebaseUser> {
         return try {
-            android.util.Log.d("FirebaseAuthManager", "=== INICIANDO CADASTRO ===")
-            android.util.Log.d("FirebaseAuthManager", "Email: $email")
-            android.util.Log.d("FirebaseAuthManager", "Nome Completo: ${userData.fullName}")
-            android.util.Log.d("FirebaseAuthManager", "Tipo: ${userData.userType}")
+            android.util.Log.d("FirebaseAuthManager", "Iniciando cadastro")
+            
+            // Verificar se o username já está em uso
+            if (!isUsernameAvailable(userData.username)) {
+                android.util.Log.e("FirebaseAuthManager", "❌ ERRO: Username já está em uso")
+                return Result.failure(Exception("Este nome de usuário já está em uso"))
+            }
             
             android.util.Log.d("FirebaseAuthManager", "🔄 CRIANDO USUÁRIO NO FIREBASE AUTH...")
             
             val result = auth.createUserWithEmailAndPassword(email, password).await()
             
-            android.util.Log.d("FirebaseAuthManager", "✅ USUÁRIO CRIADO NO FIREBASE AUTH")
-            android.util.Log.d("FirebaseAuthManager", "UID: ${result.user?.uid}")
+            android.util.Log.d("FirebaseAuthManager", "Usuário criado no Firebase Auth")
             
             result.user?.let { user ->
-                android.util.Log.d("FirebaseAuthManager", "🔄 SALVANDO DADOS NO FIRESTORE...")
+                android.util.Log.d("FirebaseAuthManager", "Salvando dados no Firestore")
                 
                 // Salvar dados do usuário no Firestore
                 val userMap = hashMapOf(
@@ -61,27 +86,19 @@ class FirebaseAuthManager(private val context: Context) {
                     "createdAt" to com.google.firebase.Timestamp.now()
                 )
                 
-                android.util.Log.d("FirebaseAuthManager", "📋 DADOS PARA SALVAR NO FIRESTORE:")
-                android.util.Log.d("FirebaseAuthManager", "- UID: ${userMap["uid"]}")
-                android.util.Log.d("FirebaseAuthManager", "- Email: ${userMap["email"]}")
-                android.util.Log.d("FirebaseAuthManager", "- Nome Completo: ${userMap["fullName"]}")
-                android.util.Log.d("FirebaseAuthManager", "- Nome de Usuário: ${userMap["username"]}")
-                android.util.Log.d("FirebaseAuthManager", "- Tipo: ${userMap["userType"]}")
-                
                 try {
                     firestore.collection("users").document(user.uid).set(userMap).await()
                     android.util.Log.d("FirebaseAuthManager", "✅ DADOS SALVOS NO FIRESTORE")
                 } catch (firestoreError: Exception) {
-                    android.util.Log.w("FirebaseAuthManager", "⚠️ ERRO AO SALVAR NO FIRESTORE: ${firestoreError.message}")
+                    android.util.Log.w("FirebaseAuthManager", "Erro ao salvar dados no Firestore", firestoreError)
                     android.util.Log.w("FirebaseAuthManager", "⚠️ CONTINUANDO COM CADASTRO LOCAL...")
                     // Continuar mesmo com erro do Firestore
                 }
                 
                 // Salvar dados locais com UID atualizado (sempre funciona)
-                android.util.Log.d("FirebaseAuthManager", "🔄 SALVANDO DADOS LOCAIS...")
                 val updatedUserData = userData.copy(uid = user.uid)
                 saveUserDataLocally(updatedUserData)
-                android.util.Log.d("FirebaseAuthManager", "✅ DADOS LOCAIS SALVADOS COM UID: ${user.uid}")
+                android.util.Log.d("FirebaseAuthManager", "Dados locais salvos")
 
                 // Registrar token FCM (best-effort)
                 try {
@@ -95,13 +112,15 @@ class FirebaseAuthManager(private val context: Context) {
             Result.success(result.user!!)
         } catch (e: Exception) {
             android.util.Log.e("FirebaseAuthManager", "❌ ERRO NO CADASTRO:", e)
-            android.util.Log.e("FirebaseAuthManager", "Tipo de erro: ${e.javaClass.simpleName}")
-            android.util.Log.e("FirebaseAuthManager", "Mensagem: ${e.message}")
             
             when {
                 e.message?.contains("email address is already in use") == true -> {
                     android.util.Log.e("FirebaseAuthManager", "ERRO: Email já está em uso")
                     Result.failure(Exception("Este e-mail já está em uso"))
+                }
+                e.message?.contains("nome de usuário já está em uso") == true -> {
+                    android.util.Log.e("FirebaseAuthManager", "ERRO: Username já está em uso")
+                    Result.failure(Exception("Este nome de usuário já está em uso"))
                 }
                 e.message?.contains("password is invalid") == true -> {
                     android.util.Log.e("FirebaseAuthManager", "ERRO: Senha inválida")
@@ -112,7 +131,7 @@ class FirebaseAuthManager(private val context: Context) {
                     Result.failure(Exception("Erro de conexão. Verifique sua internet"))
                 }
                 else -> {
-                    android.util.Log.e("FirebaseAuthManager", "ERRO DESCONHECIDO: ${e.message}")
+                    android.util.Log.e("FirebaseAuthManager", "ERRO DESCONHECIDO")
                     Result.failure(Exception("Erro ao criar conta: ${e.message}"))
                 }
             }
@@ -121,10 +140,9 @@ class FirebaseAuthManager(private val context: Context) {
     
     suspend fun signIn(email: String, password: String): Result<UserData> {
         return try {
-            android.util.Log.d("FirebaseAuthManager", "Attempting sign in for email: $email")
+            android.util.Log.d("FirebaseAuthManager", "Attempting sign in")
             
             val result = auth.signInWithEmailAndPassword(email, password).await()
-            android.util.Log.d("FirebaseAuthManager", "Sign in result: ${result.user?.uid}")
             
             result.user?.let { user ->
                 android.util.Log.d("FirebaseAuthManager", "User authenticated, fetching data from Firestore")
@@ -180,7 +198,7 @@ class FirebaseAuthManager(private val context: Context) {
                 Result.success(finalData)
             } ?: Result.failure(Exception("Falha na autenticação"))
         } catch (e: Exception) {
-            android.util.Log.e("FirebaseAuthManager", "Sign in error: ${e.message}", e)
+            android.util.Log.e("FirebaseAuthManager", "Sign in error", e)
             when {
                 e.message?.contains("no user record") == true -> {
                     Result.failure(Exception("Usuário não encontrado"))
@@ -237,19 +255,19 @@ class FirebaseAuthManager(private val context: Context) {
         return try {
             // Verificar se há usuário atual no Firebase
             val currentUser = auth.currentUser
-            
+
             if (currentUser != null) {
                 // Usuário já está logado no Firebase
-                android.util.Log.d("FirebaseAuthManager", "✅ Usuário já logado no Firebase: ${currentUser.email}")
+                android.util.Log.d("FirebaseAuthManager", "Usuário já logado no Firebase")
                 return true
             }
-            
+
             // Verificar se há dados locais de login
             if (isLoggedInLocally()) {
                 val localUserData = getLocalUserData()
                 if (localUserData != null) {
-                    android.util.Log.d("FirebaseAuthManager", "🔄 Tentando restaurar sessão para: ${localUserData.email}")
-                    
+                    android.util.Log.d("FirebaseAuthManager", "Tentando restaurar sessão")
+
                     // Tentar obter dados atualizados do Firestore
                     val firestoreUserData = getUserDataFromFirestore(localUserData.uid)
                     if (firestoreUserData != null) {
@@ -264,11 +282,11 @@ class FirebaseAuthManager(private val context: Context) {
                     }
                 }
             }
-            
+
             android.util.Log.d("FirebaseAuthManager", "❌ Nenhuma sessão válida encontrada")
             false
         } catch (e: Exception) {
-            android.util.Log.e("FirebaseAuthManager", "Erro ao verificar sessão: ${e.message}")
+            android.util.Log.e("FirebaseAuthManager", "Erro ao verificar sessão", e)
             false
         }
     }
@@ -303,10 +321,18 @@ class FirebaseAuthManager(private val context: Context) {
                 "phone" to userData.phone,
                 "userType" to userData.userType,
                 "profileImageUrl" to userData.profileImageUrl,
-                "updatedAt" to com.google.firebase.Timestamp.now()
+                "updatedAt" to com.google.firebase.Timestamp.now(),
+                "isVerified" to userData.isVerified,
+                "uid" to userData.uid,
+                "email" to userData.email,
+                "username" to userData.username,
+                "lastUsernameEdit" to userData.lastUsernameEdit
             )
-            
-            firestore.collection("users").document(userData.uid).update(userMap.toMap()).await()
+
+            firestore.collection("users")
+                .document(userData.uid)
+                .set(userMap, SetOptions.merge())
+                .await()
             saveUserDataLocally(userData)
             Result.success(Unit)
         } catch (e: Exception) {
@@ -375,7 +401,7 @@ class FirebaseAuthManager(private val context: Context) {
             
             Result.success(Unit)
         } catch (e: Exception) {
-            android.util.Log.e("FirebaseAuthManager", "Erro ao atualizar imagem de perfil: ${e.message}")
+            android.util.Log.e("FirebaseAuthManager", "Erro ao atualizar imagem de perfil", e)
             Result.failure(e)
         }
     }
@@ -409,7 +435,7 @@ class FirebaseAuthManager(private val context: Context) {
             
             !query.isEmpty
         } catch (e: Exception) {
-            android.util.Log.e("FirebaseAuthManager", "Erro ao verificar nome de usuário: ${e.message}")
+            android.util.Log.e("FirebaseAuthManager", "Erro ao verificar nome de usuário", e)
             false // Em caso de erro, assumir que não está em uso
         }
     }
@@ -523,9 +549,9 @@ class FirebaseAuthManager(private val context: Context) {
                 .update(updates)
                 .await()
                 
-            android.util.Log.d("FirebaseAuthManager", "✅ Status online atualizado: ${if (isOnline) "Login" else "Logout"} em $formattedTime")
+            android.util.Log.d("FirebaseAuthManager", "Status online atualizado")
         } catch (e: Exception) {
-            android.util.Log.e("FirebaseAuthManager", "Erro ao atualizar status online: ${e.message}")
+            android.util.Log.e("FirebaseAuthManager", "Erro ao atualizar status online", e)
         }
     }
-} 
+}

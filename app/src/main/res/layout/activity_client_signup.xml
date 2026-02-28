@@ -253,24 +253,47 @@
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="start|center_vertical"
+                    android:orientation="vertical"
                     android:layout_marginBottom="24dp">
 
-                    <CheckBox
-                        android:id="@+id/cbTerms"
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:buttonTint="@color/primary_color" />
+                        android:orientation="horizontal"
+                        android:gravity="start|center_vertical">
+
+                        <CheckBox
+                            android:id="@+id/cbTerms"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:buttonTint="@color/primary_color" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/terms_agreement"
+                            android:textSize="14sp"
+                            android:textColor="@color/text_secondary"
+                            android:lineSpacingExtra="2dp" />
+
+                    </LinearLayout>
 
                     <TextView
-                        android:layout_width="0dp"
+                        android:id="@+id/tvReadTerms"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/terms_agreement"
+                        android:layout_marginTop="8dp"
+                        android:text="Ler Termos de Uso do Cliente"
                         android:textSize="14sp"
-                        android:textColor="@color/text_secondary"
-                        android:lineSpacingExtra="2dp" />
+                        android:textColor="@color/primary_color"
+                        android:textStyle="bold"
+                        android:drawableStart="@drawable/ic_document"
+                        android:drawablePadding="8dp"
+                        android:gravity="center_vertical"
+                        android:padding="4dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Ler Termos de Uso do Cliente" />
 
                 </LinearLayout>
 

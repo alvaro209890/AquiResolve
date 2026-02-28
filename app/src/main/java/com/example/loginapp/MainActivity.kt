@@ -36,19 +36,16 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
-        // Inicializar Firebase
-        FirebaseConfig.initialize(this)
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
         
         // Inicializar AuthManager
         authManager = FirebaseAuthManager(this)
-        
+
         // Inicializar ViewBinding
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        
-        // Inicializar sistema de notificações
-        NotificationManager.createNotificationChannels(this)
+
+        // Solicitar permissão de notificação
         requestNotificationPermissionIfNeeded()
         
         // Configurar a interface
@@ -98,7 +95,7 @@ class MainActivity : AppCompatActivity() {
                     val userData = authManager.getLocalUserData()
                     
                     if (userData != null) {
-                        android.util.Log.d("MainActivity", "🔄 Login automático detectado para: ${userData.email} (${userData.userType})")
+                        android.util.Log.d("MainActivity", "Login automático detectado")
                         
                         // Garantir userType atualizado do Firestore (caso tenha virado prestador em outra tela)
                         val refreshed = authManager.getUserDataFromFirestore(userData.uid)
@@ -259,17 +256,17 @@ class MainActivity : AppCompatActivity() {
             handleForgotPassword()
         }
         
-        // Botão de login social
-        binding.btnGoogleLogin.setOnClickListener {
-            handleGoogleLogin()
-        }
-        
         // Links de privacidade e termos
         binding.tvPrivacyPolicy.setOnClickListener {
             openPrivacyPolicy()
         }
         
         binding.tvTermsOfService.setOnClickListener {
+            openTermsOfService()
+        }
+        
+        // Ler Termos de Uso do Cliente (na seção Criar Conta)
+        binding.tvReadTermsClient.setOnClickListener {
             openTermsOfService()
         }
     }
@@ -425,7 +422,6 @@ class MainActivity : AppCompatActivity() {
         }
         
         // Desabilitar outros botões durante o carregamento
-        binding.btnGoogleLogin.isEnabled = !loading
         binding.tvForgotPassword.isEnabled = !loading
     }
 
@@ -437,14 +433,6 @@ class MainActivity : AppCompatActivity() {
         val intent = Intent(this, ForgotPasswordActivity::class.java)
         startActivity(intent)
         overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
-    }
-
-    /**
-     * Manipula o login com Google
-     */
-    private fun handleGoogleLogin() {
-        showToast("🔄 Conectando com Google...")
-        showErrorMessage("❌ Login com Google será implementado em breve!")
     }
 
     /**
@@ -524,4 +512,3 @@ class MainActivity : AppCompatActivity() {
         // Limpar recursos se necessário
     }
 }
-

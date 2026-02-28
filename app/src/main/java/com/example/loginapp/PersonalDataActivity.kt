@@ -18,6 +18,11 @@ class PersonalDataActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Garantir Firebase inicializado
+        if (!FirebaseConfig.isInitialized()) {
+            FirebaseConfig.initialize(this)
+        }
+
         authManager = FirebaseAuthManager(this)
         binding = ActivityPersonalDataBinding.inflate(layoutInflater)
         setContentView(binding.root)

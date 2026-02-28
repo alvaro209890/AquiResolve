@@ -135,7 +135,7 @@
                 android:alignmentMode="alignMargins"
                 android:useDefaultMargins="true">
 
-                <!-- Estofados -->
+                <!-- Limpeza de estofados -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardLimpeza"
                     android:layout_width="0dp"
@@ -167,7 +167,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Estofados"
+                            android:text="Limpeza de estofados"
                             android:textSize="16sp"
                             android:textStyle="bold"
                             android:textColor="@color/text_primary"
@@ -177,7 +177,7 @@
 
                 </com.google.android.material.card.MaterialCardView>
 
-                <!-- Hidráulica -->
+                <!-- Encanador -->
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardManutencao"
                     android:layout_width="0dp"
@@ -209,7 +209,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Hidráulica"
+                            android:text="Encanador"
                             android:textSize="16sp"
                             android:textStyle="bold"
                             android:textColor="@color/text_primary"
@@ -349,7 +349,7 @@
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardJardinagem"
                     android:layout_width="0dp"
-                    android:layout_height="132dp"
+                    android:layout_height="152dp"
                     android:layout_columnWeight="1"
                     app:cardCornerRadius="16dp"
                     app:cardElevation="4dp"
@@ -378,11 +378,11 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Desentupimento manual"
-                            android:maxLines="2"
+                            android:maxLines="3"
                             android:ellipsize="end"
                             android:paddingHorizontal="8dp"
                             android:textAlignment="center"
-                            android:textSize="16sp"
+                            android:textSize="14sp"
                             android:textStyle="bold"
                             android:textColor="@color/text_primary"
                             android:gravity="center" />
@@ -395,7 +395,7 @@
                 <com.google.android.material.card.MaterialCardView
                     android:id="@+id/cardMudancas"
                     android:layout_width="0dp"
-                    android:layout_height="132dp"
+                    android:layout_height="152dp"
                     android:layout_columnWeight="1"
                     app:cardCornerRadius="16dp"
                     app:cardElevation="4dp"
@@ -424,11 +424,11 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Desentupimento com maquinário até 2 m"
-                            android:maxLines="2"
+                            android:maxLines="3"
                             android:ellipsize="end"
                             android:paddingHorizontal="8dp"
                             android:textAlignment="center"
-                            android:textSize="16sp"
+                            android:textSize="14sp"
                             android:textStyle="bold"
                             android:textColor="@color/text_primary"
                             android:gravity="center" />
@@ -512,48 +512,6 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="Faxina"
-                            android:textSize="16sp"
-                            android:textStyle="bold"
-                            android:textColor="@color/text_primary"
-                            android:gravity="center" />
-
-                    </LinearLayout>
-
-                </com.google.android.material.card.MaterialCardView>
-
-                <!-- Troca de bateria Automotiva -->
-                <com.google.android.material.card.MaterialCardView
-                    android:id="@+id/cardTrocaBateria"
-                    android:layout_width="0dp"
-                    android:layout_height="120dp"
-                    android:layout_columnWeight="1"
-                    app:cardCornerRadius="16dp"
-                    app:cardElevation="4dp"
-                    app:cardBackgroundColor="@color/white"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:foreground="?attr/selectableItemBackground">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="match_parent"
-                        android:orientation="vertical"
-                        android:gravity="center"
-                        android:padding="16dp">
-
-                        <ImageView
-                            android:layout_width="48dp"
-                            android:layout_height="48dp"
-                            android:src="@drawable/ic_services"
-                            android:background="@drawable/circle_background_primary"
-                            android:padding="12dp"
-                            app:tint="@color/white"
-                            android:layout_marginBottom="8dp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Troca de bateria Automotiva"
                             android:textSize="16sp"
                             android:textStyle="bold"
                             android:textColor="@color/text_primary"

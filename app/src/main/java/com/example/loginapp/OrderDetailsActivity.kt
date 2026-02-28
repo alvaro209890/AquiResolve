@@ -1,23 +1,45 @@
 package com.example.loginapp
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
+import android.location.Location
+import android.os.Looper
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.example.loginapp.adapters.ImageAdapter
 import com.example.loginapp.databinding.ActivityOrderDetailsBinding
 import com.example.loginapp.models.OrderData
 import com.example.loginapp.models.OrderStatus
 import com.example.loginapp.utils.ProtocolGenerator
+import com.example.loginapp.utils.VerificationCodeDialog
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.text.SimpleDateFormat
 import java.util.*
+import com.bumptech.glide.Glide
+import com.bumptech.glide.load.resource.bitmap.CircleCrop
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationResult
+import com.google.android.gms.location.Priority
+import org.osmdroid.config.Configuration
+import org.osmdroid.tileprovider.tilesource.TileSourceFactory
+import org.osmdroid.util.GeoPoint
+import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Polyline
 
 /**
  * OrderDetailsActivity - Tela de detalhes do pedido
@@ -32,7 +54,6 @@ import com.google.firebase.firestore.FirebaseFirestore
 class OrderDetailsActivity : AppCompatActivity() {
 
     companion object {
-        private const val RATING_REQUEST_CODE = 1001
     }
 
     // ViewBinding para acesso aos elementos da interface
@@ -46,13 +67,27 @@ class OrderDetailsActivity : AppCompatActivity() {
     // Firebase
     private val db = FirebaseFirestore.getInstance()
     private lateinit var orderManager: FirebaseOrderManager
+    private lateinit var fusedLocationClient: FusedLocationProviderClient
+    
+    // Map overlays
+    private var clientMarker: Marker? = null
+    private var providerMarker: Marker? = null
+    private var routeLine: Polyline? = null
+    private var locationCallback: LocationCallback? = null
+    private var locationRequest: LocationRequest? = null
+    private var lastRouteUpdateAt: Long = 0L
+    private var lastProviderPoint: GeoPoint? = null
+    private var currentClientPoint: GeoPoint? = null
+    private var providerLocationListener: com.google.firebase.firestore.ListenerRegistration? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Configuration.getInstance().userAgentValue = packageName
         
         // Inicializar ViewBinding
         binding = ActivityOrderDetailsBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         
         // Obter dados da intent
         orderId = intent.getStringExtra("order_id")
@@ -124,6 +159,11 @@ class OrderDetailsActivity : AppCompatActivity() {
         binding.btnSecondaryAction.setOnClickListener {
             handleSecondaryAction()
         }
+
+        // Botão de recorrer ao serviço (WhatsApp)
+        binding.btnAppeal.setOnClickListener {
+            openAppealWhatsApp()
+        }
     }
 
     /**
@@ -183,6 +223,17 @@ class OrderDetailsActivity : AppCompatActivity() {
             binding.tvOrderProtocol.visibility = View.GONE
         }
         
+        // Mostrar código de verificação do cliente se o pedido foi aceito ou está em andamento
+        if (!isProviderView && 
+            (order.status == OrderData.STATUS_ASSIGNED || order.status == OrderData.STATUS_IN_PROGRESS) && 
+            order.clientVerificationCode != null) {
+            // Exibir código no campo da interface
+            showVerificationCodeField(order.clientVerificationCode!!)
+        } else {
+            // Ocultar campo de código se não for cliente ou pedido não aceito
+            binding.cardVerificationCode.visibility = View.GONE
+        }
+        
         // Configurar status
         setStatusInfo(order.status)
         
@@ -192,17 +243,33 @@ class OrderDetailsActivity : AppCompatActivity() {
         // Configurar badges
         setBadges(order)
 
+        // Mapa e distância (apenas se tiver coordenadas do cliente)
+        setupMapAndDistance(order)
+
         // Se cancelado, exibir cartão com informações de cancelamento
-        if (order.status == "cancelled" || order.status == "expired") {
+        if (order.status == OrderData.STATUS_CANCELLED || order.status == OrderData.STATUS_EXPIRED) {
             binding.cardCancellationInfo.visibility = View.VISIBLE
             val dateFormat = SimpleDateFormat("dd/MM/yyyy 'às' HH:mm", Locale("pt", "BR"))
             val cancelledAtText = order.cancelledAt?.toDate()?.let { dateFormat.format(it) } ?: "--"
-            val cancelledByText = when (order.cancelledBy) { "client" -> "Cliente"; "provider" -> "Prestador"; else -> "Indisponível" }
+            val cancelledByText = when (order.cancelledBy) { 
+                "client" -> "Cliente"
+                "provider" -> "Prestador"
+                else -> "Sistema"
+            }
             binding.tvCancelledAt.text = "Cancelado em $cancelledAtText"
             binding.tvCancelledBy.text = "Por: $cancelledByText"
             binding.tvCancellationReason.text = order.cancellationReason?.ifEmpty { "Sem motivo informado" } ?: "Sem motivo informado"
+            
+            // Mostrar informações de reembolso se cancelado pelo cliente e aguardando reembolso
+            if (order.cancelledBy == "client" && order.refundStatus == "pending") {
+                binding.cardRefundInfo.visibility = View.VISIBLE
+                binding.tvRefundInfo.text = "💳 O valor pago será reembolsado automaticamente em até 24 horas.\n\nVocê receberá uma notificação quando o reembolso for processado."
+            } else {
+                binding.cardRefundInfo.visibility = View.GONE
+            }
         } else {
             binding.cardCancellationInfo.visibility = View.GONE
+            binding.cardRefundInfo.visibility = View.GONE
         }
         
         // Configurar complemento
@@ -214,7 +281,24 @@ class OrderDetailsActivity : AppCompatActivity() {
         // Configurar imagens
         if (order.images.isNotEmpty()) {
             binding.cardImages.visibility = View.VISIBLE
-            // TODO: Implementar adapter de imagens
+            val imageAdapter = ImageAdapter(
+                context = this,
+                imageUrls = order.images,
+                onImageClick = { imageUrl, _ ->
+                    val intent = Intent(this, ImagePreviewActivity::class.java).apply {
+                        putStringArrayListExtra("image_uris", ArrayList(order.images))
+                        putStringArrayListExtra("file_names", ArrayList(List(order.images.size) { "imagem_${it + 1}.jpg" }))
+                        putExtra("file_sizes", LongArray(order.images.size) { 0L })
+                        putStringArrayListExtra("image_types", ArrayList(List(order.images.size) { "ORDER" }))
+                        putExtra("current_position", order.images.indexOf(imageUrl))
+                    }
+                    startActivity(intent)
+                }
+            )
+            binding.rvImages.layoutManager = GridLayoutManager(this, 3)
+            binding.rvImages.adapter = imageAdapter
+        } else {
+            binding.cardImages.visibility = View.GONE
         }
         
         // Configurar prestador (se atribuído)
@@ -222,6 +306,11 @@ class OrderDetailsActivity : AppCompatActivity() {
             binding.cardProvider.visibility = View.VISIBLE
             binding.tvProviderName.text = order.assignedProviderName
             binding.tvProviderRating.text = "⭐ Prestador Atribuído"
+            // Carregar nota média real e foto do prestador
+            if (!order.assignedProvider.isNullOrEmpty()) {
+                loadProviderRating(order.assignedProvider!!)
+                loadProviderImage(order.assignedProvider!!)
+            }
         } else {
             binding.cardProvider.visibility = View.VISIBLE
             binding.tvProviderName.text = when (order.status) {
@@ -249,7 +338,7 @@ class OrderDetailsActivity : AppCompatActivity() {
     private fun setServiceIcon(serviceNiche: String) {
         val iconRes = when (serviceNiche.lowercase()) {
             "elétrica" -> R.drawable.ic_electrician
-            "hidráulica" -> R.drawable.ic_plumber
+            "encanador", "hidráulica" -> R.drawable.ic_plumber
             "pintura" -> R.drawable.ic_painter
             "limpeza" -> R.drawable.ic_cleaning
             "jardinagem" -> R.drawable.ic_gardening
@@ -265,14 +354,16 @@ class OrderDetailsActivity : AppCompatActivity() {
      * Define as informações de status
      */
     private fun setStatusInfo(status: String) {
-        val (text, backgroundRes) = when (status) {
-            "pending" -> "PENDENTE" to R.drawable.status_pending_background
+        val normalized = status.lowercase()
+        val (text, backgroundRes) = when (normalized) {
+            OrderData.STATUS_PENDING -> "PENDENTE" to R.drawable.status_pending_background
             "quotes_received" -> "COTAÇÕES" to R.drawable.status_pending_background
-            "assigned" -> "ATRIBUIDO" to R.drawable.status_pending_background
-            "in_progress" -> "EM ANDAMENTO" to R.drawable.status_pending_background
-            "completed" -> "CONCLUÍDO" to R.drawable.status_pending_background
-            "cancelled" -> "CANCELADO" to R.drawable.status_pending_background
-            "expired" -> "EXPIRADO" to R.drawable.status_pending_background
+            OrderData.STATUS_ASSIGNED -> "ATRIBUIDO" to R.drawable.status_pending_background
+            OrderData.STATUS_IN_PROGRESS -> "EM ANDAMENTO" to R.drawable.status_pending_background
+            OrderData.STATUS_COMPLETED -> "CONCLUÍDO" to R.drawable.status_pending_background
+            OrderData.STATUS_CANCELLED -> "CANCELADO" to R.drawable.status_cancelled_background
+            OrderData.STATUS_EXPIRED -> "EXPIRADO" to R.drawable.status_cancelled_background
+            OrderData.STATUS_DISTRIBUTING -> "EM DISTRIBUIÇÃO" to R.drawable.status_pending_background
             else -> "PENDENTE" to R.drawable.status_pending_background
         }
         
@@ -286,7 +377,15 @@ class OrderDetailsActivity : AppCompatActivity() {
     private fun setPriceInfo(order: OrderData) {
         when {
             order.estimatedPrice > 0 -> {
-                binding.tvPrice.text = "R$ %.2f".format(order.estimatedPrice).replace(".", ",")
+                if (isProviderView && order.providerCommission > 0) {
+                    // Para prestador, mostrar APENAS a comissão (não o valor total)
+                    binding.tvPrice.text = "💰 Você ganha: R$ %.2f".format(
+                        order.providerCommission
+                    ).replace(".", ",")
+                } else {
+                    // Para cliente, mostrar apenas valor total
+                    binding.tvPrice.text = "R$ %.2f".format(order.estimatedPrice).replace(".", ",")
+                }
             }
             else -> {
                 binding.tvPrice.text = "Aguardando"
@@ -311,19 +410,19 @@ class OrderDetailsActivity : AppCompatActivity() {
     private fun setActionButtons(order: OrderData) {
         val (primaryText, secondaryText) = if (isProviderView) {
             when (order.status) {
-                "distributing", "pending" -> "Aceitar Pedido" to "Ver Detalhes"
-                "assigned" -> "Chat" to "Iniciar Serviço"
-                "in_progress" -> "Chat" to "Confirmar Conclusão"
-                "completed" -> "Ver Detalhes" to "—"
-                "cancelled", "expired" -> "Ver Detalhes" to "—"
+                OrderData.STATUS_DISTRIBUTING, OrderData.STATUS_PENDING -> "Aceitar Pedido" to "Ver Detalhes"
+                OrderData.STATUS_ASSIGNED -> "Chat" to "Finalizar Pedido"
+                OrderData.STATUS_IN_PROGRESS -> "Chat" to "Finalizar Pedido"
+                OrderData.STATUS_COMPLETED -> "Ver Detalhes" to "—"
+                OrderData.STATUS_CANCELLED, OrderData.STATUS_EXPIRED -> "Ver Detalhes" to "—"
                 else -> "Ver Detalhes" to "—"
             }
         } else {
             when (order.status) {
-                "distributing" -> {
+                OrderData.STATUS_DISTRIBUTING -> {
                     "⏳ Em Distribuição" to "Cancelar Pedido"
                 }
-                "pending" -> {
+                OrderData.STATUS_PENDING -> {
                     if (order.serviceType == "SIMPLE") {
                         "Aguardando Prestador" to "Cancelar Pedido"
                     } else {
@@ -331,29 +430,50 @@ class OrderDetailsActivity : AppCompatActivity() {
                     }
                 }
                 "quotes_received" -> "Ver Cotações" to "Cancelar Pedido"
-                "assigned" -> "Iniciar Serviço" to "Cancelar Pedido"
-                "in_progress" -> "Confirmar Conclusão" to "Reportar Problema"
-                "completed" -> "Avaliar Serviço" to "Solicitar Revisão"
-                "cancelled" -> "Ver Detalhes" to "Criar Novo Pedido"
-                "expired" -> "Ver Detalhes" to "Criar Novo Pedido"
+                OrderData.STATUS_ASSIGNED -> "Iniciar Serviço" to "Cancelar Pedido"
+                OrderData.STATUS_IN_PROGRESS -> "Confirmar Conclusão" to "Reportar Problema"
+                OrderData.STATUS_COMPLETED -> {
+                    if (order.rating != null && order.rating > 0) {
+                        "⭐ Já Avaliado (${order.rating} estrelas)" to "Solicitar Revisão"
+                    } else {
+                        "Avaliar Serviço" to "Solicitar Revisão"
+                    }
+                }
+                OrderData.STATUS_CANCELLED -> "Ver Detalhes" to "Criar Novo Pedido"
+                OrderData.STATUS_EXPIRED -> "Ver Detalhes" to "Criar Novo Pedido"
                 else -> "Ver Detalhes" to "Cancelar Pedido"
             }
         }
         
         // Definir textos dos botões
         binding.btnPrimaryAction.text = primaryText
-        binding.btnSecondaryAction.text = secondaryText
         
-        // Debug: verificar se o texto foi definido
-        android.util.Log.d("OrderDetails", "Texto do botão secundário: ${binding.btnSecondaryAction.text}")
-        
-        // Garantir que o texto seja sempre visível
-        binding.btnSecondaryAction.setTextColor(ContextCompat.getColor(this, R.color.error_red))
+        // Configurar botão secundário
+        if (secondaryText == "—") {
+            binding.btnSecondaryAction.visibility = View.GONE
+        } else {
+            binding.btnSecondaryAction.visibility = View.VISIBLE
+            binding.btnSecondaryAction.text = secondaryText
+            binding.btnSecondaryAction.setTextColor(ContextCompat.getColor(this, R.color.error_red))
+        }
         
         // Configurar visibilidade e estado dos botões
         if (isProviderView) {
             when (order.status) {
-                "distributing", "pending", "assigned", "in_progress", "completed", "cancelled", "expired" -> {
+                OrderData.STATUS_DISTRIBUTING, OrderData.STATUS_PENDING -> {
+                    binding.btnPrimaryAction.isEnabled = true
+                    binding.btnSecondaryAction.isEnabled = true
+                }
+                OrderData.STATUS_ASSIGNED, OrderData.STATUS_IN_PROGRESS -> {
+                    binding.btnPrimaryAction.isEnabled = true
+                    binding.btnSecondaryAction.isEnabled = true
+                    binding.btnSecondaryAction.visibility = View.VISIBLE
+                }
+                OrderData.STATUS_COMPLETED, OrderData.STATUS_CANCELLED, OrderData.STATUS_EXPIRED -> {
+                    binding.btnPrimaryAction.isEnabled = true
+                    binding.btnSecondaryAction.visibility = View.GONE
+                }
+                else -> {
                     binding.btnPrimaryAction.isEnabled = true
                     binding.btnSecondaryAction.isEnabled = true
                 }
@@ -369,11 +489,14 @@ class OrderDetailsActivity : AppCompatActivity() {
                     binding.btnSecondaryAction.isEnabled = true
                 }
                 "completed" -> {
-                    binding.btnPrimaryAction.isEnabled = true
+                    val alreadyRated = order.rating != null && order.rating > 0
+                    binding.btnPrimaryAction.isEnabled = !alreadyRated
                     binding.btnSecondaryAction.isEnabled = true
                     // Para pedidos concluídos, usar cor verde
                     binding.btnSecondaryAction.setStrokeColorResource(R.color.secondary_color)
                     binding.btnSecondaryAction.setTextColor(ContextCompat.getColor(this, R.color.secondary_color))
+                    // Mostrar botão de recorrer
+                    binding.btnAppeal.visibility = View.VISIBLE
                 }
                 "cancelled", "expired" -> {
                     binding.btnPrimaryAction.isEnabled = true
@@ -381,6 +504,8 @@ class OrderDetailsActivity : AppCompatActivity() {
                     // Para pedidos cancelados, usar cor laranja
                     binding.btnSecondaryAction.setStrokeColorResource(R.color.primary_color)
                     binding.btnSecondaryAction.setTextColor(ContextCompat.getColor(this, R.color.primary_color))
+                    // Mostrar botão de recorrer
+                    binding.btnAppeal.visibility = View.VISIBLE
                 }
                 else -> {
                     binding.btnPrimaryAction.isEnabled = true
@@ -398,19 +523,143 @@ class OrderDetailsActivity : AppCompatActivity() {
         order?.let { order ->
             if (isProviderView) {
                 when (order.status) {
-                    "distributing", "pending" -> acceptOrderAsProvider(order)
-                    "assigned", "in_progress" -> openChat()
-                    else -> showToast("Ação não disponível")
+                    OrderData.STATUS_DISTRIBUTING, OrderData.STATUS_PENDING -> acceptOrderAsProvider(order)
+                    OrderData.STATUS_ASSIGNED, OrderData.STATUS_IN_PROGRESS -> {
+                        // Abrir chat
+                        openChat()
+                    }
+                    else -> openChat()
                 }
             } else {
                 when (order.status) {
                     "quotes_received" -> openQuotesScreen(order.id)
-                    "assigned" -> startService(order)
-                    "in_progress" -> confirmCompletion(order, actor = "client")
-                    "completed" -> openRatingScreen(order.id)
+                    OrderData.STATUS_ASSIGNED -> startService(order)
+                    OrderData.STATUS_IN_PROGRESS -> confirmCompletion(order, actor = "client")
+                    OrderData.STATUS_COMPLETED -> {
+                        if (order.rating != null && order.rating > 0) {
+                            showToast("Você já avaliou este serviço (${order.rating} estrelas)")
+                        } else {
+                            val intent = Intent(this, RatingActivity::class.java)
+                            intent.putExtra("order_id", order.id)
+                            intent.putExtra("provider_id", order.assignedProvider)
+                            intent.putExtra("provider_name", order.assignedProviderName)
+                            startActivity(intent)
+                        }
+                    }
+                    OrderData.STATUS_CANCELLED, OrderData.STATUS_EXPIRED -> {
+                        // Pedido cancelado - não há ação primária
+                        showToast("Este pedido foi cancelado")
+                    }
                     else -> showToast("Ação não disponível para este status")
                 }
             }
+        }
+    }
+    
+    /**
+     * Finaliza o serviço solicitando código do cliente
+     */
+    private fun finishServiceWithCode(order: OrderData) {
+        VerificationCodeDialog.showCodeInputDialog(
+            context = this,
+            onCodeEntered = { code ->
+                lifecycleScope.launch {
+                    try {
+                        val result = orderManager.completeOrderWithVerification(order.id, code)
+                        
+                        if (result.isSuccess) {
+                            showSuccessMessage("✅ Serviço finalizado com sucesso!")
+                            
+                            // Navegar de volta para a tela inicial do prestador após finalizar
+                            if (isProviderView) {
+                                // Aguardar um pouco para mostrar a mensagem de sucesso
+                                delay(1000)
+                                
+                                // Criar intent para voltar à tela inicial do prestador
+                                val intent = Intent(this@OrderDetailsActivity, ProviderHomeActivity::class.java)
+                                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                                startActivity(intent)
+                                finish() // Finalizar esta activity
+                            } else {
+                                loadOrderDetails()
+                            }
+                        } else {
+                            val errorMessage = result.exceptionOrNull()?.message ?: "Erro desconhecido"
+                            if (errorMessage.contains("incorreto", ignoreCase = true)) {
+                                showErrorMessage("❌ Código incorreto! Verifique o código fornecido pelo cliente.")
+                            } else {
+                                showErrorMessage("❌ Erro ao finalizar: $errorMessage")
+                            }
+                        }
+                    } catch (e: Exception) {
+                        showErrorMessage("❌ Erro ao finalizar serviço: ${e.message}")
+                    }
+                }
+            },
+            onCancel = {
+                // Usuário cancelou
+            }
+        )
+    }
+
+    /**
+     * Carrega a nota média do prestador do Firebase
+     */
+    private fun loadProviderRating(providerId: String) {
+        lifecycleScope.launch {
+            try {
+                val providerDoc = FirebaseFirestore.getInstance()
+                    .collection("providers").document(providerId).get().await()
+                if (providerDoc.exists()) {
+                    val rating = providerDoc.getDouble("rating") ?: 0.0
+                    val totalRatings = (providerDoc.getLong("totalRatings") ?: 0L).toInt()
+                    if (rating > 0) {
+                        binding.tvProviderRating.text = "⭐ ${String.format("%.1f", rating)} ($totalRatings avaliações)"
+                    } else {
+                        binding.tvProviderRating.text = "⭐ Sem avaliações"
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("OrderDetails", "Erro ao carregar rating: ${e.message}")
+            }
+        }
+    }
+
+    private fun loadProviderImage(providerId: String) {
+        lifecycleScope.launch {
+            try {
+                val providerDoc = FirebaseFirestore.getInstance()
+                    .collection("providers").document(providerId).get().await()
+                if (providerDoc.exists()) {
+                    val imageUrl = providerDoc.getString("profileImageUrl")
+                    if (!imageUrl.isNullOrEmpty()) {
+                        binding.ivProviderPhoto.setPadding(0, 0, 0, 0)
+                        binding.ivProviderPhoto.imageTintList = null
+                        Glide.with(this@OrderDetailsActivity)
+                            .load(imageUrl)
+                            .transform(CircleCrop())
+                            .placeholder(R.drawable.ic_person)
+                            .error(R.drawable.ic_person)
+                            .into(binding.ivProviderPhoto)
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("OrderDetails", "Erro ao carregar foto do prestador: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Abre WhatsApp para recorrer ao serviço
+     */
+    private fun openAppealWhatsApp() {
+        // TODO: Substituir pelo link do WhatsApp definitivo
+        val whatsappUrl = "https://wa.me/SEUNUMEROAQUI?text=Olá, gostaria de recorrer ao serviço. Protocolo: ${order?.protocol ?: "N/A"}"
+        try {
+            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(whatsappUrl))
+            startActivity(intent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Não foi possível abrir o WhatsApp", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -420,14 +669,24 @@ class OrderDetailsActivity : AppCompatActivity() {
     private fun handleSecondaryAction() {
         order?.let { order ->
             if (isProviderView) {
-                // Prestador: sempre "Ver detalhes" (sem cancelar do cliente)
-                showToast("Abrindo detalhes...")
+                // Prestador: botão secundário
+                when (order.status) {
+                    OrderData.STATUS_ASSIGNED, OrderData.STATUS_IN_PROGRESS -> {
+                        // Finalizar pedido com código de verificação
+                        finishServiceWithCode(order)
+                    }
+                    OrderData.STATUS_DISTRIBUTING, OrderData.STATUS_PENDING -> {
+                        // Já está nos detalhes — scroll para o topo
+                        binding.contentLayout.smoothScrollTo(0, 0)
+                    }
+                    else -> {}
+                }
             } else {
                 when (order.status) {
-                    "distributing", "pending", "quotes_received", "assigned" -> showCancelOrderDialog(order)
-                    "in_progress" -> showReportProblemDialog(order)
-                    "completed" -> showRequestRevisionDialog(order)
-                    "cancelled", "expired" -> createNewOrder()
+                    OrderData.STATUS_DISTRIBUTING, OrderData.STATUS_PENDING, "quotes_received", OrderData.STATUS_ASSIGNED -> showCancelOrderDialog(order)
+                    OrderData.STATUS_IN_PROGRESS -> showReportProblemDialog(order)
+                    OrderData.STATUS_COMPLETED -> showRequestRevisionDialog(order)
+                    OrderData.STATUS_CANCELLED, OrderData.STATUS_EXPIRED -> createNewOrder()
                     else -> showCancelOrderDialog(order)
                 }
             }
@@ -443,13 +702,21 @@ class OrderDetailsActivity : AppCompatActivity() {
                     showToast("Usuário não autenticado")
                     return@launch
                 }
+                
+                // Buscar nome real do prestador da coleção providers
+                val providerDoc = db.collection("providers").document(current.uid).get().await()
+                val providerName = if (providerDoc.exists()) {
+                    providerDoc.getString("fullName") ?: auth.currentUser?.displayName ?: "Prestador"
+                } else {
+                    auth.currentUser?.displayName ?: "Prestador"
+                }
+                
                 val docRef = db.collection("orders").document(order.id)
                 com.google.firebase.firestore.FirebaseFirestore.getInstance().runTransaction { tx ->
                     val snap = tx.get(docRef)
                     val currentStatus = snap.getString("status") ?: OrderData.STATUS_DISTRIBUTING
                     val assigned = snap.getString("assignedProvider")
                     if ((currentStatus == OrderData.STATUS_DISTRIBUTING || currentStatus == OrderData.STATUS_PENDING) && assigned.isNullOrEmpty()) {
-                        val providerName = auth.currentUser?.displayName ?: "Prestador"
                         tx.update(docRef, mapOf(
                             "assignedProvider" to current.uid,
                             "assignedProviderName" to providerName,
@@ -461,10 +728,17 @@ class OrderDetailsActivity : AppCompatActivity() {
                         throw IllegalStateException("Indisponível")
                     }
                 }.await()
-                showSuccessMessage("✅ Pedido aceito com sucesso!")
+                
+                // Gerar códigos de verificação (sem mostrar para o prestador)
+                val codesResult = orderManager.generateVerificationCodes(order.id)
+                if (codesResult.isSuccess) {
+                    showSuccessMessage("✅ Pedido aceito com sucesso!")
+                } else {
+                    showSuccessMessage("✅ Pedido aceito com sucesso!")
+                }
                 loadOrderDetails()
             } catch (e: Exception) {
-                showErrorMessage("❌ Não foi possível aceitar: ${'$'}{e.message}")
+                showErrorMessage("❌ Não foi possível aceitar: ${e.message}")
             }
         }
     }
@@ -479,17 +753,6 @@ class OrderDetailsActivity : AppCompatActivity() {
         showToast("💰 Tela de cotações em desenvolvimento")
     }
 
-    /**
-     * Abre a tela de avaliação
-     */
-    private fun openRatingScreen(orderId: String) {
-        val intent = Intent(this, RatingActivity::class.java).apply {
-            putExtra("order_id", orderId)
-            putExtra("provider_id", order?.assignedProvider)
-            putExtra("provider_name", "Prestador") // TODO: Buscar nome do prestador
-        }
-        startActivityForResult(intent, RATING_REQUEST_CODE)
-    }
 
     /**
      * Inicia o serviço
@@ -534,27 +797,93 @@ class OrderDetailsActivity : AppCompatActivity() {
     }
 
     /**
+     * Exibe o código de verificação no campo da interface
+     */
+    private fun showVerificationCodeField(code: String) {
+        binding.cardVerificationCode.visibility = View.VISIBLE
+        binding.tvVerificationCode.text = code
+        
+        // Configurar botão de copiar
+        binding.btnCopyCode.setOnClickListener {
+            copyCodeToClipboard(code)
+        }
+    }
+    
+    /**
+     * Copia o código para a área de transferência
+     */
+    private fun copyCodeToClipboard(code: String) {
+        val clipboard = getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("Código de Finalização", code)
+        clipboard.setPrimaryClip(clip)
+        Toast.makeText(this, "✅ Código copiado!", Toast.LENGTH_SHORT).show()
+    }
+    
+    /**
      * Abre o chat
      */
     private fun openChat() {
         order?.let { order ->
-            if (isProviderView) {
-                // Prestador conversa com o cliente
-                val intent = Intent(this, ProviderChatActivity::class.java)
-                intent.putExtra("order_id", order.id)
-                intent.putExtra("client_id", order.clientId)
-                intent.putExtra("client_name", order.clientName)
-                intent.putExtra("order_title", order.serviceName)
-                intent.putExtra("order_description", order.description)
-                startActivity(intent)
-            } else {
-                // Cliente conversa com o prestador
-                val intent = Intent(this, ClientChatActivity::class.java)
-                intent.putExtra("order_id", order.id)
-                intent.putExtra("provider_id", order.assignedProvider)
-                intent.putExtra("provider_name", order.assignedProviderName)
-                intent.putExtra("order_title", order.serviceName)
-                startActivity(intent)
+            // Verificar se o chat pode ser acessado (5 minutos após aceitação)
+            val (canAccess, message) = com.example.loginapp.utils.ChatAccessHelper.canAccessChat(order)
+            
+            if (!canAccess) {
+                AlertDialog.Builder(this)
+                    .setTitle("Chat Indisponível")
+                    .setMessage(message ?: "O chat ainda não está disponível.")
+                    .setPositiveButton("OK", null)
+                    .show()
+                return
+            }
+            
+            // Buscar foto do contato antes de abrir o chat
+            lifecycleScope.launch {
+                try {
+                    if (isProviderView) {
+                        // Prestador conversa com o cliente - buscar foto do cliente
+                        val clientPhotoUrl = try {
+                            db.collection("users").document(order.clientId)
+                                .get().await()
+                                .getString("profileImageUrl")
+                        } catch (e: Exception) {
+                            null
+                        }
+                        
+                        val intent = Intent(this@OrderDetailsActivity, ProviderChatActivity::class.java)
+                        intent.putExtra("order_id", order.id)
+                        intent.putExtra("client_id", order.clientId)
+                        intent.putExtra("client_name", order.clientName)
+                        intent.putExtra("client_photo", clientPhotoUrl)
+                        intent.putExtra("order_title", order.serviceName)
+                        intent.putExtra("order_description", order.description)
+                        startActivity(intent)
+                    } else {
+                        // Cliente conversa com o prestador - buscar foto do prestador
+                        val providerPhotoUrl = try {
+                            val providerId = order.assignedProvider ?: ""
+                            // Tentar buscar de providers primeiro, fallback para users
+                            db.collection("providers").document(providerId)
+                                .get().await()
+                                .getString("profileImageUrl")
+                                ?: db.collection("users").document(providerId)
+                                    .get().await()
+                                    .getString("profileImageUrl")
+                        } catch (e: Exception) {
+                            null
+                        }
+                        
+                        val intent = Intent(this@OrderDetailsActivity, ClientChatActivity::class.java)
+                        intent.putExtra("order_id", order.id)
+                        intent.putExtra("provider_id", order.assignedProvider)
+                        intent.putExtra("provider_name", order.assignedProviderName)
+                        intent.putExtra("provider_photo", providerPhotoUrl)
+                        intent.putExtra("order_title", order.serviceName)
+                        startActivity(intent)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.e("OrderDetails", "Erro ao abrir chat: ${e.message}")
+                    showToast("Erro ao abrir chat")
+                }
             }
         }
     }
@@ -564,24 +893,27 @@ class OrderDetailsActivity : AppCompatActivity() {
      */
     private fun showCancelOrderDialog(order: OrderData) {
         val statusText = when (order.status) {
-            "distributing" -> "em distribuição"
-            "pending" -> "pendente"
+            OrderData.STATUS_DISTRIBUTING -> "em distribuição"
+            OrderData.STATUS_PENDING -> "pendente"
             "quotes_received" -> "com cotações recebidas"
-            "assigned" -> "atribuído a um prestador"
+            OrderData.STATUS_ASSIGNED -> "atribuído a um prestador"
             else -> "neste status"
         }
         
         val message = when (order.status) {
-            "distributing" -> "Este pedido ainda está sendo distribuído para prestadores. Tem certeza que deseja cancelá-lo?"
-            "pending" -> "Este pedido está aguardando resposta de prestadores. Tem certeza que deseja cancelá-lo?"
+            OrderData.STATUS_DISTRIBUTING -> "Este pedido ainda está sendo distribuído para prestadores. Tem certeza que deseja cancelá-lo?"
+            OrderData.STATUS_PENDING -> "Este pedido está aguardando resposta de prestadores. Tem certeza que deseja cancelá-lo?"
             "quotes_received" -> "Este pedido já recebeu cotações de prestadores. Tem certeza que deseja cancelá-lo?"
-            "assigned" -> "Este pedido já foi atribuído a um prestador. Tem certeza que deseja cancelá-lo?"
+            OrderData.STATUS_ASSIGNED -> "Este pedido já foi atribuído a um prestador. Tem certeza que deseja cancelá-lo?"
             else -> "Tem certeza que deseja cancelar este pedido? Esta ação não pode ser desfeita."
         }
         
+        // Mensagem sobre reembolso
+        val refundMessage = "\n\n💳 IMPORTANTE: O valor pago será reembolsado automaticamente na sua conta em até 24 horas após o cancelamento."
+        
         AlertDialog.Builder(this)
             .setTitle("❌ Cancelar Pedido")
-            .setMessage(message)
+            .setMessage(message + refundMessage)
             .setPositiveButton("Sim, Cancelar") { _, _ ->
                 cancelOrder(order)
             }
@@ -606,9 +938,11 @@ class OrderDetailsActivity : AppCompatActivity() {
             else -> "• O pedido será marcado como cancelado\n• Você pode criar um novo pedido a qualquer momento"
         }
         
+        val refundInfo = "\n\n💳 REEMBOLSO:\n• O valor pago será reembolsado automaticamente\n• O reembolso será processado em até 24 horas\n• O valor retornará na mesma forma de pagamento utilizada\n• Você receberá uma notificação quando o reembolso for processado"
+        
         AlertDialog.Builder(this)
             .setTitle("ℹ️ Informações sobre Cancelamento")
-            .setMessage(info)
+            .setMessage(info + refundInfo)
             .setPositiveButton("Entendi") { dialog, _ ->
                 dialog.dismiss()
             }
@@ -623,6 +957,8 @@ class OrderDetailsActivity : AppCompatActivity() {
             try {
                 showLoading(true)
                 
+                android.util.Log.d("OrderDetails", "🔄 Iniciando cancelamento do pedido: ${order.id}")
+                
                 // Cancelar o pedido no Firebase
                 val result = orderManager.cancelOrder(
                     orderId = order.id,
@@ -631,14 +967,45 @@ class OrderDetailsActivity : AppCompatActivity() {
                 )
                 
                 if (result.isSuccess) {
-                    showSuccessMessage("❌ Pedido cancelado com sucesso!")
+                    android.util.Log.d("OrderDetails", "✅ Pedido cancelado com sucesso no Firebase")
+                    
+                    // Mostrar mensagem de sucesso com informação sobre reembolso
+                    AlertDialog.Builder(this@OrderDetailsActivity)
+                        .setTitle("✅ Pedido Cancelado")
+                        .setMessage("Seu pedido foi cancelado com sucesso!\n\n💳 O valor pago será reembolsado automaticamente na sua conta em até 24 horas.\n\nVocê receberá uma notificação quando o reembolso for processado.")
+                        .setPositiveButton("Entendi") { _, _ ->
+                            // Recarregar dados para atualizar a interface
+                            loadOrderDetails()
+                        }
+                        .setCancelable(false)
+                        .show()
+                    
                     // Recarregar dados para atualizar a interface
                     loadOrderDetails()
+                    
+                    // Aguardar um pouco para garantir que o Firebase atualizou
+                    kotlinx.coroutines.delay(500)
+                    
+                    // Verificar se o status foi atualizado
+                    val updatedResult = orderManager.getOrderById(order.id)
+                    if (updatedResult.isSuccess) {
+                        val updatedOrder = updatedResult.getOrNull()
+                        android.util.Log.d("OrderDetails", "📊 Status após cancelamento: ${updatedOrder?.status}")
+                        
+                        if (updatedOrder?.status == OrderData.STATUS_CANCELLED) {
+                            android.util.Log.d("OrderDetails", "✅ Status confirmado como cancelado no Firebase")
+                        } else {
+                            android.util.Log.w("OrderDetails", "⚠️ Status não atualizado corretamente: ${updatedOrder?.status}")
+                        }
+                    }
                 } else {
-                    showErrorMessage("Erro ao cancelar pedido: ${result.exceptionOrNull()?.message}")
+                    val error = result.exceptionOrNull()?.message ?: "Erro desconhecido"
+                    android.util.Log.e("OrderDetails", "❌ Erro ao cancelar pedido: $error")
+                    showErrorMessage("Erro ao cancelar pedido: $error")
                 }
                 
             } catch (e: Exception) {
+                android.util.Log.e("OrderDetails", "❌ Exceção ao cancelar pedido: ${e.message}", e)
                 showErrorMessage("Erro ao cancelar pedido: ${e.message}")
             } finally {
                 showLoading(false)
@@ -663,10 +1030,10 @@ class OrderDetailsActivity : AppCompatActivity() {
     }
 
     /**
-     * Cria novo pedido
+     * Navega para aba Serviços (único local onde cliente pode fazer pedido)
      */
     private fun createNewOrder() {
-        val intent = Intent(this, CreateOrderActivity::class.java)
+        val intent = Intent(this, ServicesActivity::class.java)
         startActivity(intent)
         finish()
     }
@@ -733,6 +1100,409 @@ class OrderDetailsActivity : AppCompatActivity() {
     private fun showToast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
+
+    /**
+     * Configura mapa e distância (ponto do cliente + rota real até localização atual do prestador).
+     * Se não houver coordenadas do cliente, oculta o cartão.
+     */
+    private fun setupMapAndDistance(order: OrderData) {
+        val coords = order.coordinates
+        if (coords == null) {
+            binding.cardMap.visibility = View.GONE
+            return
+        }
+        binding.cardMap.visibility = View.VISIBLE
+
+        val map = binding.mapOrder
+        val clientPoint = GeoPoint(coords.latitude, coords.longitude)
+        currentClientPoint = clientPoint
+
+        map.setTileSource(TileSourceFactory.MAPNIK)
+        map.setMultiTouchControls(true)
+        map.controller.setZoom(15.5)
+        map.controller.setCenter(clientPoint)
+
+        // Salvar posição anterior do prestador antes de limpar
+        val previousProviderPos = providerMarker?.position
+
+        // Limpar overlays anteriores
+        map.overlays.remove(clientMarker)
+        map.overlays.remove(providerMarker)
+        map.overlays.remove(routeLine)
+        providerMarker = null
+
+        // Cliente
+        clientMarker = Marker(map).apply {
+            position = clientPoint
+            title = "Local do serviço"
+            setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+        }
+        map.overlays.add(clientMarker)
+
+        // Restaurar marcador do prestador se havia posição anterior
+        if (previousProviderPos != null) {
+            providerMarker = Marker(map).apply {
+                position = previousProviderPos
+                title = if (isProviderView) "Você" else "Prestador"
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                icon = ContextCompat.getDrawable(this@OrderDetailsActivity, R.drawable.ic_location)
+            }
+            map.overlays.add(providerMarker)
+            val boundingBox = org.osmdroid.util.BoundingBox.fromGeoPoints(listOf(previousProviderPos, clientPoint))
+            map.zoomToBoundingBox(boundingBox.increaseByScale(1.4f), true)
+        }
+
+        // Adicionar overlay para detectar clique no mapa e expandir fullscreen
+        // (o setOnClickListener no cardMap não funciona porque o MapView intercepta os toques)
+        val tapOverlay = object : org.osmdroid.views.overlay.Overlay() {
+            override fun onSingleTapConfirmed(e: android.view.MotionEvent?, mapView: org.osmdroid.views.MapView?): Boolean {
+                openFullScreenMap()
+                return true
+            }
+        }
+        map.overlays.add(tapOverlay)
+
+        if (isProviderView) {
+            // Prestador vendo: usar GPS do dispositivo
+            startProviderLocationUpdates(clientPoint, map)
+        } else {
+            // Cliente vendo: buscar localização do prestador via Firestore
+            val providerId = order.assignedProvider
+            if (!providerId.isNullOrEmpty()) {
+                startProviderLocationFromFirestore(providerId, clientPoint, map)
+            }
+        }
+    }
+
+    private fun openFullScreenMap() {
+        val dialog = android.app.Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
+        val view = layoutInflater.inflate(R.layout.dialog_fullscreen_map, null)
+        dialog.setContentView(view)
+
+        val fullMap = view.findViewById<org.osmdroid.views.MapView>(R.id.mapFullscreen)
+        val btnClose = view.findViewById<com.google.android.material.button.MaterialButton>(R.id.btnCloseMap)
+
+        fullMap.setTileSource(org.osmdroid.tileprovider.tilesource.TileSourceFactory.MAPNIK)
+        fullMap.setMultiTouchControls(true)
+
+        // Adicionar marcador do cliente
+        if (currentClientPoint != null) {
+            val cm = org.osmdroid.views.overlay.Marker(fullMap).apply {
+                position = currentClientPoint
+                title = "Local do serviço"
+                setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM)
+            }
+            fullMap.overlays.add(cm)
+        }
+
+        // Adicionar marcador do prestador
+        val providerPos = providerMarker?.position
+        if (providerPos != null) {
+            val pm = org.osmdroid.views.overlay.Marker(fullMap).apply {
+                position = providerPos
+                title = if (isProviderView) "Você" else "Prestador"
+                setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_BOTTOM)
+                icon = ContextCompat.getDrawable(this@OrderDetailsActivity, R.drawable.ic_location)
+            }
+            fullMap.overlays.add(pm)
+        }
+
+        // Ajustar zoom
+        val points = listOfNotNull(currentClientPoint, providerPos)
+        if (points.size == 2) {
+            val bb = org.osmdroid.util.BoundingBox.fromGeoPoints(points)
+            fullMap.post {
+                fullMap.zoomToBoundingBox(bb.increaseByScale(1.3f), false)
+            }
+        } else if (currentClientPoint != null) {
+            fullMap.controller.setZoom(15.5)
+            fullMap.controller.setCenter(currentClientPoint)
+        }
+
+        btnClose.setOnClickListener {
+            fullMap.onDetach()
+            dialog.dismiss()
+        }
+
+        dialog.setOnDismissListener {
+            fullMap.onDetach()
+        }
+
+        dialog.show()
+    }
+
+    /**
+     * Escuta localização do prestador via Firestore (para visão do cliente).
+     */
+    private fun startProviderLocationFromFirestore(providerId: String, clientPoint: GeoPoint, map: org.osmdroid.views.MapView) {
+        providerLocationListener?.remove()
+        providerLocationListener = db.collection("users").document(providerId)
+            .addSnapshotListener { doc, error ->
+                if (error != null || doc == null || !doc.exists()) return@addSnapshotListener
+                val lat = doc.getDouble("latitude") ?: return@addSnapshotListener
+                val lng = doc.getDouble("longitude") ?: return@addSnapshotListener
+
+                val providerPoint = GeoPoint(lat, lng)
+                if (providerMarker == null) {
+                    providerMarker = Marker(map).apply {
+                        position = providerPoint
+                        title = "Prestador"
+                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                        icon = ContextCompat.getDrawable(this@OrderDetailsActivity, R.drawable.ic_location)
+                    }
+                    map.overlays.add(providerMarker)
+                } else {
+                    providerMarker?.position = providerPoint
+                }
+
+                if (shouldUpdateRoute(providerPoint)) {
+                    fetchRouteFromOSRM(providerPoint, clientPoint, map)
+                    lastRouteUpdateAt = System.currentTimeMillis()
+                    lastProviderPoint = providerPoint
+                }
+
+                val boundingBox = org.osmdroid.util.BoundingBox.fromGeoPoints(listOf(providerPoint, clientPoint))
+                map.zoomToBoundingBox(boundingBox.increaseByScale(1.4f), true)
+                map.invalidate()
+            }
+    }
+
+    /**
+     * Inicia atualização contínua da localização do prestador.
+     */
+    private fun startProviderLocationUpdates(clientPoint: GeoPoint, map: org.osmdroid.views.MapView) {
+        // Evitar múltiplos callbacks ativos
+        stopProviderLocationUpdates()
+
+        val fine = androidx.core.app.ActivityCompat.checkSelfPermission(
+            this,
+            android.Manifest.permission.ACCESS_FINE_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+        val coarse = androidx.core.app.ActivityCompat.checkSelfPermission(
+            this,
+            android.Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+        if (!fine && !coarse) {
+            binding.tvDistance.text = "Permissão de localização não concedida."
+            binding.tvDistance.visibility = View.VISIBLE
+            return
+        }
+
+        locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 10_000L)
+            .setMinUpdateIntervalMillis(5_000L)
+            .setMinUpdateDistanceMeters(10f)
+            .build()
+
+        locationCallback = object : LocationCallback() {
+            override fun onLocationResult(result: LocationResult) {
+                val loc = result.lastLocation ?: return
+                updateProviderLocation(loc, clientPoint, map)
+            }
+        }
+
+        // Primeira tentativa rápida
+        fusedLocationClient.lastLocation.addOnSuccessListener { loc ->
+            if (loc != null) {
+                updateProviderLocation(loc, clientPoint, map)
+            }
+        }
+
+        fusedLocationClient.requestLocationUpdates(
+            locationRequest!!,
+            locationCallback as LocationCallback,
+            Looper.getMainLooper()
+        )
+    }
+
+    /**
+     * Interrompe atualizações de localização.
+     */
+    private fun stopProviderLocationUpdates() {
+        locationCallback?.let { fusedLocationClient.removeLocationUpdates(it) }
+        locationCallback = null
+        locationRequest = null
+        providerLocationListener?.remove()
+        providerLocationListener = null
+    }
+
+    /**
+     * Atualiza marcador do prestador e recalcula rota quando necessário.
+     */
+    private fun updateProviderLocation(loc: Location, clientPoint: GeoPoint, map: org.osmdroid.views.MapView) {
+        val providerPoint = GeoPoint(loc.latitude, loc.longitude)
+        if (providerMarker == null) {
+            providerMarker = Marker(map).apply {
+                position = providerPoint
+                title = "Você"
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM)
+                icon = ContextCompat.getDrawable(this@OrderDetailsActivity, R.drawable.ic_location)
+            }
+            map.overlays.add(providerMarker)
+        } else {
+            providerMarker?.position = providerPoint
+        }
+
+        if (shouldUpdateRoute(providerPoint)) {
+            fetchRouteFromOSRM(providerPoint, clientPoint, map)
+            lastRouteUpdateAt = System.currentTimeMillis()
+            lastProviderPoint = providerPoint
+        }
+
+        // Ajustar zoom para mostrar ambos os pontos
+        val boundingBox = org.osmdroid.util.BoundingBox.fromGeoPoints(listOf(providerPoint, clientPoint))
+        map.zoomToBoundingBox(boundingBox.increaseByScale(1.4f), true)
+        map.invalidate()
+    }
+
+    /**
+     * Atualiza rota se o prestador se moveu ou passou tempo suficiente.
+     */
+    private fun shouldUpdateRoute(newPoint: GeoPoint): Boolean {
+        val now = System.currentTimeMillis()
+        if (lastProviderPoint == null) return true
+        val results = FloatArray(1)
+        Location.distanceBetween(
+            lastProviderPoint!!.latitude,
+            lastProviderPoint!!.longitude,
+            newPoint.latitude,
+            newPoint.longitude,
+            results
+        )
+        val movedEnough = results[0] >= 25f
+        val timeEnough = now - lastRouteUpdateAt >= 30_000L
+        return movedEnough || timeEnough
+    }
+
+    /**
+     * Busca rota real via OSRM (gratuito, sem API key) e desenha no mapa.
+     * Fallback para linha reta se a API falhar.
+     */
+    private fun fetchRouteFromOSRM(from: GeoPoint, to: GeoPoint, map: org.osmdroid.views.MapView) {
+        lifecycleScope.launch {
+            try {
+                val url = "https://router.project-osrm.org/route/v1/driving/" +
+                    "${from.longitude},${from.latitude};${to.longitude},${to.latitude}" +
+                    "?overview=full&geometries=geojson"
+
+                val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val client = okhttp3.OkHttpClient.Builder()
+                        .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                        .readTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
+                        .build()
+                    val request = okhttp3.Request.Builder()
+                        .url(url)
+                        .header("User-Agent", "AppServico/1.0")
+                        .build()
+                    val response = client.newCall(request).execute()
+                    val body = response.body?.string()
+                    if (response.isSuccessful && body != null) {
+                        val json = org.json.JSONObject(body)
+                        val routes = json.getJSONArray("routes")
+                        if (routes.length() > 0) {
+                            val route = routes.getJSONObject(0)
+                            val distanceMeters = route.getDouble("distance")
+                            val durationSeconds = route.getDouble("duration")
+                            val geometry = route.getJSONObject("geometry")
+                            val coordinates = geometry.getJSONArray("coordinates")
+
+                            val points = mutableListOf<GeoPoint>()
+                            for (i in 0 until coordinates.length()) {
+                                val coord = coordinates.getJSONArray(i)
+                                points.add(GeoPoint(coord.getDouble(1), coord.getDouble(0)))
+                            }
+                            Triple(points, distanceMeters, durationSeconds)
+                        } else null
+                    } else {
+                        android.util.Log.e("OrderDetails", "OSRM HTTP ${response.code}: $body")
+                        null
+                    }
+                }
+
+                if (result != null) {
+                    val (points, distanceMeters, durationSeconds) = result
+
+                    // Desenhar rota real
+                    map.overlays.remove(routeLine)
+                    routeLine = Polyline().apply {
+                        outlinePaint.color = ContextCompat.getColor(this@OrderDetailsActivity, R.color.primary_color)
+                        outlinePaint.strokeWidth = 8f
+                        outlinePaint.strokeCap = android.graphics.Paint.Cap.ROUND
+                        outlinePaint.strokeJoin = android.graphics.Paint.Join.ROUND
+                        setPoints(points)
+                    }
+                    map.overlays.add(routeLine)
+                    map.invalidate()
+
+                    // Mostrar distância e tempo
+                    val distText = if (distanceMeters >= 1000) {
+                        "%.1f km".format(distanceMeters / 1000.0)
+                    } else {
+                        "%.0f m".format(distanceMeters)
+                    }
+                    val minutes = (durationSeconds / 60).toInt()
+                    val timeText = if (minutes >= 60) {
+                        "${minutes / 60}h${minutes % 60}min"
+                    } else {
+                        "${minutes} min"
+                    }
+                    binding.tvDistance.text = "Distância: $distText ~ $timeText de carro"
+                    binding.tvDistance.visibility = View.VISIBLE
+                } else {
+                    drawFallbackRoute(from, to, map)
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("OrderDetails", "OSRM falhou: ${e.message}", e)
+                drawFallbackRoute(from, to, map)
+            }
+        }
+    }
+
+    /**
+     * Desenha linha reta como fallback quando OSRM não está disponível.
+     */
+    private fun drawFallbackRoute(from: GeoPoint, to: GeoPoint, map: org.osmdroid.views.MapView) {
+        map.overlays.remove(routeLine)
+        routeLine = Polyline().apply {
+            outlinePaint.color = ContextCompat.getColor(this@OrderDetailsActivity, R.color.primary_color)
+            outlinePaint.strokeWidth = 6f
+            addPoint(from)
+            addPoint(to)
+        }
+        map.overlays.add(routeLine)
+
+        val results = FloatArray(1)
+        Location.distanceBetween(from.latitude, from.longitude, to.latitude, to.longitude, results)
+        val distText = if (results[0] >= 1000) {
+            "%.1f km".format(results[0] / 1000.0)
+        } else {
+            "%.0f m".format(results[0])
+        }
+        binding.tvDistance.text = "Distância: $distText (linha reta)"
+        binding.tvDistance.visibility = View.VISIBLE
+        map.invalidate()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        binding.mapOrder.onResume()
+        currentClientPoint?.let { clientPoint ->
+            if (isProviderView) {
+                startProviderLocationUpdates(clientPoint, binding.mapOrder)
+            } else {
+                val providerId = order?.assignedProvider
+                if (!providerId.isNullOrEmpty()) {
+                    startProviderLocationFromFirestore(providerId, clientPoint, binding.mapOrder)
+                }
+            }
+        }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        stopProviderLocationUpdates()
+        binding.mapOrder.onPause()
+    }
     
     /**
      * Controla o estado de carregamento
@@ -747,15 +1517,4 @@ class OrderDetailsActivity : AppCompatActivity() {
         }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        
-        if (requestCode == RATING_REQUEST_CODE) {
-            if (resultCode == RESULT_OK) {
-                showToast("✅ Avaliação enviada com sucesso!")
-                // Atualizar a interface se necessário
-                loadOrderDetails()
-            }
-        }
-    }
 } 

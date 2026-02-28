@@ -58,10 +58,13 @@ class FirebaseProviderManager {
         val address: Address,
         val bank: BankInfo,
         val services: List<String>,
+        val pixKey: String? = null,
+        val pixKeyType: String? = null, // "celular" ou "cpf"
         val verificationStatus: String = "pending", // pending, verified, rejected
         val rating: Double = 0.0,
         val totalJobs: Int = 0,
         val completedJobs: Int = 0,
+        val totalEarnings: Double = 0.0, // Lucro total do prestador
         val isActive: Boolean = true,
         val bio: String = "",
         val profileImageUrl: String? = null,
@@ -82,13 +85,26 @@ class FirebaseProviderManager {
      */
     suspend fun hasProviderProfile(uid: String): Boolean {
         return try {
+            Log.d(TAG, "🔍 Verificando se usuário $uid tem perfil de prestador...")
+            Log.d(TAG, "📂 Consultando coleção: $PROVIDERS_COLLECTION")
+            
             val doc = db.collection(PROVIDERS_COLLECTION)
                 .document(uid)
                 .get()
                 .await()
-            doc.exists()
+            
+            val exists = doc.exists()
+            Log.d(TAG, "📊 Perfil de prestador existe? $exists")
+            
+            if (exists) {
+                Log.d(TAG, "✅ Usuário tem perfil de prestador")
+            } else {
+                Log.d(TAG, "❌ Usuário não tem perfil de prestador")
+            }
+            
+            exists
         } catch (e: Exception) {
-            Log.e(TAG, "Erro ao verificar perfil do prestador: ${e.message}")
+            Log.e(TAG, "❌ Erro ao verificar perfil do prestador: ${e.message}", e)
             false
         }
     }
@@ -98,7 +114,8 @@ class FirebaseProviderManager {
      */
     suspend fun updateProfile(profile: ProviderProfile): ProviderResult {
         return try {
-            Log.d(TAG, "Atualizando perfil do prestador: ${profile.uid}")
+            Log.d(TAG, "🔄 Atualizando perfil do prestador: ${profile.uid}")
+            Log.d(TAG, "📂 Coleção: $PROVIDERS_COLLECTION")
             
             val profileData = mapOf(
                 "uid" to profile.uid,
@@ -122,10 +139,13 @@ class FirebaseProviderManager {
                     "accountType" to profile.bank.accountType
                 ),
                 "services" to profile.services,
+                "pixKey" to profile.pixKey,
+                "pixKeyType" to profile.pixKeyType,
                 "verificationStatus" to profile.verificationStatus,
                 "rating" to profile.rating,
                 "totalJobs" to profile.totalJobs,
                 "completedJobs" to profile.completedJobs,
+                "totalEarnings" to profile.totalEarnings,
                 "isActive" to profile.isActive,
                 "bio" to profile.bio,
                 "profileImageUrl" to profile.profileImageUrl,
@@ -133,16 +153,17 @@ class FirebaseProviderManager {
                 "updatedAt" to Date()
             )
             
+            Log.d(TAG, "📝 Salvando dados na coleção providers...")
             db.collection(PROVIDERS_COLLECTION)
                 .document(profile.uid)
                 .set(profileData)
                 .await()
             
-            Log.d(TAG, "Perfil do prestador atualizado: ${profile.uid}")
+            Log.d(TAG, "✅ Perfil do prestador salvo com sucesso: ${profile.uid}")
             ProviderResult.Success
             
         } catch (e: Exception) {
-            Log.e(TAG, "Erro ao atualizar perfil: ${e.message}")
+            Log.e(TAG, "❌ Erro ao atualizar perfil: ${e.message}", e)
             ProviderResult.Error("Erro ao atualizar perfil: ${e.message}")
         }
     }
@@ -187,10 +208,13 @@ class FirebaseProviderManager {
                     accountType = bankData["accountType"] as? String ?: "CONTA_CORRENTE"
                 ),
                 services = (data["services"] as? List<*>)?.mapNotNull { it as? String } ?: emptyList(),
+                pixKey = data["pixKey"] as? String,
+                pixKeyType = data["pixKeyType"] as? String,
                 verificationStatus = data["verificationStatus"] as? String ?: "pending",
                 rating = (data["rating"] as? Double) ?: 0.0,
                 totalJobs = (data["totalJobs"] as? Long)?.toInt() ?: 0,
                 completedJobs = (data["completedJobs"] as? Long)?.toInt() ?: 0,
+                totalEarnings = (data["totalEarnings"] as? Double) ?: 0.0,
                 isActive = data["isActive"] as? Boolean ?: true,
                 bio = data["bio"] as? String ?: "",
                 profileImageUrl = data["profileImageUrl"] as? String,
@@ -283,6 +307,32 @@ class FirebaseProviderManager {
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao buscar prestadores: ${e.message}")
             emptyList()
+        }
+    }
+    
+    /**
+     * Atualiza a URL da foto de perfil do prestador
+     */
+    suspend fun updateProfileImage(uid: String, profileImageUrl: String): ProviderResult {
+        return try {
+            Log.d(TAG, "Atualizando foto de perfil do prestador: $uid")
+            
+            db.collection(PROVIDERS_COLLECTION)
+                .document(uid)
+                .update(
+                    mapOf(
+                        "profileImageUrl" to profileImageUrl,
+                        "updatedAt" to Date()
+                    )
+                )
+                .await()
+            
+            Log.d(TAG, "Foto de perfil atualizada: $uid")
+            ProviderResult.Success
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao atualizar foto de perfil: ${e.message}")
+            ProviderResult.Error("Erro ao atualizar foto de perfil: ${e.message}")
         }
     }
     

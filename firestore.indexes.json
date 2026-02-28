@@ -1,20 +1,6 @@
 {
   "indexes": [
     {
-      "collectionGroup": "provider_verifications",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "providerId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "createdAt",
-          "order": "DESCENDING"
-        }
-      ]
-    },
-    {
       "collectionGroup": "provider_documents",
       "queryScope": "COLLECTION",
       "fields": [
@@ -73,6 +59,8 @@
   ],
   "fieldOverrides": []
 }
+
+
 
 
 

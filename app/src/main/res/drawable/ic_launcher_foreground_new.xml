@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Logo "A" estilizado do Aqui Resolve -->
+    <!-- Safe zone: centro 66dp de 108dp (margem de 21dp cada lado) -->
+    
+    <!-- Letra A estilizada - arco superior azul -->
+    <path
+        android:fillColor="#2563EB"
+        android:pathData="M54,24
+                          C36,24 22,38 22,54
+                          C22,58 23,62 25,66
+                          L35,66
+                          C33,62 32,58 32,54
+                          C32,44 42,34 54,34
+                          C66,34 76,44 76,54
+                          L86,54
+                          C86,38 72,24 54,24Z" />
+    
+    <!-- Perna direita da letra A - azul -->
+    <path
+        android:fillColor="#2563EB"
+        android:pathData="M62,50
+                          L62,84
+                          L72,84
+                          L72,50
+                          C72,44 64,38 54,38
+                          L54,48
+                          C60,48 62,49 62,50Z" />
+    
+    <!-- Onda laranja decorativa (detalhe inferior) -->
+    <path
+        android:fillColor="#FF7A00"
+        android:pathData="M36,70
+                          C40,66 47,64 54,64
+                          C61,64 68,66 72,70
+                          L72,80
+                          C68,76 61,74 54,74
+                          C47,74 40,76 36,80
+                          Z" />
+
+</vector>

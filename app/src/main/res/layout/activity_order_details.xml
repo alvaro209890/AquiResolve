@@ -116,7 +116,7 @@
                                 android:id="@+id/tvServiceNiche"
                                 android:layout_width="wrap_content"
                                 android:layout_height="wrap_content"
-                                android:text="Hidráulica"
+                                android:text="Encanador"
                                 android:textSize="18sp"
                                 android:textStyle="bold"
                                 android:textColor="@color/text_primary" />
@@ -318,6 +318,32 @@
                         android:layout_marginStart="32dp"
                         android:visibility="gone" />
 
+                    <!-- Distância e mapa -->
+                    <TextView
+                        android:id="@+id/tvDistance"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Distância: --"
+                        android:textSize="14sp"
+                        android:textColor="@color/text_primary"
+                        android:layout_marginTop="12dp"
+                        android:visibility="gone" />
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardMap"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:visibility="gone"
+                        app:cardCornerRadius="12dp"
+                        app:cardElevation="2dp">
+
+                        <org.osmdroid.views.MapView
+                            android:id="@+id/mapOrder"
+                            android:layout_width="match_parent"
+                            android:layout_height="220dp" />
+                    </com.google.android.material.card.MaterialCardView>
+
                 </LinearLayout>
 
             </com.google.android.material.card.MaterialCardView>
@@ -351,7 +377,8 @@
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/rvImages"
                         android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
+                        android:layout_height="wrap_content"
+                        android:nestedScrollingEnabled="false" />
 
                 </LinearLayout>
 
@@ -390,6 +417,7 @@
                         android:gravity="center_vertical">
 
                         <ImageView
+                            android:id="@+id/ivProviderPhoto"
                             android:layout_width="48dp"
                             android:layout_height="48dp"
                             android:src="@drawable/ic_person"
@@ -435,6 +463,105 @@
                             android:padding="8dp" />
 
                     </LinearLayout>
+
+                </LinearLayout>
+
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Código de Finalização (apenas para cliente quando pedido aceito) -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardVerificationCode"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:cardCornerRadius="12dp"
+                app:cardElevation="4dp"
+                app:cardBackgroundColor="@color/success_color"
+                android:layout_marginBottom="16dp"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="🔐 Código de Finalização"
+                        android:textSize="18sp"
+                        android:textStyle="bold"
+                        android:textColor="@color/white"
+                        android:layout_marginBottom="12dp" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Guarde este código. O prestador irá solicitá-lo ao finalizar o serviço."
+                        android:textSize="14sp"
+                        android:textColor="@color/white"
+                        android:layout_marginBottom="12dp" />
+
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        app:cardCornerRadius="8dp"
+                        app:cardElevation="2dp"
+                        app:cardBackgroundColor="@color/white">
+
+                        <LinearLayout
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:orientation="horizontal"
+                            android:padding="16dp"
+                            android:gravity="center_vertical">
+
+                            <TextView
+                                android:id="@+id/tvVerificationCode"
+                                android:layout_width="0dp"
+                                android:layout_height="wrap_content"
+                                android:layout_weight="1"
+                                android:text="000000"
+                                android:textSize="24sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/primary_color"
+                                android:fontFamily="monospace"
+                                android:gravity="center" />
+
+                            <ImageView
+                                android:id="@+id/btnCopyCode"
+                                android:layout_width="32dp"
+                                android:layout_height="32dp"
+                                android:src="@android:drawable/ic_menu_share"
+                                android:background="?attr/selectableItemBackgroundBorderless"
+                                android:padding="6dp"
+                                app:tint="@color/primary_color" />
+
+                        </LinearLayout>
+
+                    </com.google.android.material.card.MaterialCardView>
+
+                    <!-- Aviso sobre confirmação de serviço -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        app:cardCornerRadius="8dp"
+                        app:cardElevation="2dp"
+                        app:cardBackgroundColor="#B3FFFFFF">
+
+                        <TextView
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="⚠️ IMPORTANTE: Ao fornecer este código para o prestador, você está confirmando que o serviço foi realizado completamente e sem danos à sua residência."
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/primary_color"
+                            android:padding="12dp"
+                            android:lineSpacingExtra="4dp"
+                            android:gravity="center_vertical" />
+
+                    </com.google.android.material.card.MaterialCardView>
 
                 </LinearLayout>
 
@@ -490,7 +617,35 @@
                         android:layout_height="wrap_content"
                         android:text="Motivo: --"
                         android:textSize="14sp"
-                        android:textColor="@color/text_secondary" />
+                        android:textColor="@color/text_secondary"
+                        android:layout_marginBottom="12dp" />
+
+                    <!-- Informações sobre reembolso (apenas para cancelamento pelo cliente) -->
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/cardRefundInfo"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        app:cardCornerRadius="8dp"
+                        app:cardElevation="0dp"
+                        app:cardBackgroundColor="#E8F5E9"
+                        app:strokeWidth="1dp"
+                        app:strokeColor="@color/success_color"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:id="@+id/tvRefundInfo"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="💳 O valor pago será reembolsado automaticamente em até 24 horas."
+                            android:textSize="13sp"
+                            android:textStyle="bold"
+                            android:textColor="@color/success_color"
+                            android:padding="12dp"
+                            android:lineSpacingExtra="2dp"
+                            android:gravity="center_vertical" />
+
+                    </com.google.android.material.card.MaterialCardView>
 
                 </LinearLayout>
 
@@ -582,6 +737,25 @@
                     android:padding="12dp"
                     android:minHeight="48dp"
                     android:visibility="visible" />
+
+                <!-- Botão Recorrer (visível apenas para completed/cancelled) -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnAppeal"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Recorrer ao Serviço"
+                    android:textSize="14sp"
+                    app:cornerRadius="8dp"
+                    app:icon="@drawable/ic_help"
+                    app:iconGravity="textStart"
+                    app:iconPadding="8dp"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:textColor="@color/primary_color"
+                    app:strokeColor="@color/primary_color"
+                    android:padding="12dp"
+                    android:minHeight="48dp"
+                    android:layout_marginTop="8dp"
+                    android:visibility="gone" />
 
             </LinearLayout>
 

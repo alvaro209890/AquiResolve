@@ -2,21 +2,26 @@ package com.example.loginapp
 
 import android.app.Activity
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.provider.MediaStore
 import android.view.View
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.loginapp.adapters.DocumentUploadAdapter
 import com.example.loginapp.databinding.ActivityDocumentUploadBinding
 import com.example.loginapp.models.DocumentUploadItem
 import kotlinx.coroutines.launch
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -40,6 +45,8 @@ class DocumentUploadActivity : AppCompatActivity() {
     private var documents = mutableListOf<DocumentUploadItem>()
     private var verificationId: String? = null
     private lateinit var authManager: FirebaseAuthManager
+    private var currentDocumentType: ProviderVerificationManager.DocumentType? = null
+    private var currentPhotoFile: File? = null
     
     // Adapter da lista
     private lateinit var documentAdapter: DocumentUploadAdapter
@@ -55,6 +62,23 @@ class DocumentUploadActivity : AppCompatActivity() {
         }
     }
 
+    // Launcher para câmera
+    private val cameraLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            currentPhotoFile?.let { file ->
+                val photoUri = FileProvider.getUriForFile(
+                    this,
+                    "${packageName}.fileprovider",
+                    file
+                )
+                handleDocumentSelection(photoUri)
+            }
+        }
+        currentPhotoFile = null
+    }
+
     // Launcher para permissão de mídia
     private val requestMediaPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
@@ -63,6 +87,16 @@ class DocumentUploadActivity : AppCompatActivity() {
                 showDocumentTypeDialog()
             } else {
                 showToast("Permissão de acesso a mídia negada. Não será possível enviar documentos.")
+            }
+        }
+    
+    // Launcher para permissão de câmera
+    private val requestCameraPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
+            if (isGranted) {
+                takePhoto()
+            } else {
+                showToast("Permissão de câmera negada. Não será possível tirar fotos.")
             }
         }
 
@@ -162,6 +196,10 @@ class DocumentUploadActivity : AppCompatActivity() {
                 if (existingVerification != null) {
                     verificationId = existingVerification.id
                     loadExistingDocuments()
+                    // Se não há documentos (prestador novo ou sem uploads), mostrar slots obrigatórios
+                    if (documents.isEmpty()) {
+                        setupRequiredDocuments()
+                    }
                 } else {
                     // Iniciar nova verificação
                     startNewVerification()
@@ -391,20 +429,70 @@ class DocumentUploadActivity : AppCompatActivity() {
     }
 
     /**
-     * Abre seletor de documentos
+     * Abre seletor de documentos com opção de câmera ou galeria
      */
     private fun openDocumentPicker(documentType: ProviderVerificationManager.DocumentType) {
-        val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
-            type = "*/*"
-            addCategory(Intent.CATEGORY_OPENABLE)
-            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(
-                "image/jpeg",
-                "image/png",
-                "application/pdf"
-            ))
-        }
+        currentDocumentType = documentType
+        val options = arrayOf("📷 Tirar Foto", "🖼️ Escolher da Galeria")
         
-        documentPickerLauncher.launch(Intent.createChooser(intent, "Selecionar Documento"))
+        AlertDialog.Builder(this)
+            .setTitle("Enviar ${documentType.displayName}")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> {
+                        // Tirar foto
+                        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.CAMERA) 
+                            != PackageManager.PERMISSION_GRANTED) {
+                            requestCameraPermissionLauncher.launch(android.Manifest.permission.CAMERA)
+                        } else {
+                            takePhoto()
+                        }
+                    }
+                    1 -> {
+                        // Escolher da galeria
+                        val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
+                            type = "image/*"
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(
+                                "image/jpeg",
+                                "image/png"
+                            ))
+                        }
+                        documentPickerLauncher.launch(Intent.createChooser(intent, "Selecionar Imagem"))
+                    }
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+    
+    /**
+     * Tira foto do documento
+     */
+    private fun takePhoto() {
+        try {
+            val photoFile = File(getExternalFilesDir(null), "photo_${System.currentTimeMillis()}.jpg")
+            currentPhotoFile = photoFile
+            
+            val photoUri = FileProvider.getUriForFile(
+                this,
+                "${packageName}.fileprovider",
+                photoFile
+            )
+            
+            val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE).apply {
+                putExtra(MediaStore.EXTRA_OUTPUT, photoUri)
+                addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION)
+            }
+            
+            if (intent.resolveActivity(packageManager) != null) {
+                cameraLauncher.launch(intent)
+            } else {
+                showToast("Câmera não disponível")
+            }
+        } catch (e: Exception) {
+            showToast("Erro ao abrir câmera: ${e.message}")
+        }
     }
 
     /**
@@ -570,57 +658,91 @@ class DocumentUploadActivity : AppCompatActivity() {
     }
 
     /**
-     * Submete para análise
+     * Submete para análise com barra de progresso de upload
      */
     private fun uploadAllAndSubmit() {
         val currentUser = authManager.getLocalUserData()
         if (currentUser == null) return
-        
+
         setLoadingState(true)
-        
+        binding.layoutUploadProgress.visibility = View.VISIBLE
+        binding.progressBarUpload.progress = 0
+        binding.tvUploadStatus.text = "Preparando envio..."
+
         lifecycleScope.launch {
             try {
                 val verificationManager = ProviderVerificationManager()
+                val docsToUpload = documents.filter {
+                    it.status == DocumentUploadItem.Status.SELECTED && it.fileUri != null
+                }
+                val totalSteps = docsToUpload.size + 1 // +1 para submissão final
+                var currentStep = 0
+
                 // 1) Fazer upload de todos com status SELECTED
-                for (item in documents) {
-                    if (item.status == DocumentUploadItem.Status.SELECTED && item.fileUri != null) {
-                        val result = verificationManager.uploadDocument(
-                            context = this@DocumentUploadActivity,
-                            providerId = currentUser.uid,
-                            documentType = item.type,
-                            fileName = item.fileName,
-                            fileSize = item.fileSize,
-                            fileUri = item.fileUri
-                        )
-                        if (result !is ProviderVerificationManager.VerificationResult.Success) {
-                            throw IllegalStateException("Falha ao enviar ${item.type.displayName}")
-                        }
+                for (item in docsToUpload) {
+                    currentStep++
+                    val progress = (currentStep * 100) / totalSteps
+                    runOnUiThread {
+                        binding.tvUploadStatus.text = "Enviando ${item.type.displayName}... ($currentStep/$totalSteps)"
+                        binding.progressBarUpload.progress = progress
+                    }
+
+                    val result = verificationManager.uploadDocument(
+                        context = this@DocumentUploadActivity,
+                        providerId = currentUser.uid,
+                        documentType = item.type,
+                        fileName = item.fileName,
+                        fileSize = item.fileSize,
+                        fileUri = item.fileUri!!
+                    )
+                    if (result !is ProviderVerificationManager.VerificationResult.Success) {
+                        throw IllegalStateException("Falha ao enviar ${item.type.displayName}")
+                    }
+
+                    // Atualizar item na lista
+                    val idx = documents.indexOf(item)
+                    if (idx != -1) {
+                        documents[idx] = item.copy(status = DocumentUploadItem.Status.UPLOADED, uploadedAt = Date())
+                        runOnUiThread { documentAdapter.notifyItemChanged(idx) }
                     }
                 }
 
                 // 2) Submeter para análise
+                runOnUiThread {
+                    binding.tvUploadStatus.text = "Enviando para verificação..."
+                    binding.progressBarUpload.progress = 95
+                }
+
                 val submitResult = verificationManager.submitForReview(currentUser.uid)
                 if (submitResult is ProviderVerificationManager.VerificationResult.Success) {
-                    // 3) Bloquear exclusão: marcar como SUBMITTED
+                    runOnUiThread {
+                        binding.tvUploadStatus.text = "Enviado com sucesso!"
+                        binding.progressBarUpload.progress = 100
+                    }
+
                     documents.replaceAll { d ->
                         if (d.status == DocumentUploadItem.Status.SELECTED || d.status == DocumentUploadItem.Status.UPLOADED) {
                             d.copy(status = DocumentUploadItem.Status.SUBMITTED, uploadedAt = d.uploadedAt ?: Date())
                         } else d
                     }
-                    documentAdapter.notifyDataSetChanged()
-                    updateUI()
+                    runOnUiThread {
+                        documentAdapter.notifyDataSetChanged()
+                        updateUI()
+                    }
 
-                    showSuccessMessage("✅ Documentos enviados para verificação!")
-                    showSuccessMessage("📧 Você será notificado sobre o resultado em até 48 horas")
+                    showSuccessMessage("Documentos enviados para verificação! Você será notificado em até 48 horas.")
                     binding.root.postDelayed({ finish() }, 2000)
                 } else if (submitResult is ProviderVerificationManager.VerificationResult.Error) {
-                    showErrorMessage("❌ ${submitResult.message}")
+                    showErrorMessage(submitResult.message)
                 }
-                
+
             } catch (e: Exception) {
-                showErrorMessage("❌ Erro ao enviar verificação")
+                showErrorMessage("Erro ao enviar verificação: ${e.message}")
             } finally {
                 setLoadingState(false)
+                runOnUiThread {
+                    binding.layoutUploadProgress.visibility = View.GONE
+                }
             }
         }
     }
@@ -755,32 +877,43 @@ class DocumentUploadActivity : AppCompatActivity() {
     }
 
     /**
-     * Obtém nome do arquivo
+     * Obtém nome do arquivo (compatível com content:// URIs no Android 10+)
      */
     private fun getFileName(uri: Uri): String? {
+        val fallback = uri.lastPathSegment?.substringAfterLast("/") ?: "document_${System.currentTimeMillis()}.jpg"
         return try {
-            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                val nameIndex = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME)
-                if (nameIndex == -1) return null
-                if (!cursor.moveToFirst()) return null
-                cursor.getString(nameIndex)
-            }
+            contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val idx = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                    if (idx >= 0) cursor.getString(idx)?.takeIf { it.isNotBlank() } ?: fallback else fallback
+                } else fallback
+            } ?: contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val idx = cursor.getColumnIndex(MediaStore.MediaColumns.DISPLAY_NAME)
+                    if (idx >= 0) cursor.getString(idx)?.takeIf { it.isNotBlank() } ?: fallback else fallback
+                } else fallback
+            } ?: fallback
         } catch (e: Exception) {
-            null
+            fallback
         }
     }
 
     /**
-     * Obtém tamanho do arquivo
+     * Obtém tamanho do arquivo (compatível com content:// URIs no Android 10+)
      */
     private fun getFileSize(uri: Uri): Long? {
         return try {
-            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
-                val sizeIndex = cursor.getColumnIndex(MediaStore.MediaColumns.SIZE)
-                if (sizeIndex == -1) return null
-                if (!cursor.moveToFirst()) return null
-                cursor.getLong(sizeIndex)
-            }
+            contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val sizeIndex = cursor.getColumnIndex(OpenableColumns.SIZE)
+                    if (sizeIndex >= 0) cursor.getLong(sizeIndex) else null
+                } else null
+            } ?: contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val sizeIndex = cursor.getColumnIndex(MediaStore.MediaColumns.SIZE)
+                    if (sizeIndex >= 0) cursor.getLong(sizeIndex) else null
+                } else null
+            } ?: contentResolver.openAssetFileDescriptor(uri, "r")?.use { it.length }
         } catch (e: Exception) {
             null
         }
@@ -791,10 +924,16 @@ class DocumentUploadActivity : AppCompatActivity() {
      */
     private fun setLoadingState(loading: Boolean) {
         isLoading = loading
-        
-        binding.progressBar.visibility = if (loading) View.VISIBLE else View.GONE
-        binding.btnSubmitForReview.isEnabled = !loading && documents.isNotEmpty()
+
+        binding.btnSubmitForReview.isEnabled = !loading && documents.none { it.status == DocumentUploadItem.Status.PENDING }
         binding.btnUploadDocument.isEnabled = !loading
+        binding.btnSaveProgress.isEnabled = !loading
+
+        if (loading) {
+            binding.btnSubmitForReview.text = "Enviando..."
+        } else {
+            binding.btnSubmitForReview.text = "Enviar para Verificação"
+        }
     }
 
     /**

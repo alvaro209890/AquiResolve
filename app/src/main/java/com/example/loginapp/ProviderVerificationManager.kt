@@ -24,7 +24,7 @@ class ProviderVerificationManager {
     
     companion object {
         private const val TAG = "ProviderVerificationManager"
-        private const val VERIFICATIONS_COLLECTION = "provider_verifications"
+        private const val PROVIDERS_COLLECTION = "providers"
         private const val DOCUMENTS_COLLECTION = "provider_documents"
     }
     
@@ -113,36 +113,15 @@ class ProviderVerificationManager {
     }
     
     /**
-     * Inicia processo de verificação
+     * Inicia processo de verificação.
+     * O status é gerenciado na coleção providers - não cria documentos em provider_verifications.
+     * Retorna VerificationCreated(providerId) para compatibilidade com fluxo de upload de documentos.
      */
     suspend fun startVerification(providerId: String): VerificationResult {
         return try {
-            Log.d(TAG, "Iniciando verificação para prestador: $providerId")
-            
-            // Verificar se já existe verificação ativa
-            val existingVerification = getVerificationStatus(providerId)
-            if (existingVerification != null && existingVerification.status != VerificationStatus.EXPIRED) {
-                Log.d(TAG, "Verificação já existe: ${existingVerification.id}")
-                return VerificationResult.Success
-            }
-            
-            // Criar nova verificação
-            val verificationId = db.collection(VERIFICATIONS_COLLECTION).document().id
-            val verificationData = VerificationData(
-                id = verificationId,
-                providerId = providerId,
-                status = VerificationStatus.PENDING
-            )
-            
-            // Salvar no Firestore
-            db.collection(VERIFICATIONS_COLLECTION)
-                .document(verificationId)
-                .set(verificationData)
-                .await()
-            
-            Log.d(TAG, "Verificação criada: $verificationId")
-            VerificationResult.VerificationCreated(verificationId)
-            
+            Log.d(TAG, "Iniciando verificação para prestador: $providerId (status em providers)")
+            // O prestador já existe na coleção providers com verificationStatus do cadastro
+            VerificationResult.VerificationCreated(providerId)
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao iniciar verificação: ${e.message}")
             VerificationResult.Error("Erro ao iniciar verificação: ${e.message}")
@@ -150,47 +129,91 @@ class ProviderVerificationManager {
     }
     
     /**
-     * Obtém status da verificação
+     * Obtém status da verificação da coleção providers.
+     * Usa o campo verificationStatus do documento do prestador.
+     * "verified" ou "verificado" = aprovado.
      */
     suspend fun getVerificationStatus(providerId: String): VerificationData? {
         return try {
-            // Consulta sem orderBy para não exigir índice composto
-            val snapshot = db.collection(VERIFICATIONS_COLLECTION)
-                .whereEqualTo("providerId", providerId)
+            Log.d(TAG, "🔍 Consultando verificação para prestador: $providerId")
+            Log.d(TAG, "📂 Coleção: $PROVIDERS_COLLECTION")
+            
+            val doc = db.collection(PROVIDERS_COLLECTION)
+                .document(providerId)
                 .get()
                 .await()
 
-            if (snapshot.isEmpty) {
-                null
-            } else {
-                // Selecionar manualmente a verificação mais recente por createdAt
-                val mostRecentDoc = snapshot.documents.maxByOrNull { doc ->
-                    doc.getDate("createdAt")?.time ?: 0L
-                } ?: snapshot.documents.first()
-
-                VerificationData(
-                    id = mostRecentDoc.id,
-                    providerId = mostRecentDoc.getString("providerId") ?: "",
-                    status = when (mostRecentDoc.getString("status")) {
-                        "PENDING" -> VerificationStatus.PENDING
-                        "UNDER_REVIEW" -> VerificationStatus.UNDER_REVIEW
-                        "APPROVED" -> VerificationStatus.APPROVED
-                        "REJECTED" -> VerificationStatus.REJECTED
-                        "EXPIRED" -> VerificationStatus.EXPIRED
-                        else -> VerificationStatus.PENDING
-                    },
-                    submittedAt = mostRecentDoc.getDate("submittedAt"),
-                    reviewedAt = mostRecentDoc.getDate("reviewedAt"),
-                    reviewedBy = mostRecentDoc.getString("reviewedBy"),
-                    rejectionReason = mostRecentDoc.getString("rejectionReason"),
-                    notes = mostRecentDoc.getString("notes") ?: "",
-                    createdAt = mostRecentDoc.getDate("createdAt") ?: Date(),
-                    expiresAt = mostRecentDoc.getDate("expiresAt") ?: Date()
-                )
+            if (!doc.exists()) {
+                Log.w(TAG, "❌ Prestador não encontrado na coleção providers")
+                return null
             }
+
+            val statusString = doc.getString("verificationStatus") ?: "pending"
+            Log.d(TAG, "📋 Status encontrado: $statusString")
+
+            VerificationData(
+                id = providerId,
+                providerId = providerId,
+                status = when (statusString.lowercase()) {
+                    "verified", "verificado" -> VerificationStatus.APPROVED
+                    "rejected", "rejeitado" -> VerificationStatus.REJECTED
+                    "under_review", "em_analise" -> VerificationStatus.UNDER_REVIEW
+                    "expired", "expirado" -> VerificationStatus.EXPIRED
+                    else -> VerificationStatus.PENDING
+                },
+                submittedAt = doc.getDate("updatedAt"),
+                reviewedAt = doc.getDate("updatedAt"),
+                reviewedBy = doc.getString("reviewedBy"),
+                rejectionReason = doc.getString("rejectionReason"),
+                notes = doc.getString("notes") ?: "",
+                createdAt = doc.getDate("createdAt") ?: Date(),
+                expiresAt = doc.getDate("expiresAt") ?: Date()
+            )
         } catch (e: Exception) {
-            Log.e(TAG, "Erro ao obter status da verificação: ${e.message}")
+            Log.e(TAG, "❌ Erro ao obter status da verificação: ${e.message}", e)
             null
+        }
+    }
+    
+    /**
+     * Limpa dados inconsistentes de verificação.
+     * O status é gerenciado na coleção providers - corrige se under_review sem documentos.
+     */
+    suspend fun cleanInconsistentVerificationData(providerId: String): VerificationResult {
+        return try {
+            Log.d(TAG, "🧹 Limpando dados inconsistentes para: $providerId")
+            
+            val verification = getVerificationStatus(providerId)
+            if (verification == null) {
+                Log.d(TAG, "Nenhum prestador encontrado")
+                return VerificationResult.Success
+            }
+            
+            val documents = getProviderDocuments(providerId)
+            Log.d(TAG, "Status atual: ${verification.status}, Documentos encontrados: ${documents.size}")
+            
+            // Se está marcado como UNDER_REVIEW mas não tem documentos válidos, corrigir em providers
+            if (verification.status == VerificationStatus.UNDER_REVIEW && documents.isEmpty()) {
+                Log.w(TAG, "⚠️ Status under_review sem documentos válidos. Corrigindo em providers...")
+                
+                db.collection(PROVIDERS_COLLECTION)
+                    .document(providerId)
+                    .update(
+                        mapOf(
+                            "verificationStatus" to "pending",
+                            "updatedAt" to Date()
+                        )
+                    )
+                    .await()
+                
+                Log.d(TAG, "✅ Status corrigido para pending")
+            }
+            
+            VerificationResult.Success
+            
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao limpar dados inconsistentes: ${e.message}")
+            VerificationResult.Error("Erro ao limpar dados: ${e.message}")
         }
     }
     
@@ -281,7 +304,23 @@ class ProviderVerificationManager {
     }
     
     /**
-     * Obtém documentos do prestador
+     * Verifica se um arquivo realmente existe no Firebase Storage
+     */
+    suspend fun verifyDocumentExists(fileUrl: String): Boolean {
+        return try {
+            if (fileUrl.isEmpty()) return false
+            
+            val storageRef = storage.getReferenceFromUrl(fileUrl)
+            storageRef.metadata.await()
+            true
+        } catch (e: Exception) {
+            Log.w(TAG, "Documento não encontrado no Storage: ${e.message}")
+            false
+        }
+    }
+    
+    /**
+     * Obtém documentos do prestador e verifica se realmente existem
      */
     suspend fun getProviderDocuments(providerId: String): List<DocumentData> {
         return try {
@@ -292,6 +331,28 @@ class ProviderVerificationManager {
             
             snapshot.documents.mapNotNull { doc ->
                 try {
+                    val fileUri = doc.getString("fileUri") ?: ""
+                    
+                    // Verificar se o arquivo realmente existe no Storage
+                    val documentExists = if (fileUri.isNotEmpty()) {
+                        verifyDocumentExists(fileUri)
+                    } else {
+                        false
+                    }
+                    
+                    // Se o documento não existe, marcar como PENDING ou deletar registro
+                    if (!documentExists && fileUri.isNotEmpty()) {
+                        Log.w(TAG, "Documento ${doc.id} marcado como UPLOADED mas arquivo não existe no Storage. Corrigindo...")
+                        
+                        // Deletar registro inválido do Firestore
+                        db.collection(DOCUMENTS_COLLECTION)
+                            .document(doc.id)
+                            .delete()
+                            .await()
+                        
+                        return@mapNotNull null
+                    }
+                    
                     DocumentData(
                         id = doc.id,
                         verificationId = doc.getString("verificationId") ?: "",
@@ -299,7 +360,7 @@ class ProviderVerificationManager {
                         type = DocumentType.valueOf(doc.getString("type") ?: ""),
                         fileName = doc.getString("fileName") ?: "",
                         fileSize = doc.getLong("fileSize") ?: 0,
-                        fileUri = doc.getString("fileUri") ?: "",
+                        fileUri = fileUri,
                         status = when (doc.getString("status")) {
                             "PENDING" -> DocumentStatus.PENDING
                             "UPLOADED" -> DocumentStatus.UPLOADED
@@ -337,7 +398,15 @@ class ProviderVerificationManager {
             }
             
             // Verificar se todos os documentos obrigatórios foram enviados
+            // IMPORTANTE: Esta função já valida se os arquivos realmente existem no Storage
             val documents = getProviderDocuments(providerId)
+            
+            if (documents.isEmpty()) {
+                return VerificationResult.Error("Nenhum documento encontrado. Faça upload dos documentos primeiro.")
+            }
+            
+            Log.d(TAG, "Documentos encontrados e validados: ${documents.size}")
+            
             // Regras: SELFIE obrigatória + (RG frente/verso) OU (CNH frente/verso)
             val hasSelfie = documents.any { it.type == DocumentType.SELFIE && it.status == DocumentStatus.UPLOADED }
             val hasRgPair = documents.any { it.type == DocumentType.RG_FRONT && it.status == DocumentStatus.UPLOADED } &&
@@ -345,22 +414,39 @@ class ProviderVerificationManager {
             val hasCnhPair = documents.any { it.type == DocumentType.CNH_FRONT && it.status == DocumentStatus.UPLOADED } &&
                     documents.any { it.type == DocumentType.CNH_BACK && it.status == DocumentStatus.UPLOADED }
 
-            if (!hasSelfie || !(hasRgPair || hasCnhPair)) {
-                return VerificationResult.Error("Envie SELFIE e RG (frente/verso) OU CNH (frente/verso) para continuar")
+            Log.d(TAG, "Validação de documentos: SELFIE=$hasSelfie, RG=$hasRgPair, CNH=$hasCnhPair")
+
+            if (!hasSelfie) {
+                return VerificationResult.Error("❌ Selfie obrigatória não encontrada. Faça upload novamente.")
             }
             
-            // Atualizar status da verificação
-            db.collection(VERIFICATIONS_COLLECTION)
-                .document(verification.id)
+            if (!hasRgPair && !hasCnhPair) {
+                return VerificationResult.Error("❌ Envie RG (frente/verso) OU CNH (frente/verso). Documentos não encontrados no sistema.")
+            }
+            
+            // VERIFICAÇÃO ADICIONAL: Garantir que os arquivos realmente existem no Storage
+            Log.d(TAG, "Verificando existência dos arquivos no Firebase Storage...")
+            for (doc in documents) {
+                if (!verifyDocumentExists(doc.fileUri)) {
+                    Log.e(TAG, "Arquivo não encontrado: ${doc.type} - ${doc.fileUri}")
+                    return VerificationResult.Error("❌ Arquivo ${doc.type.displayName} não encontrado no servidor. Faça upload novamente.")
+                }
+            }
+            
+            Log.d(TAG, "✅ Todos os arquivos foram verificados e existem no Storage")
+            
+            // Atualizar status na coleção providers
+            db.collection(PROVIDERS_COLLECTION)
+                .document(providerId)
                 .update(
                     mapOf(
-                        "status" to "UNDER_REVIEW",
-                        "submittedAt" to Date()
+                        "verificationStatus" to "under_review",
+                        "updatedAt" to Date()
                     )
                 )
                 .await()
             
-            Log.d(TAG, "Verificação submetida para análise: ${verification.id}")
+            Log.d(TAG, "Verificação submetida para análise: $providerId")
             VerificationResult.Success
             
         } catch (e: Exception) {
@@ -454,31 +540,44 @@ class ProviderVerificationManager {
     }
     
     /**
-     * Aprova verificação (admin)
+     * Aprova verificação (admin).
+     * Atualiza verificationStatus na coleção providers e isVerified na coleção users.
+     * @param providerId ID do prestador (documento em providers)
      */
     suspend fun approveVerification(
-        verificationId: String,
+        providerId: String,
         adminId: String,
         notes: String = ""
     ): VerificationResult {
         return try {
-            Log.d(TAG, "Aprovando verificação: $verificationId")
+            Log.d(TAG, "Aprovando verificação do prestador: $providerId")
             
-            db.collection(VERIFICATIONS_COLLECTION)
-                .document(verificationId)
+            // Atualizar status na coleção providers
+            db.collection(PROVIDERS_COLLECTION)
+                .document(providerId)
                 .update(
                     mapOf(
-                        "status" to "APPROVED",
-                        "reviewedAt" to Date(),
+                        "verificationStatus" to "verified",
+                        "updatedAt" to Date(),
                         "reviewedBy" to adminId,
                         "notes" to notes
                     )
                 )
                 .await()
             
-            // Atualizar status dos documentos
+            // Atualizar isVerified na coleção users (consistência com login e rastreamento)
+            try {
+                db.collection("users")
+                    .document(providerId)
+                    .update("isVerified", true)
+                    .await()
+            } catch (e: Exception) {
+                Log.w(TAG, "Aviso: não foi possível atualizar users.isVerified: ${e.message}")
+            }
+            
+            // Atualizar status dos documentos do prestador
             val documents = db.collection(DOCUMENTS_COLLECTION)
-                .whereEqualTo("verificationId", verificationId)
+                .whereEqualTo("providerId", providerId)
                 .get()
                 .await()
             
@@ -491,7 +590,7 @@ class ProviderVerificationManager {
                 ).await()
             }
             
-            Log.d(TAG, "Verificação aprovada: $verificationId")
+            Log.d(TAG, "Verificação aprovada: $providerId")
             VerificationResult.Success
             
         } catch (e: Exception) {
@@ -501,23 +600,25 @@ class ProviderVerificationManager {
     }
     
     /**
-     * Rejeita verificação (admin)
+     * Rejeita verificação (admin).
+     * Atualiza verificationStatus na coleção providers.
+     * @param providerId ID do prestador (documento em providers)
      */
     suspend fun rejectVerification(
-        verificationId: String,
+        providerId: String,
         adminId: String,
         reason: String,
         notes: String = ""
     ): VerificationResult {
         return try {
-            Log.d(TAG, "Rejeitando verificação: $verificationId")
+            Log.d(TAG, "Rejeitando verificação do prestador: $providerId")
             
-            db.collection(VERIFICATIONS_COLLECTION)
-                .document(verificationId)
+            db.collection(PROVIDERS_COLLECTION)
+                .document(providerId)
                 .update(
                     mapOf(
-                        "status" to "REJECTED",
-                        "reviewedAt" to Date(),
+                        "verificationStatus" to "rejected",
+                        "updatedAt" to Date(),
                         "reviewedBy" to adminId,
                         "rejectionReason" to reason,
                         "notes" to notes
@@ -525,7 +626,17 @@ class ProviderVerificationManager {
                 )
                 .await()
             
-            Log.d(TAG, "Verificação rejeitada: $verificationId")
+            // Atualizar isVerified na coleção users
+            try {
+                db.collection("users")
+                    .document(providerId)
+                    .update("isVerified", false)
+                    .await()
+            } catch (e: Exception) {
+                Log.w(TAG, "Aviso: não foi possível atualizar users.isVerified: ${e.message}")
+            }
+            
+            Log.d(TAG, "Verificação rejeitada: $providerId")
             VerificationResult.Success
             
         } catch (e: Exception) {

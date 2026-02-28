@@ -37,20 +37,34 @@
                     android:textColor="@color/text_primary"
                     android:layout_marginBottom="16dp" />
 
-                <!-- Avatar -->
-                <com.google.android.material.imageview.ShapeableImageView
-                    android:id="@+id/ivProfilePhoto"
+                <!-- Avatar com overlay de loading -->
+                <FrameLayout
                     android:layout_width="120dp"
                     android:layout_height="120dp"
-                    android:src="@drawable/ic_person"
-                    android:background="@color/gray_200"
-                    android:padding="24dp"
-                    app:tint="@color/gray_600"
-                    app:shapeAppearanceOverlay="@style/CircleImageView"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:foreground="?attr/selectableItemBackground"
-                    android:layout_marginBottom="16dp" />
+                    android:layout_marginBottom="16dp">
+
+                    <com.google.android.material.imageview.ShapeableImageView
+                        android:id="@+id/ivProfilePhoto"
+                        android:layout_width="120dp"
+                        android:layout_height="120dp"
+                        android:src="@drawable/ic_person"
+                        android:background="@color/gray_200"
+                        android:padding="24dp"
+                        app:shapeAppearanceOverlay="@style/CircleImageView"
+                        android:clickable="true"
+                        android:focusable="true"
+                        android:foreground="?attr/selectableItemBackground" />
+
+                    <com.google.android.material.progressindicator.CircularProgressIndicator
+                        android:id="@+id/profileImageProgress"
+                        android:layout_width="48dp"
+                        android:layout_height="48dp"
+                        android:layout_gravity="center"
+                        android:indeterminate="true"
+                        android:visibility="gone"
+                        app:indicatorColor="@color/primary_color"
+                        app:trackColor="@color/white_50" />
+                </FrameLayout>
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnChangePhoto"
@@ -63,6 +77,53 @@
                     android:textColor="@color/white"
                     app:icon="@drawable/ic_camera_alt"
                     app:iconTint="@color/white" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Seção de nota média -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp"
+            app:cardBackgroundColor="@color/white"
+            android:layout_marginBottom="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp"
+                android:gravity="center">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Sua Avaliação"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:layout_marginBottom="12dp" />
+
+                <TextView
+                    android:id="@+id/tvProfileRating"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="⭐ 0.0"
+                    android:textSize="32sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_color"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/tvProfileRatingCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Sem avaliações ainda"
+                    android:textSize="14sp"
+                    android:textColor="@color/text_secondary" />
 
             </LinearLayout>
 
@@ -190,7 +251,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Serviços Oferecidos"
+                    android:text="Nichos de Serviços"
                     android:textSize="18sp"
                     android:textStyle="bold"
                     android:textColor="@color/text_primary"
@@ -217,7 +278,7 @@
                     <com.google.android.material.chip.Chip
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:text="Hidráulica"
+                        android:text="Encanador"
                         style="@style/Widget.Material3.Chip.Filter"
                         app:checkedIconVisible="true"
                         android:checkable="true" />
@@ -277,13 +338,55 @@
                     android:id="@+id/btnSaveServices"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Salvar Serviços"
+                    android:text="Salvar Nichos"
                     android:textSize="16sp"
                     app:cornerRadius="8dp"
                     android:backgroundTint="@color/primary_color"
                     android:textColor="@color/white"
                     app:icon="@drawable/ic_save"
                     app:iconTint="@color/white" />
+
+            </LinearLayout>
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Seção de tabela de valores do prestador -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="12dp"
+            app:cardElevation="4dp"
+            app:cardBackgroundColor="@color/white"
+            android:layout_marginBottom="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="20dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Tabela de Valores"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:layout_marginBottom="4dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Valores que você recebe por serviço efetuado"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginBottom="16dp" />
+
+                <LinearLayout
+                    android:id="@+id/llPricingTable"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
 
             </LinearLayout>
 
@@ -396,7 +499,6 @@
     </LinearLayout>
 
 </androidx.core.widget.NestedScrollView>
-
 
 
 

@@ -2,12 +2,15 @@ package com.example.loginapp
 
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
+import androidx.core.content.FileProvider
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
@@ -15,7 +18,15 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.request.RequestOptions
 import com.example.loginapp.databinding.FragmentProviderProfileBinding
 import com.example.loginapp.utils.ActivityPermissionManager
+import com.example.loginapp.utils.ServiceNicheCatalog
+import com.google.android.material.chip.Chip
+import com.google.firebase.Timestamp
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import com.yalantis.ucrop.UCrop
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import java.io.File
 
 /**
  * ProviderProfileFragment - Fragment para configurações de perfil do prestador
@@ -28,15 +39,40 @@ class ProviderProfileFragment : Fragment() {
     private lateinit var authManager: FirebaseAuthManager
     private lateinit var permissionManager: ActivityPermissionManager
     private lateinit var firebaseImageManager: FirebaseImageManager
+    private val firestore = FirebaseFirestore.getInstance()
+    private val firebaseAuth = FirebaseAuth.getInstance()
     
-    // Launcher para seleção de imagem
-    private val imagePickerLauncher = registerForActivityResult(
+    // Launcher para galeria
+    private val galleryLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { launchCrop(it) }
+    }
+
+    // Launcher para câmera
+    private var cameraImageUri: Uri? = null
+    private val cameraLauncher = registerForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) cameraImageUri?.let { launchCrop(it) }
+        cameraImageUri = null
+    }
+
+    // Launcher para UCrop (recorte 1:1 estilo WhatsApp)
+    private val uCropLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val imageUrl = result.data?.getStringExtra(ImagePickerActivity.EXTRA_IMAGE_URL)
-            if (imageUrl != null) {
-                updateProfileImage(imageUrl)
+        when {
+            result.resultCode == Activity.RESULT_OK -> {
+                result.data?.let { data ->
+                    UCrop.getOutput(data)?.let { uploadAndUpdateProfile(it) }
+                }
+            }
+            result.resultCode == UCrop.RESULT_ERROR -> {
+                result.data?.let { data ->
+                    val cropError = UCrop.getError(data)
+                    showToast("Erro ao recortar: ${cropError?.message ?: "Desconhecido"}")
+                }
             }
         }
     }
@@ -53,13 +89,21 @@ class ProviderProfileFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         
+        // Garantir Firebase inicializado
+        if (!FirebaseConfig.isInitialized()) {
+            FirebaseConfig.initialize(requireContext())
+        }
+        
         // Inicializar managers
         authManager = FirebaseAuthManager(requireContext())
         permissionManager = ActivityPermissionManager(requireActivity())
         firebaseImageManager = FirebaseImageManager()
         
         setupClickListeners()
+        setupServiceNicheChips()
         loadProviderData()
+        loadPricingTable()
+        loadProviderRating()
     }
 
     /**
@@ -95,25 +139,61 @@ class ProviderProfileFragment : Fragment() {
      * Carrega os dados do prestador
      */
     private fun loadProviderData() {
-        val user = authManager.getLocalUserData()
-        val provider = LocalAuthManager.getCurrentProviderData()
-        
-        if (user != null && provider != null) {
-            // Carregar informações pessoais
-            binding.etFullName.setText(provider.fullName)
-            binding.etPhone.setText(provider.phone)
-            binding.etCpf.setText(provider.cpf)
-            
-            // Carregar foto de perfil
-            loadProfileImage(user.profileImageUrl)
-            
-            // Carregar serviços selecionados
-            loadSelectedServices(provider.services)
-            
-            // Carregar dados bancários
-            binding.etBankName.setText(provider.bank ?: "")
-            binding.etAgency.setText(provider.agency ?: "")
-            binding.etAccount.setText(provider.account ?: "")
+        val localUser = authManager.getLocalUserData()
+        val userId = localUser?.uid
+            ?: authManager.getCurrentUser()?.uid
+            ?: firebaseAuth.currentUser?.uid
+            ?: return
+
+        lifecycleScope.launch {
+            try {
+                val providerDoc = firestore.collection("providers")
+                    .document(userId)
+                    .get()
+                    .await()
+
+                val providerFullName = providerDoc.getString("fullName").orEmpty()
+                val providerPhone = providerDoc.getString("phone").orEmpty()
+                val providerCpf = providerDoc.getString("cpf").orEmpty()
+                val providerPhoto = providerDoc.getString("profileImageUrl")
+
+                binding.etFullName.setText(providerFullName.ifEmpty { localUser?.fullName.orEmpty() })
+                binding.etPhone.setText(providerPhone.ifEmpty { localUser?.phone.orEmpty() })
+                binding.etCpf.setText(providerCpf)
+
+                val rawServices = (providerDoc.get("services") as? List<*>)
+                    ?.mapNotNull { it as? String }
+                    ?: emptyList()
+                loadSelectedServices(rawServices)
+
+                val bankData = providerDoc.get("bank") as? Map<*, *>
+                binding.etBankName.setText(bankData?.get("bankName") as? String ?: "")
+                binding.etAgency.setText(bankData?.get("agency") as? String ?: "")
+                binding.etAccount.setText(bankData?.get("account") as? String ?: "")
+
+                val imageUrl = providerPhoto?.takeIf { it.isNotBlank() } ?: localUser?.profileImageUrl
+                loadProfileImage(imageUrl)
+            } catch (e: Exception) {
+                android.util.Log.e("ProviderProfileFragment", "Erro ao carregar dados do prestador: ${e.message}")
+                loadProfileImage(localUser?.profileImageUrl)
+                showToast("❌ Erro ao carregar perfil")
+            }
+        }
+    }
+
+    private fun setupServiceNicheChips() {
+        val chipGroup = binding.chipGroupServices
+        chipGroup.removeAllViews()
+
+        ServiceNicheCatalog.providerSelectableNiches.forEach { niche ->
+            val chip = Chip(requireContext()).apply {
+                text = niche
+                isCheckable = true
+                isClickable = true
+                isFocusable = true
+                isCloseIconVisible = false
+            }
+            chipGroup.addView(chip)
         }
     }
 
@@ -121,30 +201,120 @@ class ProviderProfileFragment : Fragment() {
      * Carrega a imagem do perfil
      */
     private fun loadProfileImage(imageUrl: String?) {
-        if (!imageUrl.isNullOrEmpty()) {
-            val requestOptions = RequestOptions()
-                .diskCacheStrategy(DiskCacheStrategy.ALL)
-                .circleCrop()
-                .placeholder(R.drawable.ic_person)
-                .error(R.drawable.ic_person)
-            
-            Glide.with(this)
-                .load(imageUrl)
-                .apply(requestOptions)
-                .into(binding.ivProfilePhoto)
-        }
+        // Remover tint para que a foto carregue com cores corretas (evita aparência cinza)
+        binding.ivProfilePhoto.imageTintList = null
+        
+        val requestOptions = RequestOptions()
+            .diskCacheStrategy(DiskCacheStrategy.ALL)
+            .circleCrop()
+            .placeholder(R.drawable.ic_person)
+            .error(R.drawable.ic_person)
+        
+        Glide.with(this)
+            .load(imageUrl?.takeIf { it.isNotEmpty() })
+            .apply(requestOptions)
+            .into(binding.ivProfilePhoto)
     }
 
     /**
      * Carrega os serviços selecionados
      */
     private fun loadSelectedServices(services: List<String>) {
+        val selectedNormalized = ServiceNicheCatalog.normalizeProviderServices(services)
         val chipGroup = binding.chipGroupServices
         for (i in 0 until chipGroup.childCount) {
             val chip = chipGroup.getChildAt(i)
             if (chip is com.google.android.material.chip.Chip) {
                 val serviceName = chip.text.toString()
-                chip.isChecked = services.contains(serviceName)
+                val serviceKey = ServiceNicheCatalog.normalizeProviderServices(listOf(serviceName)).firstOrNull()
+                chip.isChecked = serviceKey != null && selectedNormalized.contains(serviceKey)
+            }
+        }
+    }
+
+    /**
+     * Carrega a nota média do prestador
+     */
+    private fun loadProviderRating() {
+        val userId = authManager.getLocalUserData()?.uid ?: return
+        lifecycleScope.launch {
+            try {
+                val doc = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                    .collection("providers").document(userId).get().await()
+                if (doc.exists()) {
+                    val rating = doc.getDouble("rating") ?: 0.0
+                    val totalRatings = (doc.getLong("totalRatings") ?: 0L).toInt()
+                    if (rating > 0) {
+                        binding.tvProfileRating.text = "⭐ ${String.format("%.1f", rating)}"
+                        binding.tvProfileRatingCount.text = "$totalRatings avaliações"
+                    } else {
+                        binding.tvProfileRating.text = "⭐ —"
+                        binding.tvProfileRatingCount.text = "Sem avaliações ainda"
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("ProviderProfile", "Erro ao carregar rating: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Carrega a tabela de valores do prestador
+     */
+    private fun loadPricingTable() {
+        val container = binding.llPricingTable
+        container.removeAllViews()
+        val ctx = requireContext()
+        val table = com.example.loginapp.models.ServicePricing.getProviderPricingTable()
+
+        for ((category, services) in table) {
+            // Título da categoria
+            val categoryTitle = android.widget.TextView(ctx).apply {
+                text = category
+                setTextColor(resources.getColor(R.color.primary_color, null))
+                textSize = 15f
+                setTypeface(typeface, android.graphics.Typeface.BOLD)
+                setPadding(0, 24, 0, 8)
+            }
+            container.addView(categoryTitle)
+
+            // Linha separadora
+            val divider = android.view.View(ctx).apply {
+                layoutParams = android.widget.LinearLayout.LayoutParams(
+                    android.widget.LinearLayout.LayoutParams.MATCH_PARENT, 2
+                ).apply { bottomMargin = 8 }
+                setBackgroundColor(resources.getColor(R.color.gray_200, null))
+            }
+            container.addView(divider)
+
+            for ((serviceName, value) in services) {
+                val row = android.widget.LinearLayout(ctx).apply {
+                    orientation = android.widget.LinearLayout.HORIZONTAL
+                    layoutParams = android.widget.LinearLayout.LayoutParams(
+                        android.widget.LinearLayout.LayoutParams.MATCH_PARENT,
+                        android.widget.LinearLayout.LayoutParams.WRAP_CONTENT
+                    ).apply { bottomMargin = 6 }
+                }
+
+                val nameView = android.widget.TextView(ctx).apply {
+                    text = serviceName
+                    textSize = 13f
+                    setTextColor(resources.getColor(R.color.text_primary, null))
+                    layoutParams = android.widget.LinearLayout.LayoutParams(
+                        0, android.widget.LinearLayout.LayoutParams.WRAP_CONTENT, 1f
+                    )
+                }
+
+                val valueView = android.widget.TextView(ctx).apply {
+                    text = "R$ ${String.format("%.2f", value)}"
+                    textSize = 13f
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    setTextColor(resources.getColor(R.color.success_color, null))
+                }
+
+                row.addView(nameView)
+                row.addView(valueView)
+                container.addView(row)
             }
         }
     }
@@ -155,19 +325,93 @@ class ProviderProfileFragment : Fragment() {
     private fun showImagePickerDialog() {
         permissionManager.checkAndRequestImagePermissions(
             onGranted = {
-                val intent = ImagePickerActivity.createIntent(
-                    context = requireActivity(),
-                    folder = FirebaseImageManager.FOLDER_PROFILE_IMAGES,
-                    userId = authManager.getCurrentUser()?.uid,
-                    orderId = null,
-                    maxImages = 1
-                )
-                imagePickerLauncher.launch(intent)
+                val userId = authManager.getLocalUserData()?.uid
+                    ?: authManager.getCurrentUser()?.uid
+                    ?: com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+
+                if (userId == null) {
+                    showToast("❌ Usuário não autenticado. Faça login novamente.")
+                    return@checkAndRequestImagePermissions
+                }
+
+                AlertDialog.Builder(requireContext())
+                    .setTitle("Foto do Perfil")
+                    .setItems(arrayOf("📷 Tirar Foto", "🖼️ Galeria")) { _, which ->
+                        when (which) {
+                            0 -> takeProfilePhoto()
+                            1 -> galleryLauncher.launch("image/*")
+                        }
+                    }
+                    .setNegativeButton("Cancelar", null)
+                    .show()
             },
             onDenied = {
                 showToast("Permissões necessárias para alterar foto do perfil")
             }
         )
+    }
+
+    private fun takeProfilePhoto() {
+        try {
+            val photoFile = File(requireContext().getExternalFilesDir(null), "profile_${System.currentTimeMillis()}.jpg")
+            cameraImageUri = FileProvider.getUriForFile(requireContext(), "${requireContext().packageName}.fileprovider", photoFile)
+            cameraLauncher.launch(cameraImageUri!!)
+        } catch (e: Exception) {
+            showToast("Erro ao abrir câmera: ${e.message}")
+        }
+    }
+
+    private fun launchCrop(sourceUri: Uri) {
+        val fileName = "profile_crop_${System.currentTimeMillis()}.jpg"
+        val destinationFile = File(requireContext().cacheDir, fileName)
+        val destinationUri = Uri.fromFile(destinationFile)
+
+        val options = UCrop.Options().apply {
+            setCompressionFormat(android.graphics.Bitmap.CompressFormat.JPEG)
+            setCompressionQuality(90)
+        }
+
+        val uCropIntent = UCrop.of(sourceUri, destinationUri)
+            .withAspectRatio(1f, 1f)
+            .withOptions(options)
+            .getIntent(requireContext())
+
+        uCropLauncher.launch(uCropIntent)
+    }
+
+    private fun uploadAndUpdateProfile(croppedUri: Uri) {
+        val userId = authManager.getLocalUserData()?.uid
+            ?: authManager.getCurrentUser()?.uid
+            ?: com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+            ?: return
+
+        // Mostrar barra de carregamento durante o upload
+        binding.profileImageProgress.visibility = View.VISIBLE
+        binding.ivProfilePhoto.isClickable = false
+        binding.btnChangePhoto.isEnabled = false
+
+        lifecycleScope.launch {
+            try {
+                val uploadData = FirebaseImageManager.ImageUploadData(
+                    uri = croppedUri,
+                    fileName = "profile_${userId}.jpg",
+                    folder = FirebaseImageManager.FOLDER_PROFILE_IMAGES,
+                    userId = userId,
+                    orderId = null
+                )
+                when (val result = firebaseImageManager.uploadImage(requireContext(), uploadData)) {
+                    is FirebaseImageManager.UploadResult.Success -> updateProfileImage(result.downloadUrl)
+                    is FirebaseImageManager.UploadResult.Error -> showToast("❌ Erro no upload: ${result.message}")
+                    else -> showToast("❌ Erro ao enviar foto")
+                }
+            } catch (e: Exception) {
+                showToast("❌ Erro: ${e.message}")
+            } finally {
+                binding.profileImageProgress.visibility = View.GONE
+                binding.ivProfilePhoto.isClickable = true
+                binding.btnChangePhoto.isEnabled = true
+            }
+        }
     }
 
     /**
@@ -176,6 +420,14 @@ class ProviderProfileFragment : Fragment() {
     private fun updateProfileImage(imageUrl: String) {
         lifecycleScope.launch {
             try {
+                // Esconder barra de carregamento
+                binding.profileImageProgress.visibility = View.GONE
+                binding.ivProfilePhoto.isClickable = true
+                binding.btnChangePhoto.isEnabled = true
+                
+                // Remover tint para foto carregar com cores corretas
+                binding.ivProfilePhoto.imageTintList = null
+                
                 // Carregar imagem com Glide
                 val requestOptions = RequestOptions()
                     .diskCacheStrategy(DiskCacheStrategy.ALL)
@@ -188,11 +440,15 @@ class ProviderProfileFragment : Fragment() {
                     .apply(requestOptions)
                     .into(binding.ivProfilePhoto)
                 
-                // Salvar URL da imagem no perfil do usuário
-                val user = authManager.getCurrentUser()
-                if (user != null) {
-                    // Atualizar URL da imagem no Firestore
-                    updateProfileImageInFirestore(user.uid, imageUrl)
+                // Salvar URL da imagem no Firestore
+                val userId = authManager.getLocalUserData()?.uid 
+                    ?: authManager.getCurrentUser()?.uid
+                    ?: com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                    
+                if (userId != null) {
+                    updateProfileImageInFirestore(userId, imageUrl)
+                } else {
+                    showToast("❌ Não foi possível identificar o usuário")
                 }
                 
             } catch (e: Exception) {
@@ -250,25 +506,35 @@ class ProviderProfileFragment : Fragment() {
                 selectedServices.add(chip.text.toString())
             }
         }
-        
-        if (selectedServices.isEmpty()) {
+
+        val canonicalServices = ServiceNicheCatalog.canonicalizeProviderServices(selectedServices)
+        if (canonicalServices.isEmpty()) {
             showToast("❌ Selecione pelo menos um serviço")
             return
         }
-        
+
+        val userId = authManager.getLocalUserData()?.uid
+            ?: authManager.getCurrentUser()?.uid
+            ?: firebaseAuth.currentUser?.uid
+            ?: run {
+                showToast("❌ Usuário não autenticado")
+                return
+            }
+
         lifecycleScope.launch {
             try {
-                val provider = LocalAuthManager.getCurrentProviderData()
-                if (provider != null) {
-                    // Atualizar serviços do prestador
-                    val updatedProvider = provider.copy(services = selectedServices)
-                    
-                    // Salvar no LocalAuthManager
-                    // TODO: Implementar método saveProviderData no LocalAuthManager
-                    // LocalAuthManager.saveProviderData(updatedProvider)
-                    
-                    showToast("✅ Serviços salvos com sucesso!")
-                }
+                firestore.collection("providers")
+                    .document(userId)
+                    .update(
+                        mapOf(
+                            "services" to canonicalServices,
+                            "updatedAt" to Timestamp.now()
+                        )
+                    )
+                    .await()
+
+                ProviderNewOrderAlertManager.refreshMonitoring()
+                showToast("✅ Serviços salvos com sucesso!")
             } catch (e: Exception) {
                 showToast("❌ Erro ao salvar serviços: ${e.message}")
             }
@@ -312,19 +578,32 @@ class ProviderProfileFragment : Fragment() {
     }
 
     /**
-     * Atualiza a URL da imagem no Firestore
+     * Atualiza a URL da imagem no Firestore (users e providers para prestadores)
      */
     private fun updateProfileImageInFirestore(userId: String, imageUrl: String) {
         lifecycleScope.launch {
             try {
-                val result = authManager.updateUserProfileImage(userId, imageUrl)
-                if (result.isSuccess) {
-                    showToast("✅ Foto do perfil atualizada com sucesso!")
-                    // Recarregar dados do usuário para atualizar a URL localmente
-                    loadProviderData()
-                } else {
+                // Atualizar coleção users (clientes e prestadores)
+                val usersResult = authManager.updateUserProfileImage(userId, imageUrl)
+                if (!usersResult.isSuccess) {
                     showToast("❌ Erro ao salvar foto no servidor")
+                    return@launch
                 }
+
+                // Sempre atualizar coleção providers (mesma foto para ambos os perfis)
+                try {
+                    val providerDoc = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        .collection("providers").document(userId).get().await()
+                    if (providerDoc.exists()) {
+                        val providerManager = FirebaseProviderManager()
+                        providerManager.updateProfileImage(userId, imageUrl)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.d("ProviderProfileFragment", "Sem perfil de prestador para atualizar: ${e.message}")
+                }
+
+                showToast("✅ Foto do perfil atualizada com sucesso!")
+                loadProviderData()
             } catch (e: Exception) {
                 showToast("❌ Erro ao salvar foto: ${e.message}")
             }

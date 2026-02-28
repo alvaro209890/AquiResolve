@@ -19,6 +19,12 @@ class UserDashboardActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Garantir Firebase inicializado
+        if (!FirebaseConfig.isInitialized()) {
+            FirebaseConfig.initialize(this)
+        }
+        
         binding = ActivityUserDashboardBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
@@ -41,7 +47,8 @@ class UserDashboardActivity : AppCompatActivity() {
     private fun setupClickListeners() {
         // Cards de ação rápida
         binding.cardCreateOrder.setOnClickListener {
-            val intent = Intent(this, CreateOrderActivity::class.java)
+            // Pedidos só podem ser feitos pela aba Serviços
+            val intent = Intent(this, ServicesActivity::class.java)
             startActivity(intent)
         }
 
@@ -137,7 +144,7 @@ class UserDashboardActivity : AppCompatActivity() {
             OrderStatus("Pedido #1234", "Elétrica", "Concluído", R.color.success_green),
             OrderStatus("Pedido #1235", "Limpeza", "Em andamento", R.color.warning_orange),
             OrderStatus("Pedido #1236", "Pintura", "Aguardando", R.color.primary_color),
-            OrderStatus("Pedido #1237", "Hidráulica", "Agendado", R.color.info_blue)
+            OrderStatus("Pedido #1237", "Encanador", "Agendado", R.color.info_blue)
         )
 
         binding.tvRecentOrder1.text = "${recentOrders[0].id} - ${recentOrders[0].service}"

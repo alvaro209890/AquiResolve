@@ -238,6 +238,66 @@
 
             </LinearLayout>
 
+            <!-- Nota média -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginBottom="8dp">
+
+                <com.google.android.material.card.MaterialCardView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    app:cardCornerRadius="12dp"
+                    app:cardElevation="4dp"
+                    app:cardBackgroundColor="@color/white">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:padding="16dp">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="⭐"
+                            android:textSize="28sp"
+                            android:layout_marginEnd="12dp" />
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/tvProviderRating"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="0.0"
+                                android:textSize="22sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/primary_color" />
+
+                            <TextView
+                                android:id="@+id/tvProviderRatingCount"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Nota média (0 avaliações)"
+                                android:textSize="12sp"
+                                android:textColor="@color/gray_600"
+                                android:layout_marginTop="2dp" />
+
+                        </LinearLayout>
+
+                    </LinearLayout>
+
+                </com.google.android.material.card.MaterialCardView>
+
+            </LinearLayout>
+
             <!-- Segunda linha de estatísticas -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -245,50 +305,10 @@
                 android:orientation="horizontal"
                 android:layout_marginBottom="24dp">
 
-                <!-- Avaliação -->
-                <com.google.android.material.card.MaterialCardView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="8dp"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="4dp"
-                    app:cardBackgroundColor="@color/white">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="vertical"
-                        android:gravity="center"
-                        android:padding="16dp">
-
-                        <TextView
-                            android:id="@+id/tvRating"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="4.8"
-                            android:textSize="24sp"
-                            android:textStyle="bold"
-                            android:textColor="@color/warning_color" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="⭐ Avaliação"
-                            android:textSize="12sp"
-                            android:textColor="@color/gray_600"
-                            android:layout_marginTop="4dp" />
-
-                    </LinearLayout>
-
-                </com.google.android.material.card.MaterialCardView>
-
                 <!-- Ganhos -->
                 <com.google.android.material.card.MaterialCardView
-                    android:layout_width="0dp"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="8dp"
                     app:cardCornerRadius="12dp"
                     app:cardElevation="4dp"
                     app:cardBackgroundColor="@color/white">
@@ -297,25 +317,55 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:orientation="vertical"
-                        android:gravity="center"
                         android:padding="16dp">
 
-                        <TextView
-                            android:id="@+id/tvEarnings"
-                            android:layout_width="wrap_content"
+                        <LinearLayout
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="R$ 2.450"
-                            android:textSize="20sp"
-                            android:textStyle="bold"
-                            android:textColor="@color/success_color" />
+                            android:orientation="vertical"
+                            android:gravity="center">
 
-                        <TextView
-                            android:layout_width="wrap_content"
+                            <TextView
+                                android:id="@+id/tvEarnings"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="R$ 2.450"
+                                android:textSize="20sp"
+                                android:textStyle="bold"
+                                android:textColor="@color/success_color" />
+
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="Ganhos"
+                                android:textSize="12sp"
+                                android:textColor="@color/gray_600"
+                                android:layout_marginTop="4dp" />
+
+                        </LinearLayout>
+
+                        <!-- Aviso sobre depósito -->
+                        <com.google.android.material.card.MaterialCardView
+                            android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="Ganhos"
-                            android:textSize="12sp"
-                            android:textColor="@color/gray_600"
-                            android:layout_marginTop="4dp" />
+                            android:layout_marginTop="12dp"
+                            app:cardCornerRadius="8dp"
+                            app:cardElevation="0dp"
+                            app:cardBackgroundColor="#F0F8FF"
+                            app:strokeWidth="1dp"
+                            app:strokeColor="@color/primary_color">
+
+                            <TextView
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:text="💳 Este saldo será depositado automaticamente na sua conta PIX na próxima quarta-feira."
+                                android:textSize="11sp"
+                                android:textColor="@color/primary_color"
+                                android:padding="10dp"
+                                android:lineSpacingExtra="2dp"
+                                android:gravity="center_vertical" />
+
+                        </com.google.android.material.card.MaterialCardView>
 
                     </LinearLayout>
 
@@ -336,23 +386,11 @@
                     android:layout_width="0dp"
                     android:layout_height="48dp"
                     android:layout_weight="1"
-                    android:layout_marginEnd="8dp"
                     android:text="📋 Meus Pedidos"
                     android:textSize="14sp"
                     app:cornerRadius="12dp"
                     app:backgroundTint="@color/primary_color" />
 
-                <!-- Ver orçamentos -->
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnViewQuotes"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="8dp"
-                    android:text="💰 Orçamentos"
-                    android:textSize="14sp"
-                    app:cornerRadius="12dp"
-                    app:backgroundTint="@color/secondary_color" />
 
             </LinearLayout>
 

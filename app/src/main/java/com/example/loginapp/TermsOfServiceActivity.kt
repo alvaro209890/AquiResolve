@@ -1,5 +1,6 @@
 package com.example.loginapp
 
+import android.content.Intent
 import android.os.Bundle
 import android.view.MenuItem
 import androidx.appcompat.app.AppCompatActivity
@@ -16,6 +17,14 @@ class TermsOfServiceActivity : AppCompatActivity() {
 
         setupToolbar()
         setupContent()
+        setupClickListeners()
+    }
+
+    private fun setupClickListeners() {
+        binding.btnCancellationPolicy.setOnClickListener {
+            startActivity(Intent(this, CancellationRefundActivity::class.java))
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+        }
     }
 
     private fun setupToolbar() {
@@ -33,189 +42,117 @@ class TermsOfServiceActivity : AppCompatActivity() {
 
     private fun getTermsOfServiceContent(): String {
         return """
-            TERMOS DE USO
+            TERMOS DE USO DO CLIENTE – PLATAFORMA AQUI RESOLVE
             
-            Última atualização: ${java.time.LocalDate.now()}
+            Última atualização: 20 de janeiro de 2026
             
-            1. ACEITAÇÃO DOS TERMOS
+            Plataforma: Aqui Resolve
+            Razão Social: Aqui Resolve Serviços Digitais Ltda.
+            CNPJ: 43.246.176/0001-30
+            E-mail: aquiresolveservico123@gmail.com
+            Sede: Vitória – Espírito Santo – Brasil
             
-            1.1 Aceitação
-            Ao acessar e usar este aplicativo, você concorda em cumprir e estar vinculado a estes Termos de Uso.
+            1. OBJETO
+            Estes Termos regulam o uso da plataforma Aqui Resolve pelo CLIENTE, pessoa física ou jurídica que solicita serviços por meio do aplicativo ou site.
+            A plataforma disponibiliza infraestrutura tecnológica de intermediação, conectando clientes a prestadores de serviços autônomos e independentes.
             
-            1.2 Modificações
-            Reservamo-nos o direito de modificar estes termos a qualquer momento. Alterações serão comunicadas através do aplicativo.
+            2. ACEITAÇÃO
+            Ao utilizar a plataforma, o cliente declara que:
+            • leu e compreendeu estes Termos;
+            • concorda com todas as suas disposições;
+            • compromete-se a utilizá-la conforme a lei e a boa-fé.
+            Caso não concorde, deverá interromper o uso.
             
-            2. DESCRIÇÃO DO SERVIÇO
+            3. PAPEL DA PLATAFORMA (DELIMITAÇÃO REALISTA)
+            A Aqui Resolve:
+            • não executa serviços;
+            • não substitui o prestador na obrigação técnica;
+            • não garante resultado técnico específico;
+            • integra a cadeia de consumo apenas quanto à intermediação digital.
+            A responsabilidade da plataforma limita-se às atividades de:
+            • intermediação tecnológica;
+            • processamento e gestão de pagamentos sob sua custódia;
+            • suporte administrativo.
             
-            2.1 Plataforma de Serviços
-            Este aplicativo conecta clientes que precisam de serviços com prestadores de serviços qualificados.
+            4. CADASTRO DO CLIENTE
+            O cliente é responsável por:
+            • fornecer informações verdadeiras e atualizadas;
+            • manter a confidencialidade de sua conta;
+            • todas as solicitações realizadas por seu cadastro.
+            O uso indevido da conta é de responsabilidade exclusiva do cliente.
             
-            2.2 Funcionalidades
-            • Criação de pedidos de serviços
-            • Conectividade entre clientes e prestadores
-            • Sistema de pagamentos
-            • Avaliações e feedback
-            • Chat e comunicação
+            5. SOLICITAÇÃO E CONTRATAÇÃO DO SERVIÇO
+            Ao solicitar um serviço, o cliente reconhece que:
+            • o serviço será executado por prestador autônomo;
+            • os detalhes técnicos da execução são de responsabilidade do prestador;
+            • a contratação se formaliza com o aceite do prestador.
             
-            3. CADASTRO E CONTA
+            6. EXECUÇÃO DO SERVIÇO
+            A execução do serviço é obrigação exclusiva do prestador.
+            A plataforma:
+            • não interfere na forma técnica de execução;
+            • não supervisiona presencialmente o serviço;
+            • não garante adequação do serviço a expectativas subjetivas do cliente.
             
-            3.1 Elegibilidade
-            • Você deve ter pelo menos 18 anos
-            • Capacidade legal para contratar
-            • Informações verdadeiras e precisas
+            7. PAGAMENTOS
+            Os pagamentos podem ser realizados por meios disponibilizados na plataforma.
+            A Aqui Resolve:
+            • responde por valores sob sua custódia;
+            • atua para resolver falhas operacionais internas comprovadas;
+            • não responde por falhas externas de instituições financeiras, sem prejuízo do dever de suporte.
             
-            3.2 Responsabilidade da Conta
-            • Manter senha segura
-            • Não compartilhar credenciais
-            • Notificar uso não autorizado
-            • Responsável por atividades na conta
+            8. CÓDIGO DE VERIFICAÇÃO
+            A confirmação por código:
+            • indica que o serviço foi executado de forma aparente;
+            • autoriza a liberação do pagamento ao prestador.
+            O fornecimento do código não elimina o direito do cliente de reclamar:
+            • vícios ocultos;
+            • defeitos identificados posteriormente, nos prazos legais.
             
-            3.3 Verificação
-            • Podemos solicitar documentos de verificação
-            • Reservamo-nos o direito de recusar cadastros
-            • Verificação pode ser obrigatória para certos serviços
+            9. CANCELAMENTO E REEMBOLSO
+            Os cancelamentos seguem a Política de Cancelamento e Reembolso, parte integrante destes Termos.
+            Poderá ser aplicada taxa compensatória, desde que:
+            • previamente informada;
+            • proporcional aos custos operacionais e deslocamento;
+            • limitada ao efetivo prejuízo causado.
+            Os prazos de reembolso dependem do meio de pagamento utilizado.
             
-            4. USO DO SERVIÇO
+            10. RESPONSABILIDADE DA PLATAFORMA
+            A plataforma responde:
+            • por falhas na intermediação tecnológica;
+            • por erros comprovados no processamento de pagamentos sob sua gestão.
+            A plataforma não responde por:
+            • erro técnico do serviço;
+            • má execução pelo prestador;
+            • danos causados exclusivamente pelo prestador, salvo quando comprovada falha direta da intermediação.
             
-            4.1 Uso Permitido
-            • Uso pessoal e não comercial
-            • Conformidade com leis aplicáveis
-            • Respeito aos direitos de terceiros
+            11. MEDIAÇÃO DE CONFLITOS
+            A Aqui Resolve poderá atuar como facilitadora administrativa, buscando solução razoável entre as partes, sem substituir o Poder Judiciário.
             
-            4.2 Uso Proibido
-            • Atividades ilegais ou fraudulentas
-            • Spam ou comunicação não solicitada
-            • Interferência na operação do sistema
-            • Violação de direitos de propriedade intelectual
-            • Assédio ou comportamento abusivo
+            12. AVALIAÇÕES
+            O cliente poderá avaliar o prestador de forma honesta e objetiva.
+            É vedado:
+            • conteúdo ofensivo;
+            • informações falsas;
+            • avaliações abusivas.
+            A plataforma poderá moderar conteúdos ilegais ou inadequados.
             
-            4.3 Conteúdo do Usuário
-            • Você mantém direitos sobre seu conteúdo
-            • Concede licença para uso na plataforma
-            • Responsável pela veracidade do conteúdo
-            • Não pode violar direitos de terceiros
+            13. USO INDEVIDO
+            É proibido ao cliente:
+            • utilizar a plataforma para fins ilícitos;
+            • fornecer informações falsas;
+            • constranger ou ameaçar prestadores;
+            • tentar burlar regras de pagamento.
             
-            5. SERVIÇOS E PAGAMENTOS
+            14. SUSPENSÃO OU ENCERRAMENTO
+            A plataforma poderá suspender ou encerrar contas em caso de violação destes Termos, garantindo, sempre que possível, motivação e proporcionalidade.
             
-            5.1 Contratação de Serviços
-            • Cliente contrata diretamente com prestador
-            • Aplicativo atua como intermediário
-            • Termos específicos entre cliente e prestador
+            15. PROTEÇÃO DE DADOS (LGPD)
+            Os dados pessoais são tratados conforme a Lei nº 13.709/2018, nos termos da Política de Privacidade da plataforma.
             
-            5.2 Pagamentos
-            • Processados por parceiros seguros
-            • Taxas podem ser aplicadas
-            • Reembolsos conforme política específica
-            • Responsabilidade por pagamentos autorizados
-            
-            5.3 Disputas
-            • Resolução entre cliente e prestador
-            • Suporte disponível para mediação
-            • Não nos responsabilizamos por disputas
-            
-            6. RESPONSABILIDADES
-            
-            6.1 Limitação de Responsabilidade
-            • Serviço fornecido "como está"
-            • Não garantimos disponibilidade contínua
-            • Limitação de danos conforme lei aplicável
-            
-            6.2 Responsabilidade do Usuário
-            • Cumprimento dos termos
-            • Veracidade das informações
-            • Conduta adequada na plataforma
-            • Respeito aos outros usuários
-            
-            6.3 Indenização
-            • Você concorda em indenizar por danos causados
-            • Inclui custos legais e administrativos
-            • Relacionados ao uso inadequado do serviço
-            
-            7. PROPRIEDADE INTELECTUAL
-            
-            7.1 Direitos da Plataforma
-            • Marca registrada e direitos autorais
-            • Conteúdo e design protegidos
-            • Não pode ser copiado ou modificado
-            
-            7.2 Licença de Uso
-            • Licença limitada para uso pessoal
-            • Não transferível
-            • Revogável a qualquer momento
-            
-            8. PRIVACIDADE E DADOS
-            
-            8.1 Política de Privacidade
-            • Coleta e uso conforme política específica
-            • Consentimento para processamento de dados
-            • Direitos de proteção de dados
-            
-            8.2 Segurança
-            • Medidas de segurança implementadas
-            • Não garantimos segurança absoluta
-            • Responsabilidade compartilhada
-            
-            9. SUSPENSÃO E TÉRMINO
-            
-            9.1 Suspensão
-            • Podemos suspender conta por violações
-            • Notificação prévia quando possível
-            • Acesso restrito durante investigação
-            
-            9.2 Término
-            • Você pode cancelar a qualquer momento
-            • Podemos encerrar por violações graves
-            • Efeitos do encerramento
-            
-            9.3 Sobrevivência
-            • Certas cláusulas sobrevivem ao término
-            • Inclui responsabilidades e limitações
-            
-            10. DISPOSIÇÕES GERAIS
-            
-            10.1 Lei Aplicável
-            • Regido pelas leis brasileiras
-            • Foro competente em São Paulo/SP
-            
-            10.2 Disputas
-            • Tentativa de resolução amigável
-            • Mediação quando aplicável
-            • Jurisdição exclusiva dos tribunais brasileiros
-            
-            10.3 Divisibilidade
-            • Cláusulas independentes
-            • Invalidade de uma não afeta outras
-            
-            10.4 Renúncia
-            • Renúncia deve ser por escrito
-            • Não afeta outros direitos
-            
-            10.5 Acordo Completo
-            • Estes termos constituem acordo completo
-            • Substitui acordos anteriores
-            
-            11. CONTATO
-            
-            11.1 Dúvidas
-            • E-mail: termos@aplicativoservico.com
-            • Telefone: (11) 99999-9999
-            • Horário: Segunda a Sexta, 9h às 18h
-            
-            11.2 Notificações
-            • Notificações por e-mail ou aplicativo
-            • Consideradas recebidas em 24h
-            • Endereço de cadastro válido
-            
-            12. VERSÃO E ATUALIZAÇÕES
-            
-            12.1 Versão Atual
-            • Versão 1.0 - ${java.time.LocalDate.now()}
-            • Histórico de alterações disponível
-            
-            12.2 Atualizações
-            • Notificação de mudanças importantes
-            • Continuar usando implica aceitação
-            • Direito de recusar e cancelar conta
+            16. LEI APLICÁVEL E FORO
+            Este Termo é regido pelas leis da República Federativa do Brasil.
+            Fica assegurado ao cliente o direito de ajuizar ação no foro de seu domicílio, conforme o Código de Defesa do Consumidor.
         """.trimIndent()
     }
 

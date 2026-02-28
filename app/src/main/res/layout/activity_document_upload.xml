@@ -108,7 +108,7 @@
 
                     </LinearLayout>
 
-                    <!-- Progress Bar -->
+                    <!-- Progress Bar de documentos -->
                     <ProgressBar
                         android:id="@+id/progressBar"
                         style="?android:attr/progressBarStyleHorizontal"
@@ -118,6 +118,36 @@
                         android:max="100"
                         android:progressTint="@color/primary_color"
                         android:progressBackgroundTint="@color/light_gray" />
+
+                    <!-- Barra de progresso de upload -->
+                    <LinearLayout
+                        android:id="@+id/layoutUploadProgress"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:layout_marginTop="12dp"
+                        android:visibility="gone">
+
+                        <TextView
+                            android:id="@+id/tvUploadStatus"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Enviando documentos..."
+                            android:textSize="13sp"
+                            android:textColor="@color/primary_color"
+                            android:layout_marginBottom="4dp" />
+
+                        <ProgressBar
+                            android:id="@+id/progressBarUpload"
+                            style="?android:attr/progressBarStyleHorizontal"
+                            android:layout_width="match_parent"
+                            android:layout_height="6dp"
+                            android:progress="0"
+                            android:max="100"
+                            android:progressTint="@color/success_color"
+                            android:progressBackgroundTint="@color/light_gray" />
+
+                    </LinearLayout>
 
                 </LinearLayout>
 

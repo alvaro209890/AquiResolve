@@ -6,7 +6,13 @@ import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.lifecycleScope
 import com.example.loginapp.databinding.ActivityProviderHomeBinding
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 /**
  * ProviderHomeActivity - Tela principal para prestadores
@@ -22,9 +28,16 @@ class ProviderHomeActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityProviderHomeBinding
     private lateinit var authManager: FirebaseAuthManager
+    private val db = FirebaseFirestore.getInstance()
+    private val auth = FirebaseAuth.getInstance()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Garantir Firebase inicializado
+        if (!FirebaseConfig.isInitialized()) {
+            FirebaseConfig.initialize(this)
+        }
         
         binding = ActivityProviderHomeBinding.inflate(layoutInflater)
         setContentView(binding.root)
@@ -33,6 +46,17 @@ class ProviderHomeActivity : AppCompatActivity() {
         setupUI()
         setupClickListeners()
         loadProviderData()
+    }
+    
+    override fun onResume() {
+        super.onResume()
+        ProviderNewOrderAlertManager.refreshMonitoring()
+        // Recarregar dados quando voltar para esta tela (ex: após finalizar um pedido)
+        // Adicionar um pequeno delay para garantir que o Firestore tenha atualizado os dados
+        lifecycleScope.launch {
+            delay(500) // Aguardar 500ms para garantir que o Firestore propagou a atualização
+            loadProviderStats()
+        }
     }
 
     /**
@@ -74,13 +98,6 @@ class ProviderHomeActivity : AppCompatActivity() {
             startActivity(intent)
         }
         
-        // Botão de ver orçamentos
-        binding.btnViewQuotes.setOnClickListener {
-            // val intent = Intent(this, QuotesActivity::class.java)
-            // startActivity(intent)
-            showToast("💰 Tela de orçamentos em desenvolvimento")
-        }
-        
         // Navegação inferior específica para prestadores
         binding.bottomNavigation.menu.clear()
         binding.bottomNavigation.inflateMenu(R.menu.bottom_nav_menu_provider)
@@ -107,7 +124,7 @@ class ProviderHomeActivity : AppCompatActivity() {
         
         // Botão de notificações
         binding.btnNotifications.setOnClickListener {
-            showNotifications()
+            startActivity(Intent(this, NotificationSettingsActivity::class.java))
         }
         
         // Botão de configurações
@@ -126,10 +143,10 @@ class ProviderHomeActivity : AppCompatActivity() {
             binding.tvWelcome.text = "Bem-vindo de volta, $firstName!"
         }
         
-        // TODO: Carregar estatísticas do prestador
+        // Carregar estatísticas do prestador
         loadProviderStats()
-        
-        // TODO: Carregar pedidos disponíveis
+
+        // Carregar pedidos disponíveis
         loadAvailableOrders()
     }
 
@@ -137,11 +154,67 @@ class ProviderHomeActivity : AppCompatActivity() {
      * Carrega as estatísticas do prestador
      */
     private fun loadProviderStats() {
-        // TODO: Carregar estatísticas do Firestore
-        binding.tvCompletedServices.text = "127"
-        binding.tvActiveOrders.text = "3"
-        binding.tvRating.text = "4.8"
-        binding.tvEarnings.text = "R$ 2.450"
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            binding.tvCompletedServices.text = "0"
+            binding.tvActiveOrders.text = "0"
+            binding.tvEarnings.text = "R$ 0,00"
+            return
+        }
+        
+        lifecycleScope.launch {
+            try {
+                // Carregar dados do prestador do Firestore
+                val providerDoc = db.collection("providers")
+                    .document(currentUser.uid)
+                    .get()
+                    .await()
+                
+                if (providerDoc.exists()) {
+                    val completedJobs = (providerDoc.getLong("completedJobs") ?: 0L).toInt()
+                    val totalEarnings = providerDoc.getDouble("totalEarnings") ?: 0.0
+                    
+                    // Contar pedidos ativos (assigned ou in_progress)
+                    val activeOrdersSnap = db.collection("orders")
+                        .whereEqualTo("assignedProvider", currentUser.uid)
+                        .whereIn("status", listOf("assigned", "in_progress"))
+                        .get()
+                        .await()
+                    
+                    val activeOrders = activeOrdersSnap.size()
+                    
+                    // Carregar nota média
+                    val rating = providerDoc.getDouble("rating") ?: 0.0
+                    val totalRatings = (providerDoc.getLong("totalRatings") ?: 0L).toInt()
+
+                    // Atualizar interface
+                    binding.tvCompletedServices.text = completedJobs.toString()
+                    binding.tvActiveOrders.text = activeOrders.toString()
+                    binding.tvEarnings.text = formatCurrency(totalEarnings)
+                    binding.tvProviderRating.text = if (rating > 0) String.format("%.1f", rating) else "—"
+                    binding.tvProviderRatingCount.text = if (totalRatings > 0) "Nota média ($totalRatings avaliações)" else "Sem avaliações ainda"
+                    
+                    android.util.Log.d("ProviderHome", "📊 Estatísticas carregadas - Completados: $completedJobs, Ativos: $activeOrders, Lucro: R$ $totalEarnings")
+                } else {
+                    // Prestador não encontrado, usar valores padrão
+                    binding.tvCompletedServices.text = "0"
+                    binding.tvActiveOrders.text = "0"
+                    binding.tvEarnings.text = "R$ 0,00"
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("ProviderHome", "❌ Erro ao carregar estatísticas: ${e.message}")
+                binding.tvCompletedServices.text = "0"
+                binding.tvActiveOrders.text = "0"
+                binding.tvEarnings.text = "R$ 0,00"
+            }
+        }
+    }
+    
+    /**
+     * Formata valor monetário
+     */
+    private fun formatCurrency(value: Double): String {
+        return "R$ ${String.format("%.2f", value).replace(".", ",")}"
     }
 
     /**
@@ -187,14 +260,6 @@ class ProviderHomeActivity : AppCompatActivity() {
             binding.btnAvailability.setBackgroundColor(ContextCompat.getColor(this, R.color.success_color))
             showToast("Você está agora disponível")
         }
-    }
-
-    /**
-     * Mostra notificações
-     */
-    private fun showNotifications() {
-        showToast("🔔 Notificações em desenvolvimento...")
-        // TODO: Implementar tela de notificações
     }
 
     /**

@@ -65,11 +65,11 @@ class ServicesActivity : AppCompatActivity() {
         
         // Cards de nichos de serviços (novas categorias)
         binding.cardLimpeza.setOnClickListener {
-            navigateToServiceCategory("estofados", "Estofados")
+            navigateToServiceCategory("estofados", "Limpeza de estofados")
         }
         
         binding.cardManutencao.setOnClickListener {
-            navigateToServiceCategory("hidraulica", "Hidráulica")
+            navigateToServiceCategory("encanador", "Encanador")
         }
         
         binding.cardEletrica.setOnClickListener {
@@ -115,10 +115,6 @@ class ServicesActivity : AppCompatActivity() {
         binding.cardFaxina.setOnClickListener {
             navigateToServiceCategory("faxina", "Faxina")
         }
-        binding.cardTrocaBateria.setOnClickListener {
-            navigateToServiceCategory("troca_bateria_automotiva", "Troca de bateria Automotiva")
-        }
-        
         // Botão popular dados (apenas para desenvolvimento)
         binding.btnPopulateData.setOnClickListener {
             populateSampleData()
@@ -144,8 +140,8 @@ class ServicesActivity : AppCompatActivity() {
      */
     private fun filterServiceCards() {
         val cards = listOf(
-            binding.cardLimpeza to "Estofados",
-            binding.cardManutencao to "Hidráulica",
+            binding.cardLimpeza to "Limpeza de estofados",
+            binding.cardManutencao to "Encanador",
             binding.cardEletrica to "Elétrica",
             binding.cardEncanamento to "Instalação",
             binding.cardPintura to "Caixa d'água",
@@ -157,8 +153,7 @@ class ServicesActivity : AppCompatActivity() {
             binding.cardChaveiroResidencial to "Chaveiro residencial",
             binding.cardServicosAutomotivos to "Serviços automotivos",
             binding.cardMontagemMoveis to "Montagem de móveis",
-            binding.cardFaxina to "Faxina",
-            binding.cardTrocaBateria to "Troca de bateria automotiva"
+            binding.cardFaxina to "Faxina"
         )
         
         if (searchQuery.isEmpty()) {

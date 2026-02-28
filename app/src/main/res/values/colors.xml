@@ -137,5 +137,11 @@
     <!-- Document Upload Colors -->
     <color name="light_gray">#F1F5F9</color>
     <color name="light_blue">#EFF6FF</color>
+    
+    <!-- Payment Activity Colors (aliases) -->
+    <color name="primary">@color/primary_color</color>
+    <color name="background_light">@color/background_secondary</color>
+    <color name="icon_tint">@color/gray_600</color>
+    <color name="divider">@color/divider_color</color>
 </resources>
 

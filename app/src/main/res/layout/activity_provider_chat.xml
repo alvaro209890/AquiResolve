@@ -143,7 +143,8 @@
         android:orientation="vertical"
         android:padding="12dp"
         android:background="@color/surface_color"
-        android:elevation="2dp">
+        android:elevation="2dp"
+        android:visibility="gone">
 
         <!-- Primeira linha de botões -->
         <LinearLayout
@@ -232,7 +233,8 @@
         android:orientation="vertical"
         android:padding="8dp"
         android:background="@color/surface_color"
-        android:elevation="1dp">
+        android:elevation="1dp"
+        android:visibility="gone">
 
         <TextView
             android:layout_width="wrap_content"
@@ -294,7 +296,7 @@
         android:id="@+id/recyclerViewMessages"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/quickResponseSection"
+        android:layout_below="@id/headerSection"
         android:layout_above="@id/inputSection"
         android:background="@color/background_color"
         android:padding="8dp"

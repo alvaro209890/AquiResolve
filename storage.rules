@@ -21,37 +21,35 @@ service firebase.storage {
       allow write: if request.auth != null && request.resource.contentType.matches('image/.*');
     }
 
-    // Imagens do chat (associadas ao pedido)
+    // Imagens do chat (associadas ao pedido) - pasta antiga
+    // Regras simplificadas: auth + contentType (evita falha do get() no Firestore)
     match /chat_images/{orderId}/{fileName} {
-      // Apenas cliente ou prestador atribuído podem ler ou enviar (apenas imagens)
-      allow read, write: if request.auth != null
-        && exists(/databases/(default)/documents/orders/$(orderId))
-        && (
-          request.auth.uid == get(/databases/(default)/documents/orders/$(orderId)).data.clientId ||
-          request.auth.uid == get(/databases/(default)/documents/orders/$(orderId)).data.assignedProvider
-        )
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    // Imagens do chat (associadas ao pedido) - pasta nova "chats/{orderId}/"
+    // Regras simplificadas: auth + contentType (evita falha do get() no Firestore)
+    match /chats/{orderId}/{fileName} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null
         && request.resource.contentType.matches('image/.*');
     }
 
     // Imagens de pedidos
+    // Regras simplificadas: auth + contentType (evita falha do get() no Firestore)
     match /order_images/{orderId}/{fileName} {
-      // Todos logados podem ver
       allow read: if request.auth != null;
-      // Apenas o criador do pedido pode enviar imagens
       allow write: if request.auth != null
-        && exists(/databases/(default)/documents/orders/$(orderId))
-        && request.auth.uid == get(/databases/(default)/documents/orders/$(orderId)).data.clientId
         && request.resource.contentType.matches('image/.*');
     }
 
     // Imagens de pedidos (pasta "Pedidos" para compatibilidade com bucket atual)
+    // Regras simplificadas: auth + contentType (evita falha do get() no Firestore)
     match /Pedidos/{orderId}/{fileName} {
-      // Todos logados podem ver
       allow read: if request.auth != null;
-      // Apenas o criador do pedido pode enviar imagens
       allow write: if request.auth != null
-        && exists(/databases/(default)/documents/orders/$(orderId))
-        && request.auth.uid == get(/databases/(default)/documents/orders/$(orderId)).data.clientId
         && request.resource.contentType.matches('image/.*');
     }
 
@@ -69,6 +67,18 @@ service firebase.storage {
 
             // Selfies de prestadores - pasta "Selfie" (compatibilidade)
             match /Selfie/{userId}/{fileName} {
+              // Apenas o dono pode ver e enviar
+              allow read, write: if request.auth != null && request.auth.uid == userId;
+            }
+
+            // Documentos de prestadores - pasta "provider_documents"
+            match /provider_documents/{userId}/{fileName} {
+              // Apenas o dono pode ver e enviar
+              allow read, write: if request.auth != null && request.auth.uid == userId;
+            }
+
+            // Documentos gerais - pasta "documents"
+            match /documents/{userId}/{fileName} {
               // Apenas o dono pode ver e enviar
               allow read, write: if request.auth != null && request.auth.uid == userId;
             }

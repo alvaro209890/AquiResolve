@@ -12,6 +12,8 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.example.loginapp.adapters.ProviderOrdersAdapter
 import com.example.loginapp.databinding.FragmentProviderOrdersBinding
 import com.example.loginapp.models.OrderData
+import com.example.loginapp.utils.NewOrderSoundHelper
+import com.example.loginapp.utils.ServiceNicheCatalog
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
@@ -36,6 +38,9 @@ class ProviderOrdersFragment : Fragment() {
     
     // Estado atual da tab
     private var currentTab = 0 // 0: Disponíveis, 1: Aceitos, 2: Concluídos, 3: Histórico
+    private val knownAvailableOrderIds = mutableSetOf<String>()
+    private var providerServices = emptyList<String>()
+    private var providerServicesNormalized = emptySet<String>()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -52,7 +57,12 @@ class ProviderOrdersFragment : Fragment() {
         setupClickListeners()
         setupTabs()
         loadOrders()
-        setupRealtimeListener()
+        // setupRealtimeListener() será chamado dentro de loadOrders() apenas se prestador estiver aprovado
+    }
+
+    override fun onResume() {
+        super.onResume()
+        ProviderNewOrderAlertManager.refreshMonitoring()
     }
 
     /**
@@ -99,6 +109,35 @@ class ProviderOrdersFragment : Fragment() {
      * Filtra pedidos baseado na tab selecionada
      */
     private fun filterOrdersByTab() {
+        // VERIFICAR STATUS DE VERIFICAÇÃO ANTES DE FILTRAR
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser != null) {
+            lifecycleScope.launch {
+                val verificationManager = ProviderVerificationManager()
+                val verificationStatus = verificationManager.getVerificationStatus(currentUser.uid)
+                
+                // BLOQUEAR FILTRO SE NÃO ESTIVER APROVADO
+                if (verificationStatus == null || verificationStatus.status != ProviderVerificationManager.VerificationStatus.APPROVED) {
+                    ordersList.clear()
+                    ordersAdapter.notifyDataSetChanged()
+                    updateEmptyState()
+                    return@launch
+                }
+                
+                // Se aprovado, aplicar filtro normalmente
+                applyTabFilter()
+            }
+        } else {
+            ordersList.clear()
+            ordersAdapter.notifyDataSetChanged()
+            updateEmptyState()
+        }
+    }
+    
+    /**
+     * Aplica o filtro da tab atual (chamado apenas se prestador estiver aprovado)
+     */
+    private fun applyTabFilter() {
         ordersList.clear()
         
         when (currentTab) {
@@ -108,10 +147,14 @@ class ProviderOrdersFragment : Fragment() {
                 })
             }
             1 -> { // Aceitos
-                ordersList.addAll(allOrdersList.filter { it.status == "accepted" })
+                val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+                ordersList.addAll(allOrdersList.filter {
+                    (it.status == "assigned" || it.status == "in_progress") && it.assignedProvider == currentUserId
+                })
             }
             2 -> { // Concluídos
-                ordersList.addAll(allOrdersList.filter { it.status == "completed" })
+                val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+                ordersList.addAll(allOrdersList.filter { it.status == "completed" && it.assignedProvider == currentUserId })
             }
             3 -> { // Histórico (todos)
                 ordersList.addAll(allOrdersList)
@@ -167,19 +210,30 @@ class ProviderOrdersFragment : Fragment() {
             return
         }
         
-        val provider = LocalAuthManager.getCurrentProviderData()
-        if (provider == null) {
-            showToast("❌ Dados do prestador não encontrados")
+        // VERIFICAR STATUS DE VERIFICAÇÃO ANTES DE BUSCAR
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser == null) {
+            showToast("❌ Usuário não autenticado")
             return
         }
         
         lifecycleScope.launch {
             try {
+                // Verificar status de verificação
+                val verificationManager = ProviderVerificationManager()
+                val verificationStatus = verificationManager.getVerificationStatus(currentUser.uid)
+                
+                // BLOQUEAR BUSCA SE NÃO ESTIVER APROVADO
+                if (verificationStatus == null || verificationStatus.status != ProviderVerificationManager.VerificationStatus.APPROVED) {
+                    showToast("⏳ Você precisa estar verificado para buscar pedidos")
+                    return@launch
+                }
+                
                 setLoadingState(true)
                 
                 // Buscar pedidos que correspondem aos serviços do prestador
                 val query = firestore.collection("orders")
-                    .whereIn("status", listOf("pending", "available", "distributing"))
+                    .whereIn("status", listOf("pending", "available", "distributing", "assigned", "in_progress", "completed"))
                     .orderBy("createdAt", Query.Direction.DESCENDING)
                     .limit(100)
                 
@@ -188,16 +242,20 @@ class ProviderOrdersFragment : Fragment() {
                 
                 for (document in snapshot.documents) {
                     try {
-                        val order = document.toObject(OrderData::class.java)
-                        if (order != null && provider.services.contains(order.serviceType)) {
-                            // Filtrar por texto de busca
-                            val matchesSearch = order.description.contains(searchQuery, ignoreCase = true) ||
-                                              order.clientName.contains(searchQuery, ignoreCase = true) ||
-                                              order.address.contains(searchQuery, ignoreCase = true) ||
-                                              order.serviceType.contains(searchQuery, ignoreCase = true)
-                            
-                            if (matchesSearch) {
-                                ordersList.add(order)
+                        val order = document.toObject(OrderData::class.java)?.copy(id = document.id)
+                        if (order != null) {
+                            val hasMatchingService = shouldIncludeOrderForProvider(order, currentUser.uid)
+
+                            if (hasMatchingService) {
+                                // Filtrar por texto de busca
+                                val matchesSearch = order.description.contains(searchQuery, ignoreCase = true) ||
+                                                  order.clientName.contains(searchQuery, ignoreCase = true) ||
+                                                  order.address.contains(searchQuery, ignoreCase = true) ||
+                                                  order.serviceType.contains(searchQuery, ignoreCase = true)
+                                
+                                if (matchesSearch) {
+                                    ordersList.add(order)
+                                }
                             }
                         }
                     } catch (e: Exception) {
@@ -239,6 +297,11 @@ class ProviderOrdersFragment : Fragment() {
                     return@launch
                 }
                 
+                // Garantir Firebase inicializado
+                if (!FirebaseConfig.isInitialized()) {
+                    FirebaseConfig.initialize(requireContext())
+                }
+                
                 val authManager = FirebaseAuthManager(requireContext())
                 val userData = authManager.getLocalUserData()
                 if (userData?.userType != FirebaseAuthManager.USER_TYPE_PROVIDER) {
@@ -246,29 +309,84 @@ class ProviderOrdersFragment : Fragment() {
                     return@launch
                 }
                 
-                // Verificar status de verificação do prestador
+                // Verificar status de verificação do prestador na coleção providers (verificationStatus)
                 val verificationManager = ProviderVerificationManager()
                 val verificationStatus = verificationManager.getVerificationStatus(currentUser.uid)
                 
-                // A PARTIR DE AGORA: NÃO BLOQUEAR MAIS O ACESSO POR FALTA DE APROVAÇÃO
-                // Apenas mostrar aviso e seguir carregando pedidos
-                if (verificationStatus == null || verificationStatus.status != ProviderVerificationManager.VerificationStatus.APPROVED) {
-                    showToast("⚠️ Sua verificação ainda não está aprovada. Você pode visualizar/aceitar pedidos assim mesmo.")
-                }
+                android.util.Log.d("ProviderOrdersFragment", "🔍 Verificando status do prestador: ${currentUser.uid}")
+                android.util.Log.d("ProviderOrdersFragment", "📊 Status encontrado: ${verificationStatus?.status}")
                 
-                // Buscar dados do prestador
-                val provider = LocalAuthManager.getCurrentProviderData()
-                if (provider == null) {
-                    showToast("❌ Dados do prestador não encontrados")
+                // Verificar se está APROVADO conforme o Firestore (como no print)
+                if (verificationStatus == null) {
+                    android.util.Log.w("ProviderOrdersFragment", "❌ Nenhuma verificação encontrada para o prestador")
+                    showDocumentsPendingMessage(ProviderVerificationManager.VerificationStatus.PENDING)
                     return@launch
                 }
                 
-                android.util.Log.d("ProviderOrders", "🔍 Carregando pedidos para prestador: ${provider.fullName}")
-                android.util.Log.d("ProviderOrders", " Serviços oferecidos: ${provider.services}")
+                when (verificationStatus.status) {
+                    ProviderVerificationManager.VerificationStatus.APPROVED -> {
+                        android.util.Log.d("ProviderOrdersFragment", "✅ Prestador APROVADO - Carregando pedidos")
+                        // Prestador aprovado - carregar pedidos normalmente
+                    }
+                    ProviderVerificationManager.VerificationStatus.PENDING -> {
+                        android.util.Log.w("ProviderOrdersFragment", "⏳ Documentos pendentes")
+                        showDocumentsPendingMessage(ProviderVerificationManager.VerificationStatus.PENDING)
+                        // Limpar lista e remover listener
+                        allOrdersList.clear()
+                        ordersList.clear()
+                        knownAvailableOrderIds.clear()
+                        ordersAdapter.notifyDataSetChanged()
+                        ordersListener?.remove()
+                        ordersListener = null
+                        return@launch
+                    }
+                    ProviderVerificationManager.VerificationStatus.UNDER_REVIEW -> {
+                        android.util.Log.w("ProviderOrdersFragment", "🔍 Verificação em análise")
+                        showDocumentsPendingMessage(ProviderVerificationManager.VerificationStatus.UNDER_REVIEW)
+                        // Limpar lista e remover listener
+                        allOrdersList.clear()
+                        ordersList.clear()
+                        knownAvailableOrderIds.clear()
+                        ordersAdapter.notifyDataSetChanged()
+                        ordersListener?.remove()
+                        ordersListener = null
+                        return@launch
+                    }
+                    ProviderVerificationManager.VerificationStatus.REJECTED -> {
+                        android.util.Log.w("ProviderOrdersFragment", "❌ Verificação rejeitada")
+                        showDocumentsPendingMessage(ProviderVerificationManager.VerificationStatus.REJECTED)
+                        // Limpar lista e remover listener
+                        allOrdersList.clear()
+                        ordersList.clear()
+                        knownAvailableOrderIds.clear()
+                        ordersAdapter.notifyDataSetChanged()
+                        ordersListener?.remove()
+                        ordersListener = null
+                        return@launch
+                    }
+                    ProviderVerificationManager.VerificationStatus.EXPIRED -> {
+                        android.util.Log.w("ProviderOrdersFragment", "⏰ Verificação expirada")
+                        showDocumentsPendingMessage(ProviderVerificationManager.VerificationStatus.EXPIRED)
+                        // Limpar lista e remover listener
+                        allOrdersList.clear()
+                        ordersList.clear()
+                        knownAvailableOrderIds.clear()
+                        ordersAdapter.notifyDataSetChanged()
+                        ordersListener?.remove()
+                        ordersListener = null
+                        return@launch
+                    }
+                }
                 
-                // Buscar pedidos com status "pending", "available" ou "distributing"
+                providerServices = loadProviderServices(currentUser.uid)
+                providerServicesNormalized = ServiceNicheCatalog.normalizeProviderServices(providerServices)
+
+                android.util.Log.d("ProviderOrders", "🔍 Carregando pedidos para prestador: ${currentUser.uid}")
+                android.util.Log.d("ProviderOrders", "🧰 Nichos oferecidos: $providerServices")
+                
+                // Buscar pedidos com todos os status relevantes
                 val query = firestore.collection("orders")
-                    .whereIn("status", listOf("pending", "available", "distributing"))
+                    .whereIn("status", listOf("pending", "available", "distributing", "assigned", "in_progress", "completed"))
                     .orderBy("createdAt", Query.Direction.DESCENDING)
                     .limit(100)
                 
@@ -281,13 +399,12 @@ class ProviderOrdersFragment : Fragment() {
                 
                 for (document in snapshot.documents) {
                     try {
-                        val order = document.toObject(OrderData::class.java)
+                        val order = document.toObject(OrderData::class.java)?.copy(id = document.id)
                         if (order != null) {
                             totalOrders++
                             
-                            // Filtrar por serviços que o prestador oferece
-                            val hasMatchingService = provider.services.contains(order.serviceType)
-                            
+                            val hasMatchingService = shouldIncludeOrderForProvider(order, currentUser.uid)
+
                             if (hasMatchingService) {
                                 allOrdersList.add(order)
                                 filteredOrders++
@@ -302,9 +419,20 @@ class ProviderOrdersFragment : Fragment() {
                 }
                 
                 android.util.Log.d("ProviderOrders", "📊 Total de pedidos: $totalOrders, Filtrados: $filteredOrders")
+
+                // Baseline dos pedidos disponíveis para detectar somente novos IDs.
+                knownAvailableOrderIds.clear()
+                knownAvailableOrderIds.addAll(
+                    allOrdersList
+                        .filter { isAvailableStatus(it.status) }
+                        .map { it.id }
+                )
                 
-                // Aplicar filtro da tab atual
-                filterOrdersByTab()
+                // Aplicar filtro da tab atual (já verifica status dentro)
+                applyTabFilter()
+                
+                // Configurar listener em tempo real APENAS se aprovado
+                setupRealtimeListener()
                 
             } catch (e: Exception) {
                 showToast("❌ Erro ao carregar pedidos: ${e.message}")
@@ -321,7 +449,7 @@ class ProviderOrdersFragment : Fragment() {
     private fun showOrderDetails(order: OrderData) {
         val intent = Intent(requireContext(), OrderDetailsActivity::class.java)
         intent.putExtra("order_id", order.id)
-        intent.putExtra("from_provider", true)
+        intent.putExtra("is_provider_view", true)
         startActivity(intent)
     }
 
@@ -331,6 +459,11 @@ class ProviderOrdersFragment : Fragment() {
     private fun acceptOrder(order: OrderData) {
         lifecycleScope.launch {
             try {
+                // Garantir Firebase inicializado
+                if (!FirebaseConfig.isInitialized()) {
+                    FirebaseConfig.initialize(requireContext())
+                }
+                
                 val authManager = FirebaseAuthManager(requireContext())
                 val user = authManager.getLocalUserData()
                 if (user == null) {
@@ -338,12 +471,13 @@ class ProviderOrdersFragment : Fragment() {
                     return@launch
                 }
                 
-                // Atualizar status do pedido para "accepted"
+                // Atualizar status do pedido para "assigned" (padrão do sistema)
                 val updates = mapOf(
-                    "status" to "accepted",
-                    "providerId" to user.uid,
-                    "providerName" to user.fullName,
-                    "acceptedAt" to System.currentTimeMillis()
+                    "assignedProvider" to user.uid,
+                    "assignedProviderName" to user.fullName,
+                    "status" to OrderData.STATUS_ASSIGNED,
+                    "assignedAt" to com.google.firebase.Timestamp.now(),
+                    "updatedAt" to com.google.firebase.Timestamp.now()
                 )
                 
                 firestore.collection("orders")
@@ -351,7 +485,15 @@ class ProviderOrdersFragment : Fragment() {
                     .update(updates)
                     .await()
                 
-                showToast("✅ Pedido aceito com sucesso!")
+                // Gerar códigos de verificação (sem mostrar para o prestador)
+                val orderManager = FirebaseOrderManager()
+                val codesResult = orderManager.generateVerificationCodes(order.id)
+                if (codesResult.isSuccess) {
+                    showToast("✅ Pedido aceito com sucesso!")
+                } else {
+                    showToast("✅ Pedido aceito com sucesso!")
+                }
+                
                 loadOrders() // Recarregar lista
                 
             } catch (e: Exception) {
@@ -367,6 +509,11 @@ class ProviderOrdersFragment : Fragment() {
     private fun rejectOrder(order: OrderData) {
         lifecycleScope.launch {
             try {
+                // Garantir Firebase inicializado
+                if (!FirebaseConfig.isInitialized()) {
+                    FirebaseConfig.initialize(requireContext())
+                }
+                
                 val authManager = FirebaseAuthManager(requireContext())
                 val user = authManager.getLocalUserData()
                 if (user == null) {
@@ -400,12 +547,6 @@ class ProviderOrdersFragment : Fragment() {
      * Mostra diálogo de filtros
      */
     private fun showFiltersDialog() {
-        val provider = LocalAuthManager.getCurrentProviderData()
-        if (provider == null) {
-            showToast("❌ Dados do prestador não encontrados")
-            return
-        }
-        
         val filterOptions = arrayOf(
             "Todos os pedidos",
             "Apenas pendentes",
@@ -422,7 +563,13 @@ class ProviderOrdersFragment : Fragment() {
                 1 -> filterOrdersByStatus("pending")
                 2 -> filterOrdersByStatus("accepted")
                 3 -> filterOrdersByStatus("rejected")
-                4 -> showServiceFilterDialog(provider.services)
+                4 -> {
+                    if (providerServices.isEmpty()) {
+                        showToast("ℹ️ Você ainda não definiu nichos. Exibindo todos os pedidos.")
+                    } else {
+                        showServiceFilterDialog(providerServices)
+                    }
+                }
             }
         }
         builder.show()
@@ -432,11 +579,25 @@ class ProviderOrdersFragment : Fragment() {
      * Filtra pedidos por status
      */
     private fun filterOrdersByStatus(status: String) {
-        val provider = LocalAuthManager.getCurrentProviderData()
-        if (provider == null) return
+        // VERIFICAR STATUS DE VERIFICAÇÃO ANTES DE FILTRAR
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser == null) {
+            showToast("❌ Usuário não autenticado")
+            return
+        }
         
         lifecycleScope.launch {
             try {
+                // Verificar status de verificação
+                val verificationManager = ProviderVerificationManager()
+                val verificationStatus = verificationManager.getVerificationStatus(currentUser.uid)
+                
+                // BLOQUEAR FILTRO SE NÃO ESTIVER APROVADO
+                if (verificationStatus == null || verificationStatus.status != ProviderVerificationManager.VerificationStatus.APPROVED) {
+                    showToast("⏳ Você precisa estar verificado para filtrar pedidos")
+                    return@launch
+                }
+                
                 val query = firestore.collection("orders")
                     .whereEqualTo("status", status)
                     .orderBy("createdAt", Query.Direction.DESCENDING)
@@ -447,9 +608,12 @@ class ProviderOrdersFragment : Fragment() {
                 
                 for (document in snapshot.documents) {
                     try {
-                        val order = document.toObject(OrderData::class.java)
-                        if (order != null && provider.services.contains(order.serviceType)) {
-                            ordersList.add(order)
+                        val order = document.toObject(OrderData::class.java)?.copy(id = document.id)
+                        if (order != null) {
+                            val hasMatchingService = shouldIncludeOrderForProvider(order, currentUser.uid)
+                            if (hasMatchingService) {
+                                ordersList.add(order)
+                            }
                         }
                     } catch (e: Exception) {
                         android.util.Log.e("ProviderOrders", "Erro ao processar pedido: ${e.message}")
@@ -483,13 +647,20 @@ class ProviderOrdersFragment : Fragment() {
      * Filtra pedidos por serviço específico
      */
     private fun filterOrdersByService(serviceType: String) {
-        val provider = LocalAuthManager.getCurrentProviderData()
-        if (provider == null) return
-        
+        val selectedServiceNormalized = ServiceNicheCatalog
+            .normalizeProviderServices(listOf(serviceType))
+            .firstOrNull()
+            ?: return
+
+        val currentUserId = FirebaseAuth.getInstance().currentUser?.uid
+            ?: run {
+                showToast("❌ Usuário não autenticado")
+                return
+            }
+
         lifecycleScope.launch {
             try {
                 val query = firestore.collection("orders")
-                    .whereEqualTo("serviceType", serviceType)
                     .whereIn("status", listOf("pending", "available", "distributing"))
                     .orderBy("createdAt", Query.Direction.DESCENDING)
                     .limit(50)
@@ -499,9 +670,16 @@ class ProviderOrdersFragment : Fragment() {
                 
                 for (document in snapshot.documents) {
                     try {
-                        val order = document.toObject(OrderData::class.java)
+                        val order = document.toObject(OrderData::class.java)?.copy(id = document.id)
                         if (order != null) {
-                            ordersList.add(order)
+                            val matchesProvider = shouldIncludeOrderForProvider(order, currentUserId)
+                            val matchesSelectedService = ServiceNicheCatalog.matchesProviderServices(
+                                setOf(selectedServiceNormalized),
+                                order
+                            )
+                            if (matchesProvider && matchesSelectedService) {
+                                ordersList.add(order)
+                            }
                         }
                     } catch (e: Exception) {
                         android.util.Log.e("ProviderOrders", "Erro ao processar pedido: ${e.message}")
@@ -702,18 +880,37 @@ class ProviderOrdersFragment : Fragment() {
      * Configura listener em tempo real para novos pedidos
      */
     private fun setupRealtimeListener() {
-        val provider = LocalAuthManager.getCurrentProviderData()
-        if (provider == null) return
+        // VERIFICAR STATUS DE VERIFICAÇÃO ANTES DE CONFIGURAR LISTENER (dentro de coroutine)
+        val currentUser = FirebaseAuth.getInstance().currentUser
+        if (currentUser == null) {
+            android.util.Log.w("ProviderOrders", "⚠️ Usuário não autenticado - não configurando listener")
+            return
+        }
         
-        // Remover listener anterior se existir
-        ordersListener?.remove()
-        
-        // Configurar novo listener
-        ordersListener = firestore.collection("orders")
-            .whereIn("status", listOf("pending", "available", "distributing"))
-            .orderBy("createdAt", Query.Direction.DESCENDING)
-            .limit(50)
-            .addSnapshotListener { snapshot, error ->
+        lifecycleScope.launch {
+            val verificationManager = ProviderVerificationManager()
+            val verificationStatus = verificationManager.getVerificationStatus(currentUser.uid)
+            
+            // SÓ CONFIGURAR LISTENER SE PRESTADOR ESTIVER APROVADO
+            if (verificationStatus == null || verificationStatus.status != ProviderVerificationManager.VerificationStatus.APPROVED) {
+                android.util.Log.w("ProviderOrders", "⚠️ Prestador não aprovado - não configurando listener de pedidos")
+                // Remover listener anterior se existir
+                ordersListener?.remove()
+                ordersListener = null
+                return@launch
+            }
+            
+            // Remover listener anterior se existir
+            ordersListener?.remove()
+            
+            android.util.Log.d("ProviderOrders", "✅ Prestador aprovado - configurando listener de pedidos")
+            
+            // Configurar novo listener
+            ordersListener = firestore.collection("orders")
+                .whereIn("status", listOf("pending", "available", "distributing", "assigned", "in_progress", "completed"))
+                .orderBy("createdAt", Query.Direction.DESCENDING)
+                .limit(50)
+                .addSnapshotListener { snapshot, error ->
                 if (error != null) {
                     android.util.Log.e("ProviderOrders", "Erro no listener: ${error.message}")
                     return@addSnapshotListener
@@ -724,32 +921,40 @@ class ProviderOrdersFragment : Fragment() {
                     
                     for (document in snapshot.documents) {
                         try {
-                            val order = document.toObject(OrderData::class.java)
-                            if (order != null && provider.services.contains(order.serviceType)) {
-                                newOrders.add(order)
+                            val order = document.toObject(OrderData::class.java)?.copy(id = document.id)
+                            if (order != null) {
+                                val hasMatchingService = shouldIncludeOrderForProvider(order, currentUser.uid)
+                                if (hasMatchingService) {
+                                    newOrders.add(order)
+                                }
                             }
                         } catch (e: Exception) {
                             android.util.Log.e("ProviderOrders", "Erro ao processar pedido: ${e.message}")
                         }
                     }
                     
-                    // Verificar se há novos pedidos
-                    val hasNewOrders = newOrders.size > allOrdersList.size
-                    val newOrdersCount = newOrders.size - allOrdersList.size
+                    val currentAvailableIds = newOrders
+                        .filter { isAvailableStatus(it.status) }
+                        .map { it.id }
+                        .toSet()
+                    val newOrderIds = currentAvailableIds - knownAvailableOrderIds
+                    knownAvailableOrderIds.clear()
+                    knownAvailableOrderIds.addAll(currentAvailableIds)
                     
                     // Atualizar lista completa
                     allOrdersList.clear()
                     allOrdersList.addAll(newOrders)
                     
-                    // Aplicar filtro da tab atual
-                    filterOrdersByTab()
+                    // Aplicar filtro da tab atual (já verifica status dentro)
+                    applyTabFilter()
                     
                     // Mostrar notificação de novos pedidos
-                    if (hasNewOrders && newOrdersCount > 0) {
-                        showNewOrdersNotification(newOrdersCount)
+                    if (newOrderIds.isNotEmpty()) {
+                        showNewOrdersNotification(newOrderIds.size)
                     }
                 }
             }
+        }
     }
     
     /**
@@ -764,6 +969,9 @@ class ProviderOrdersFragment : Fragment() {
         
         showToast(message)
         
+        // Tocar som de alerta de novo pedido
+        NewOrderSoundHelper.playNewOrderSound(requireContext())
+        
         // Vibrar o dispositivo se possível
         try {
             val vibrator = requireContext().getSystemService(android.content.Context.VIBRATOR_SERVICE) as android.os.Vibrator
@@ -777,6 +985,33 @@ class ProviderOrdersFragment : Fragment() {
             android.util.Log.e("ProviderOrders", "Erro ao vibrar: ${e.message}")
         }
     }
+
+    private suspend fun loadProviderServices(providerId: String): List<String> {
+        return try {
+            val providerDoc = firestore.collection("providers")
+                .document(providerId)
+                .get()
+                .await()
+
+            val rawServices = (providerDoc.get("services") as? List<*>)
+                ?.mapNotNull { it as? String }
+                ?: emptyList()
+
+            ServiceNicheCatalog.canonicalizeProviderServices(rawServices)
+        } catch (e: Exception) {
+            android.util.Log.e("ProviderOrders", "Erro ao carregar serviços do prestador: ${e.message}")
+            emptyList()
+        }
+    }
+
+    private fun shouldIncludeOrderForProvider(order: OrderData, providerId: String?): Boolean {
+        val isAssignedToCurrentProvider = !providerId.isNullOrBlank() && order.assignedProvider == providerId
+        if (isAssignedToCurrentProvider) {
+            return true
+        }
+
+        return ServiceNicheCatalog.matchesProviderServices(providerServicesNormalized, order)
+    }
     
     /**
      * Remove o listener em tempo real
@@ -784,6 +1019,14 @@ class ProviderOrdersFragment : Fragment() {
     private fun removeRealtimeListener() {
         ordersListener?.remove()
         ordersListener = null
+        knownAvailableOrderIds.clear()
+    }
+
+    private fun isAvailableStatus(status: String): Boolean {
+        return when (status.lowercase()) {
+            "pending", "available", "distributing" -> true
+            else -> false
+        }
     }
 
     /**
@@ -846,7 +1089,3 @@ class ProviderOrdersFragment : Fragment() {
         _binding = null
     }
 }
-
-
-
-

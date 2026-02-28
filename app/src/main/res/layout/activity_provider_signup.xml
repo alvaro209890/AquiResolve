@@ -194,6 +194,43 @@
                 </com.google.android.material.textfield.TextInputLayout>
 
 
+                <!-- Service Niches Section Title -->
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Serviços que você atende"
+                    android:textStyle="bold"
+                    android:textSize="18sp"
+                    android:textColor="@color/text_primary"
+                    android:layout_marginTop="8dp"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Selecione um ou mais nichos para receber apenas pedidos compatíveis."
+                    android:textSize="13sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginBottom="8dp" />
+
+                <com.google.android.material.chip.ChipGroup
+                    android:id="@+id/chipGroupServiceNiches"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="4dp"
+                    app:singleLine="false"
+                    app:singleSelection="false" />
+
+                <TextView
+                    android:id="@+id/tvServiceNicheError"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Selecione pelo menos um nicho"
+                    android:textSize="12sp"
+                    android:textColor="@color/error_color"
+                    android:visibility="gone"
+                    android:layout_marginBottom="8dp" />
+
                 <!-- Address Section Title -->
                 <TextView
                     android:layout_width="wrap_content"
@@ -312,6 +349,7 @@
                         android:inputType="none"
                         android:focusable="true"
                         android:clickable="true"
+                        android:cursorVisible="false"
                         android:textColor="@color/text_primary"
                         android:textSize="16sp"
                         android:completionThreshold="1"
@@ -341,114 +379,113 @@
                 </com.google.android.material.textfield.TextInputLayout>
 
 
-                <!-- Services Section Title -->
+                <!-- Chave PIX Section Title -->
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="Serviços oferecidos"
+                    android:text="Chave PIX"
                     android:textStyle="bold"
                     android:textSize="18sp"
                     android:textColor="@color/text_primary"
+                    android:layout_marginTop="8dp"
                     android:layout_marginBottom="8dp" />
 
-                <!-- Services Chips -->
-                <com.google.android.material.chip.ChipGroup
-                    android:id="@+id/chipGroupServices"
+                <!-- Tipo de Chave PIX -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/tilPixKeyType"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    app:singleSelection="false"
-                    app:selectionRequired="false"
-                    app:chipSpacing="8dp"
-                    android:layout_marginBottom="16dp">
+                    android:layout_marginBottom="12dp"
+                    android:hint="Tipo de chave"
+                    app:startIconDrawable="@drawable/ic_payment"
+                    app:startIconTint="@color/primary_color"
+                    app:boxStrokeColor="@color/primary_color"
+                    app:hintTextColor="@color/primary_color"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
 
-                    <com.google.android.material.chip.Chip
-                        android:layout_width="wrap_content"
+                    <AutoCompleteTextView
+                        android:id="@+id/spinnerPixKeyType"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Elétrica"
-                        style="@style/Widget.Material3.Chip.Filter"
-                        app:checkedIconVisible="true"
-                        android:checkable="true" />
+                        android:inputType="none"
+                        android:focusable="true"
+                        android:clickable="true"
+                        android:cursorVisible="false"
+                        android:textColor="@color/text_primary"
+                        android:textSize="16sp"
+                        android:completionThreshold="1"
+                        android:dropDownHeight="200dp"
+                        android:dropDownWidth="match_parent"
+                        android:popupBackground="@android:drawable/edit_text" />
 
-                    <com.google.android.material.chip.Chip
-                        android:layout_width="wrap_content"
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Chave PIX Field -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:id="@+id/tilPixKey"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="16dp"
+                    android:hint="Chave PIX"
+                    app:boxStrokeColor="@color/primary_color"
+                    app:hintTextColor="@color/primary_color"
+                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etPixKey"
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Hidráulica"
-                        style="@style/Widget.Material3.Chip.Filter"
-                        app:checkedIconVisible="true"
-                        android:checkable="true" />
+                        android:inputType="number"
+                        android:maxLines="1"
+                        android:textColor="@color/text_primary" />
 
-                    <com.google.android.material.chip.Chip
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Pintura"
-                        style="@style/Widget.Material3.Chip.Filter"
-                        app:checkedIconVisible="true"
-                        android:checkable="true" />
-
-                    <com.google.android.material.chip.Chip
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Limpeza"
-                        style="@style/Widget.Material3.Chip.Filter"
-                        app:checkedIconVisible="true"
-                        android:checkable="true" />
-
-                    <com.google.android.material.chip.Chip
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Jardinagem"
-                        style="@style/Widget.Material3.Chip.Filter"
-                        app:checkedIconVisible="true"
-                        android:checkable="true" />
-
-                    <com.google.android.material.chip.Chip
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="TI"
-                        style="@style/Widget.Material3.Chip.Filter"
-                        app:checkedIconVisible="true"
-                        android:checkable="true" />
-
-                    <com.google.android.material.chip.Chip
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Marcenaria"
-                        style="@style/Widget.Material3.Chip.Filter"
-                        app:checkedIconVisible="true"
-                        android:checkable="true" />
-
-                    <com.google.android.material.chip.Chip
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Mudança"
-                        style="@style/Widget.Material3.Chip.Filter"
-                        app:checkedIconVisible="true"
-                        android:checkable="true" />
-
-                </com.google.android.material.chip.ChipGroup>
+                </com.google.android.material.textfield.TextInputLayout>
 
                 <!-- Terms and Conditions -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="start|center_vertical"
+                    android:orientation="vertical"
                     android:layout_marginBottom="24dp">
 
-                    <CheckBox
-                        android:id="@+id/cbTerms"
-                        android:layout_width="wrap_content"
+                    <LinearLayout
+                        android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:buttonTint="@color/primary_color" />
+                        android:orientation="horizontal"
+                        android:gravity="start|center_vertical">
+
+                        <CheckBox
+                            android:id="@+id/cbTerms"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:buttonTint="@color/primary_color" />
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/terms_agreement"
+                            android:textSize="14sp"
+                            android:textColor="@color/text_secondary"
+                            android:lineSpacingExtra="2dp" />
+
+                    </LinearLayout>
 
                     <TextView
-                        android:layout_width="0dp"
+                        android:id="@+id/tvReadTerms"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:text="@string/terms_agreement"
+                        android:layout_marginTop="8dp"
+                        android:text="Ler Termos de Uso"
                         android:textSize="14sp"
-                        android:textColor="@color/text_secondary"
-                        android:lineSpacingExtra="2dp" />
+                        android:textColor="@color/primary_color"
+                        android:textStyle="bold"
+                        android:drawableStart="@drawable/ic_document"
+                        android:drawablePadding="8dp"
+                        android:gravity="center_vertical"
+                        android:padding="4dp"
+                        android:background="?attr/selectableItemBackgroundBorderless"
+                        android:contentDescription="Ler Termos de Uso" />
 
                 </LinearLayout>
 

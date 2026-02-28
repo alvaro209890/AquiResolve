@@ -2,6 +2,7 @@ package com.example.loginapp
 
 import android.app.Activity
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
@@ -9,13 +10,17 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.request.RequestOptions
 import com.example.loginapp.databinding.ActivityProfileBinding
 import com.example.loginapp.utils.ImagePermissionHelper
+import com.yalantis.ucrop.UCrop
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+import java.io.File
 
 /**
  * ProfileActivity - Tela de perfil do usuário
@@ -34,20 +39,48 @@ class ProfileActivity : AppCompatActivity() {
     private lateinit var permissionManager: com.example.loginapp.utils.ActivityPermissionManager
     private lateinit var firebaseImageManager: FirebaseImageManager
     
-    // Launcher para seleção de imagem
-    private val imagePickerLauncher = registerForActivityResult(
+    // Launcher para galeria
+    private val galleryLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        uri?.let { launchCrop(it) }
+    }
+
+    // Launcher para câmera
+    private var cameraImageUri: Uri? = null
+    private val cameraLauncher = registerForActivityResult(
+        ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success) cameraImageUri?.let { launchCrop(it) }
+        cameraImageUri = null
+    }
+
+    // Launcher para UCrop (recorte 1:1 estilo WhatsApp)
+    private val uCropLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val imageUrl = result.data?.getStringExtra(ImagePickerActivity.EXTRA_IMAGE_URL)
-            if (imageUrl != null) {
-                updateProfileImage(imageUrl)
+        when {
+            result.resultCode == Activity.RESULT_OK -> {
+                result.data?.let { data ->
+                    UCrop.getOutput(data)?.let { uploadAndUpdateProfile(it) }
+                }
+            }
+            result.resultCode == UCrop.RESULT_ERROR -> {
+                result.data?.let { data ->
+                    val cropError = UCrop.getError(data)
+                    showToast("Erro ao recortar: ${cropError?.message ?: "Desconhecido"}")
+                }
             }
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        
+        // Garantir Firebase inicializado
+        if (!FirebaseConfig.isInitialized()) {
+            FirebaseConfig.initialize(this)
+        }
         
         // Inicializar managers
         authManager = FirebaseAuthManager(this)
@@ -61,6 +94,15 @@ class ProfileActivity : AppCompatActivity() {
         // Configurar a interface
         setupUI()
         setupClickListeners()
+        loadUserData()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        
+        // Recarregar dados quando a Activity volta do foco
+        // Isso garante que o botão de prestador seja atualizado após voltar do envio de documentos
+        android.util.Log.d("ProfileActivity", "🔄 onResume - Recarregando dados do usuário...")
         loadUserData()
     }
 
@@ -132,11 +174,6 @@ class ProfileActivity : AppCompatActivity() {
             showBankDataDialog()
         }
         
-        binding.llDashboard.setOnClickListener {
-            val intent = Intent(this, UserDashboardActivity::class.java)
-            startActivity(intent)
-        }
-        
         binding.llHelp.setOnClickListener {
             showHelpDialog()
         }
@@ -155,10 +192,7 @@ class ProfileActivity : AppCompatActivity() {
         if (user != null) {
             // Log para debug
             android.util.Log.d("ProfileActivity", "=== CARREGANDO DADOS DO USUÁRIO ===")
-            android.util.Log.d("ProfileActivity", "UID: ${user.uid}")
-            android.util.Log.d("ProfileActivity", "Email: ${user.email}")
-            android.util.Log.d("ProfileActivity", "Username: ${user.username}")
-            android.util.Log.d("ProfileActivity", "UserType: ${user.userType}")
+            android.util.Log.d("ProfileActivity", "Dados locais encontrados")
             android.util.Log.d("ProfileActivity", "USER_TYPE_PROVIDER: ${FirebaseAuthManager.USER_TYPE_PROVIDER}")
             android.util.Log.d("ProfileActivity", "É prestador? ${user.userType == FirebaseAuthManager.USER_TYPE_PROVIDER}")
             
@@ -178,6 +212,18 @@ class ProfileActivity : AppCompatActivity() {
                 binding.btnBecomeProvider.visibility = View.GONE
                 binding.btnUploadDocuments.visibility = View.VISIBLE
                 binding.llBankData.visibility = View.VISIBLE
+
+                // Esconder botão de documentos se prestador já aprovado
+                lifecycleScope.launch {
+                    try {
+                        val verificationData = ProviderVerificationManager().getVerificationStatus(user.uid)
+                        if (verificationData?.status == ProviderVerificationManager.VerificationStatus.APPROVED) {
+                            binding.btnUploadDocuments.visibility = View.GONE
+                        }
+                    } catch (e: Exception) {
+                        android.util.Log.w("ProfileActivity", "Erro ao verificar status: ${e.message}")
+                    }
+                }
                 
                 // Adicionar botão para voltar à conta de cliente
                 addSwitchToClientButton()
@@ -193,15 +239,23 @@ class ProfileActivity : AppCompatActivity() {
                 // Remover botão de voltar à conta de cliente se existir
                 removeSwitchToClientButton()
 
-                // Se já possui perfil de prestador no Firestore, mostrar CTA de retorno à área do prestador
+                // Verificar se já possui perfil de prestador no Firestore
                 lifecycleScope.launch {
                     try {
+                        android.util.Log.d("ProfileActivity", "🔍 Verificando se usuário tem perfil de prestador...")
                         val hasProvider = FirebaseProviderManager().hasProviderProfile(user.uid)
+                        android.util.Log.d("ProfileActivity", "📊 Tem perfil de prestador? $hasProvider")
+                        
                         if (hasProvider) {
+                            android.util.Log.d("ProfileActivity", "✅ Usuário tem perfil de prestador - Atualizando botão")
                             binding.btnBecomeProvider.text = "Voltar para Conta de Prestador"
                             binding.btnBecomeProvider.backgroundTintList = ContextCompat.getColorStateList(this@ProfileActivity, R.color.secondary_color)
+                        } else {
+                            android.util.Log.d("ProfileActivity", "❌ Usuário não tem perfil de prestador - Mantendo botão padrão")
                         }
-                    } catch (_: Exception) { }
+                    } catch (e: Exception) {
+                        android.util.Log.e("ProfileActivity", "❌ Erro ao verificar perfil de prestador: ${e.message}")
+                    }
                 }
             }
         } else {
@@ -213,18 +267,19 @@ class ProfileActivity : AppCompatActivity() {
      * Carrega a imagem do perfil
      */
     private fun loadProfileImage(imageUrl: String?) {
-        if (!imageUrl.isNullOrEmpty()) {
-            val requestOptions = RequestOptions()
-                .diskCacheStrategy(DiskCacheStrategy.ALL)
-                .circleCrop()
-                .placeholder(R.drawable.ic_person)
-                .error(R.drawable.ic_person)
-            
-            Glide.with(this)
-                .load(imageUrl)
-                .apply(requestOptions)
-                .into(binding.ivAvatar)
-        }
+        // Remover tint para que a foto carregue com cores corretas (evita aparência cinza)
+        binding.ivAvatar.imageTintList = null
+        
+        val requestOptions = RequestOptions()
+            .diskCacheStrategy(DiskCacheStrategy.ALL)
+            .circleCrop()
+            .placeholder(R.drawable.ic_person)
+            .error(R.drawable.ic_person)
+        
+        Glide.with(this)
+            .load(imageUrl?.takeIf { it.isNotEmpty() })
+            .apply(requestOptions)
+            .into(binding.ivAvatar)
     }
 
     /**
@@ -233,19 +288,91 @@ class ProfileActivity : AppCompatActivity() {
     private fun showImagePickerDialog() {
         permissionManager.checkAndRequestImagePermissions(
             onGranted = {
-                val intent = ImagePickerActivity.createIntent(
-                    context = this,
-                    folder = FirebaseImageManager.FOLDER_PROFILE_IMAGES,
-                    userId = authManager.getCurrentUser()?.uid,
-                    orderId = null,
-                    maxImages = 1
-                )
-                imagePickerLauncher.launch(intent)
+                val userId = authManager.getLocalUserData()?.uid
+                    ?: authManager.getCurrentUser()?.uid
+                    ?: com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+
+                if (userId == null) {
+                    showToast("❌ Usuário não autenticado. Faça login novamente.")
+                    return@checkAndRequestImagePermissions
+                }
+
+                AlertDialog.Builder(this)
+                    .setTitle("Foto do Perfil")
+                    .setItems(arrayOf("📷 Tirar Foto", "🖼️ Galeria")) { _, which ->
+                        when (which) {
+                            0 -> takeProfilePhoto()
+                            1 -> galleryLauncher.launch("image/*")
+                        }
+                    }
+                    .setNegativeButton("Cancelar", null)
+                    .show()
             },
             onDenied = {
                 showToast("Permissões necessárias para alterar foto do perfil")
             }
         )
+    }
+
+    private fun takeProfilePhoto() {
+        try {
+            val photoFile = File(getExternalFilesDir(null), "profile_${System.currentTimeMillis()}.jpg")
+            cameraImageUri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", photoFile)
+            cameraLauncher.launch(cameraImageUri!!)
+        } catch (e: Exception) {
+            showToast("Erro ao abrir câmera: ${e.message}")
+        }
+    }
+
+    private fun launchCrop(sourceUri: Uri) {
+        val fileName = "profile_crop_${System.currentTimeMillis()}.jpg"
+        val destinationFile = File(cacheDir, fileName)
+        val destinationUri = Uri.fromFile(destinationFile)
+
+        val options = UCrop.Options().apply {
+            setCompressionFormat(android.graphics.Bitmap.CompressFormat.JPEG)
+            setCompressionQuality(90)
+        }
+
+        val uCropIntent = UCrop.of(sourceUri, destinationUri)
+            .withAspectRatio(1f, 1f)
+            .withOptions(options)
+            .getIntent(this)
+
+        uCropLauncher.launch(uCropIntent)
+    }
+
+    private fun uploadAndUpdateProfile(croppedUri: Uri) {
+        val userId = authManager.getLocalUserData()?.uid
+            ?: authManager.getCurrentUser()?.uid
+            ?: com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+            ?: return
+
+        // Mostrar barra de carregamento durante o upload
+        binding.profileImageProgress.visibility = View.VISIBLE
+        binding.ivAvatar.isClickable = false
+
+        lifecycleScope.launch {
+            try {
+                val uploadData = FirebaseImageManager.ImageUploadData(
+                    uri = croppedUri,
+                    fileName = "profile_${userId}.jpg",
+                    folder = FirebaseImageManager.FOLDER_PROFILE_IMAGES,
+                    userId = userId,
+                    orderId = null
+                )
+                when (val result = firebaseImageManager.uploadImage(this@ProfileActivity, uploadData)) {
+                    is FirebaseImageManager.UploadResult.Success -> updateProfileImage(result.downloadUrl)
+                    is FirebaseImageManager.UploadResult.Error -> showToast("❌ Erro no upload: ${result.message}")
+                    else -> showToast("❌ Erro ao enviar foto")
+                }
+            } catch (e: Exception) {
+                showToast("❌ Erro: ${e.message}")
+            } finally {
+                binding.profileImageProgress.visibility = View.GONE
+                binding.ivAvatar.isClickable = true
+            }
+        }
     }
 
     /**
@@ -254,6 +381,13 @@ class ProfileActivity : AppCompatActivity() {
     private fun updateProfileImage(imageUrl: String) {
         lifecycleScope.launch {
             try {
+                // Esconder barra de carregamento
+                binding.profileImageProgress.visibility = View.GONE
+                binding.ivAvatar.isClickable = true
+                
+                // Remover tint para foto carregar com cores corretas
+                binding.ivAvatar.imageTintList = null
+                
                 // Carregar imagem com Glide
                 val requestOptions = RequestOptions()
                     .diskCacheStrategy(DiskCacheStrategy.ALL)
@@ -266,11 +400,15 @@ class ProfileActivity : AppCompatActivity() {
                     .apply(requestOptions)
                     .into(binding.ivAvatar)
                 
-                // Salvar URL da imagem no perfil do usuário
-                val user = authManager.getCurrentUser()
-                if (user != null) {
-                    // Atualizar URL da imagem no Firestore
-                    updateProfileImageInFirestore(user.uid, imageUrl)
+                // Salvar URL da imagem no Firestore
+                val userId = authManager.getLocalUserData()?.uid 
+                    ?: authManager.getCurrentUser()?.uid
+                    ?: com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+                    
+                if (userId != null) {
+                    updateProfileImageInFirestore(userId, imageUrl)
+                } else {
+                    showToast("❌ Não foi possível identificar o usuário")
                 }
                 
             } catch (e: Exception) {
@@ -413,7 +551,7 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     /**
-     * Mostra diálogo de dados bancários
+     * Mostra diálogo de chave PIX
      */
     private fun showBankDataDialog() {
         val user = authManager.getLocalUserData()
@@ -424,95 +562,304 @@ class ProfileActivity : AppCompatActivity() {
         
         // Verificar se é prestador
         if (user.userType != FirebaseAuthManager.USER_TYPE_PROVIDER) {
-            showToast("❌ Apenas prestadores podem acessar dados bancários")
+            showToast("❌ Apenas prestadores podem acessar dados de PIX")
             return
         }
         
-        // Obter dados do prestador
-        val provider = LocalAuthManager.getCurrentProviderData()
-        if (provider == null) {
-            showToast("❌ Dados do prestador não encontrados")
-            return
-        }
-        
-        // Verificar se já tem dados bancários
-        val hasBankData = !provider.bank.isNullOrEmpty() && 
-                         !provider.agency.isNullOrEmpty() && 
-                         !provider.account.isNullOrEmpty()
-        
-        if (hasBankData) {
-            // Mostrar dados bancários existentes
-            showExistingBankData(provider)
-        } else {
-            // Mostrar opção para adicionar dados bancários
-            showAddBankDataDialog()
+        // Buscar dados do prestador do Firebase
+        lifecycleScope.launch {
+            try {
+                val providerManager = FirebaseProviderManager()
+                val providerProfile = providerManager.getProviderProfile(user.uid)
+                
+                if (providerProfile == null) {
+                    showToast("❌ Dados do prestador não encontrados")
+                    return@launch
+                }
+                
+                // Verificar se já tem dados de PIX
+                val hasPixData = !providerProfile.pixKey.isNullOrEmpty() && 
+                               !providerProfile.pixKeyType.isNullOrEmpty()
+                
+                if (hasPixData) {
+                    // Mostrar dados de PIX existentes
+                    showExistingBankData(providerProfile)
+                } else {
+                    // Mostrar opção para adicionar chave PIX
+                    showAddBankDataDialog()
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("ProfileActivity", "Erro ao carregar dados do prestador: ${e.message}")
+                showToast("❌ Erro ao carregar dados: ${e.message}")
+            }
         }
     }
     
     /**
-     * Mostra dados bancários existentes
+     * Mostra dados de PIX existentes
      */
-    private fun showExistingBankData(provider: LocalAuthManager.ProviderData) {
-        val message = "Dados Bancários:\n\n" +
-                     "Banco: ${provider.bank}\n" +
-                     "Agência: ${provider.agency}\n" +
-                     "Conta: ${provider.account}\n\n" +
-                     "Deseja editar estes dados?"
+    private fun showExistingBankData(providerProfile: FirebaseProviderManager.ProviderProfile) {
+        val pixKeyTypeDisplay = when (providerProfile.pixKeyType?.lowercase()) {
+            "cpf" -> "CPF"
+            "celular" -> "Celular"
+            "email" -> "Email"
+            else -> providerProfile.pixKeyType ?: ""
+        }
+        
+        val pixInfo = if (!providerProfile.pixKey.isNullOrEmpty() && !providerProfile.pixKeyType.isNullOrEmpty()) {
+            "Chave PIX ($pixKeyTypeDisplay): ${providerProfile.pixKey}"
+        } else {
+            "Chave PIX: Não cadastrada"
+        }
+        
+        val message = "$pixInfo\n\nDeseja editar?"
         
         AlertDialog.Builder(this)
-            .setTitle("Dados Bancários")
+            .setTitle("Chave PIX")
             .setMessage(message)
             .setPositiveButton("Editar") { _, _ ->
-                showEditBankDataDialog(provider)
+                showEditBankDataDialog(providerProfile)
             }
             .setNegativeButton("Fechar", null)
             .show()
     }
     
     /**
-     * Mostra diálogo para adicionar dados bancários
+     * Mostra diálogo para adicionar chave PIX
      */
     private fun showAddBankDataDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Dados Bancários")
-            .setMessage("Para receber pagamentos pelos seus serviços, você precisa cadastrar seus dados bancários.\n\n" +
-                       "Deseja adicionar agora?")
-            .setPositiveButton("Sim, adicionar") { _, _ ->
+        val user = authManager.getLocalUserData()
+        if (user == null) {
+            showToast("❌ Erro ao carregar dados do usuário")
+            return
+        }
+        
+        lifecycleScope.launch {
+            try {
+                val providerManager = FirebaseProviderManager()
+                val providerProfile = providerManager.getProviderProfile(user.uid)
+                showEditBankDataDialog(providerProfile)
+            } catch (e: Exception) {
+                android.util.Log.e("ProfileActivity", "Erro ao carregar dados: ${e.message}")
                 showEditBankDataDialog(null)
             }
-            .setNegativeButton("Depois", null)
-            .show()
+        }
     }
     
     /**
-     * Mostra diálogo para editar dados bancários
+     * Mostra diálogo para editar chave PIX
      */
-    private fun showEditBankDataDialog(provider: LocalAuthManager.ProviderData?) {
+    private fun showEditBankDataDialog(providerProfile: FirebaseProviderManager.ProviderProfile?) {
         val dialogView = layoutInflater.inflate(R.layout.dialog_bank_data, null)
+        
+        // Referências aos campos de PIX
+        val etPixKeyType = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.etPixKeyType)
+        val etPixKey = dialogView.findViewById<com.google.android.material.textfield.TextInputEditText>(R.id.etPixKey)
+        val tilPixKey = dialogView.findViewById<com.google.android.material.textfield.TextInputLayout>(R.id.tilPixKey)
+        
+        // Variável para rastrear o tipo de PIX selecionado
+        var selectedPixType = ""
+        
+        // Preencher dados de PIX se já existirem
+        if (providerProfile != null) {
+            if (!providerProfile.pixKeyType.isNullOrEmpty()) {
+                selectedPixType = providerProfile.pixKeyType.lowercase()
+                val pixKeyTypeDisplay = when (selectedPixType) {
+                    "cpf" -> "CPF"
+                    "celular" -> "Celular"
+                    "email" -> "Email"
+                    else -> providerProfile.pixKeyType
+                }
+                etPixKeyType.setText(pixKeyTypeDisplay)
+                tilPixKey.hint = pixKeyTypeDisplay
+            }
+            
+            if (!providerProfile.pixKey.isNullOrEmpty()) {
+                // Para celular, remover formatação ao exibir
+                val keyToDisplay = if (selectedPixType == "celular") {
+                    providerProfile.pixKey.replace(Regex("[^\\d]"), "")
+                } else {
+                    providerProfile.pixKey
+                }
+                etPixKey.setText(keyToDisplay)
+            }
+            
+            // Aplicar formatação se já tiver tipo selecionado
+            if (selectedPixType.isNotEmpty()) {
+                when (selectedPixType) {
+                    "cpf" -> {
+                        etPixKey.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                        com.example.loginapp.utils.TextFormatter.applyCpfFormatting(etPixKey)
+                    }
+                    "celular" -> {
+                        // Chave PIX celular: apenas números, sem formatação
+                        etPixKey.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                    }
+                    "email" -> {
+                        etPixKey.inputType = android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+                    }
+                }
+            }
+        }
+        
+        // Configurar seletor de tipo de chave PIX
+        val pixKeyTypes = listOf("CPF", "Celular", "Email")
+        etPixKeyType.setOnClickListener {
+            val items = pixKeyTypes.toTypedArray()
+            AlertDialog.Builder(this)
+                .setTitle("Selecione o tipo de chave PIX")
+                .setItems(items) { _, which ->
+                    val selectedType = pixKeyTypes[which]
+                    selectedPixType = selectedType.lowercase()
+                    etPixKeyType.setText(selectedType)
+                    tilPixKey.hint = selectedType
+                    
+                    // Ajustar input type e formatação baseado no tipo selecionado
+                    when (selectedPixType) {
+                        "cpf" -> {
+                            etPixKey.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                            etPixKey.text?.clear()
+                            // Aplicar formatação de CPF
+                            com.example.loginapp.utils.TextFormatter.applyCpfFormatting(etPixKey)
+                        }
+                        "celular" -> {
+                            // Chave PIX celular: apenas números, sem formatação
+                            etPixKey.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                            etPixKey.text?.clear()
+                            // Remover qualquer formatação existente
+                            etPixKey.removeTextChangedListener(etPixKey.tag as? android.text.TextWatcher)
+                        }
+                        "email" -> {
+                            etPixKey.inputType = android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+                            etPixKey.text?.clear()
+                        }
+                    }
+                }
+                .show()
+        }
+        
         val dialog = AlertDialog.Builder(this)
             .setView(dialogView)
-            .setTitle("Dados Bancários")
+            .setTitle("Chave PIX")
             .setPositiveButton("Salvar") { _, _ ->
-                // TODO: Implementar salvamento dos dados bancários
-                showToast("✅ Dados bancários salvos com sucesso!")
+                // Usar selectedPixType se disponível, senão usar o texto do campo
+                val pixTypeToSave = if (selectedPixType.isNotEmpty()) {
+                    selectedPixType
+                } else {
+                    etPixKeyType.text?.toString()?.trim()?.lowercase() ?: ""
+                }
+                
+                var pixKeyToSave = etPixKey.text?.toString()?.trim() ?: ""
+                
+                // Remover formatação da chave PIX celular antes de salvar
+                if (pixTypeToSave == "celular") {
+                    pixKeyToSave = pixKeyToSave.replace(Regex("[^\\d]"), "")
+                }
+                
+                savePixData(
+                    pixTypeToSave,
+                    pixKeyToSave
+                )
             }
             .setNegativeButton("Cancelar", null)
             .create()
         
-        // Preencher campos se já existirem dados
-        if (provider != null) {
-            // TODO: Preencher campos com dados existentes
+        dialog.show()
+    }
+    
+    /**
+     * Salva dados de PIX
+     */
+    private fun savePixData(
+        pixKeyType: String,
+        pixKey: String
+    ) {
+        val user = authManager.getLocalUserData()
+        if (user == null) {
+            showToast("❌ Erro ao salvar dados")
+            return
         }
         
-        dialog.show()
+        lifecycleScope.launch {
+            try {
+                // Validar PIX
+                if (pixKeyType.isEmpty()) {
+                    showToast("❌ Selecione o tipo de chave PIX")
+                    return@launch
+                }
+                
+                if (pixKey.isEmpty()) {
+                    showToast("❌ Informe a chave PIX")
+                    return@launch
+                }
+                
+                // Validar formato da chave PIX
+                when (pixKeyType.lowercase()) {
+                    "cpf" -> {
+                        val cleanKey = pixKey.replace(Regex("[^0-9]"), "")
+                        if (cleanKey.length != 11) {
+                            showToast("❌ CPF deve ter 11 dígitos")
+                            return@launch
+                        }
+                    }
+                    "celular" -> {
+                        // Chave PIX celular: apenas números, sem formatação, 11 dígitos
+                        val cleanKey = pixKey.replace(Regex("[^\\d]"), "")
+                        if (cleanKey.length != 11) {
+                            showToast("❌ Celular deve ter 11 dígitos (com DDD)")
+                            return@launch
+                        }
+                    }
+                    "email" -> {
+                        // Validar formato de email
+                        if (!android.util.Patterns.EMAIL_ADDRESS.matcher(pixKey).matches()) {
+                            showToast("❌ Email inválido")
+                            return@launch
+                        }
+                    }
+                }
+                
+                // Buscar perfil atual do prestador
+                val providerManager = FirebaseProviderManager()
+                val currentProfile = providerManager.getProviderProfile(user.uid)
+                
+                if (currentProfile == null) {
+                    showToast("❌ Perfil do prestador não encontrado")
+                    return@launch
+                }
+                
+                // Criar novo perfil com dados de PIX atualizados (mantendo dados bancários existentes)
+                val updatedProfile = currentProfile.copy(
+                    pixKey = pixKey.ifEmpty { null },
+                    pixKeyType = pixKeyType.lowercase().ifEmpty { null }
+                )
+                
+                // Salvar no Firebase
+                val result = providerManager.updateProfile(updatedProfile)
+                
+                if (result is FirebaseProviderManager.ProviderResult.Success) {
+                    showToast("✅ Chave PIX salva com sucesso!")
+                } else {
+                    val errorMessage = (result as? FirebaseProviderManager.ProviderResult.Error)?.message ?: "Erro desconhecido"
+                    showToast("❌ Erro ao salvar: $errorMessage")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("ProfileActivity", "Erro ao salvar chave PIX: ${e.message}")
+                showToast("❌ Erro ao salvar dados: ${e.message}")
+            }
+        }
     }
 
     /**
-     * Mostra diálogo de ajuda
+     * Mostra tela de ajuda e suporte
      */
     private fun showHelpDialog() {
-        showToast("❓ Ajuda e suporte em desenvolvimento...")
-        // TODO: Implementar ajuda e suporte
+        val user = authManager.getLocalUserData()
+        val userType = user?.userType ?: ""
+        
+        val intent = Intent(this, HelpSupportActivity::class.java)
+        intent.putExtra("user_type", userType)
+        startActivity(intent)
     }
 
     /**
@@ -545,19 +892,31 @@ class ProfileActivity : AppCompatActivity() {
     }
 
     /**
-     * Atualiza a URL da imagem no Firestore
+     * Atualiza a URL da imagem no Firestore (users e providers para prestadores)
      */
     private fun updateProfileImageInFirestore(userId: String, imageUrl: String) {
         lifecycleScope.launch {
             try {
                 val result = authManager.updateUserProfileImage(userId, imageUrl)
-                if (result.isSuccess) {
-                    showToast("✅ Foto do perfil atualizada com sucesso!")
-                    // Recarregar dados do usuário para atualizar a URL localmente
-                    loadUserData()
-                } else {
+                if (!result.isSuccess) {
                     showToast("❌ Erro ao salvar foto no servidor")
+                    return@launch
                 }
+
+                // Sempre tentar atualizar coleção providers (mesma foto para ambos os perfis)
+                try {
+                    val providerDoc = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+                        .collection("providers").document(userId).get().await()
+                    if (providerDoc.exists()) {
+                        val providerManager = FirebaseProviderManager()
+                        providerManager.updateProfileImage(userId, imageUrl)
+                    }
+                } catch (e: Exception) {
+                    android.util.Log.d("ProfileActivity", "Sem perfil de prestador para atualizar: ${e.message}")
+                }
+
+                showToast("✅ Foto do perfil atualizada com sucesso!")
+                loadUserData()
             } catch (e: Exception) {
                 showToast("❌ Erro ao salvar foto: ${e.message}")
             }
@@ -623,6 +982,7 @@ class ProfileActivity : AppCompatActivity() {
                         authManager.cacheUserDataLocally(updatedUser)
                         showToast("⚠️ Sem conexão. Alternando para cliente localmente.")
                     }
+                    ProviderNewOrderAlertManager.refreshMonitoring()
                     showToast("✅ Conta alterada para Cliente")
                     
                     // Recarregar dados e atualizar interface
@@ -683,6 +1043,7 @@ class ProfileActivity : AppCompatActivity() {
                         authManager.cacheUserDataLocally(updatedUser)
                         showToast("⚠️ Sem conexão. Alternando para prestador localmente.")
                     }
+                    ProviderNewOrderAlertManager.refreshMonitoring()
                     val intent = Intent(this@ProfileActivity, ProviderHomeActivity::class.java).apply {
                         putExtra("show_switch_message", true)
                         putExtra("switch_message", "🎉 Agora você está na conta de Prestador!")

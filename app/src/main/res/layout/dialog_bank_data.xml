@@ -12,59 +12,53 @@
         android:padding="24dp"
         android:gravity="center_horizontal">
 
-        <!-- Banco -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Chave PIX"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/text_primary"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Tipo de Chave PIX -->
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilPixKeyType"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:hint="Nome do Banco"
+            android:hint="Tipo de Chave PIX"
             app:boxStrokeColor="@color/primary_color"
             app:hintTextColor="@color/primary_color"
             style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
 
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etBankName"
+                android:id="@+id/etPixKeyType"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="textCapWords"
+                android:inputType="none"
+                android:focusable="false"
+                android:clickable="true"
                 android:maxLines="1" />
 
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Agência -->
+        <!-- Chave PIX -->
         <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/tilPixKey"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
-            android:hint="Agência"
+            android:hint="Chave PIX"
             app:boxStrokeColor="@color/primary_color"
             app:hintTextColor="@color/primary_color"
             style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
 
             <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etAgency"
+                android:id="@+id/etPixKey"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:inputType="number"
-                android:maxLines="1" />
-
-        </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- Conta -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:hint="Conta"
-            app:boxStrokeColor="@color/primary_color"
-            app:hintTextColor="@color/primary_color"
-            style="@style/Widget.Material3.TextInputLayout.OutlinedBox">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/etAccount"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:inputType="number"
+                android:inputType="text"
                 android:maxLines="1" />
 
         </com.google.android.material.textfield.TextInputLayout>

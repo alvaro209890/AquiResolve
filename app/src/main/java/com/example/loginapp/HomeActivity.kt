@@ -72,26 +72,12 @@ class HomeActivity : AppCompatActivity() {
             showToast("🔧 Funcionalidade de filtro em desenvolvimento")
         }
         
-        // Categorias de serviços
-        binding.cardPlumber.setOnClickListener {
-            navigateToCreateOrder("Hidráulica")
-        }
-        
-        binding.cardElectrician.setOnClickListener {
-            navigateToCreateOrder("Elétrica")
-        }
-        
-        binding.cardPainter.setOnClickListener {
-            navigateToCreateOrder("Pintura")
-        }
-        
-        binding.cardCleaning.setOnClickListener {
-            navigateToCreateOrder("Limpeza")
-        }
-        
-        binding.cardGardening.setOnClickListener {
-            navigateToCreateOrder("Jardinagem")
-        }
+        // Categorias de serviços: ir para aba Serviços (único local para fazer pedido)
+        binding.cardPlumber.setOnClickListener { navigateToServices() }
+        binding.cardElectrician.setOnClickListener { navigateToServices() }
+        binding.cardPainter.setOnClickListener { navigateToServices() }
+        binding.cardCleaning.setOnClickListener { navigateToServices() }
+        binding.cardGardening.setOnClickListener { navigateToServices() }
         
         binding.cardMore.setOnClickListener {
             showToast("📋 Mais categorias em breve")
@@ -105,7 +91,7 @@ class HomeActivity : AppCompatActivity() {
                     true
                 }
                 R.id.navigation_services -> {
-                    showToast("🔧 Tela de serviços em desenvolvimento")
+                    startActivity(Intent(this, ServicesActivity::class.java))
                     true
                 }
                 R.id.navigation_orders -> {
@@ -193,13 +179,10 @@ class HomeActivity : AppCompatActivity() {
     }
 
     /**
-     * Navega para a tela de criação de pedidos
+     * Navega para a aba Serviços (único local onde cliente pode fazer pedido)
      */
-    private fun navigateToCreateOrder(serviceNiche: String) {
-        val intent = Intent(this, CreateOrderActivity::class.java).apply {
-            putExtra("service_category_name", serviceNiche)
-        }
-        startActivity(intent)
+    private fun navigateToServices() {
+        startActivity(Intent(this, ServicesActivity::class.java))
     }
 
     /**

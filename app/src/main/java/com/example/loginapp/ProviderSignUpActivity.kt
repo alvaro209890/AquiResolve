@@ -2,7 +2,6 @@ package com.example.loginapp
 
 import android.content.Intent
 import android.os.Bundle
-import android.util.Patterns
 import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -14,6 +13,7 @@ import kotlinx.coroutines.launch
 import androidx.appcompat.app.AlertDialog
 import com.example.loginapp.R
 import com.example.loginapp.models.SavedAddress
+import com.example.loginapp.utils.ServiceNicheCatalog
 import com.google.firebase.firestore.GeoPoint
 
 /**
@@ -33,12 +33,18 @@ class ProviderSignUpActivity : AppCompatActivity() {
     
     // Variáveis para controle de estado
     private var isLoading = false
-    private val selectedServices = mutableSetOf<String>()
     private var isFromProfile = false // Indica se veio do perfil do cliente
     private lateinit var authManager: FirebaseAuthManager
+    private var pixKeyType: String = "" // "celular" ou "cpf"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        window.addFlags(android.view.WindowManager.LayoutParams.FLAG_SECURE)
+        
+        // Garantir Firebase inicializado
+        if (!FirebaseConfig.isInitialized()) {
+            FirebaseConfig.initialize(this)
+        }
         
         // Inicializar ViewBinding
         binding = ActivityProviderSignupBinding.inflate(layoutInflater)
@@ -49,8 +55,33 @@ class ProviderSignUpActivity : AppCompatActivity() {
         
         // Configurar a interface
         setupUI()
+        setupServiceNicheChips()
         setupClickListeners()
-        setupServiceChips()
+        setupPixKeyTypeSpinner()
+    }
+
+    /**
+     * Configura chips de nichos de serviço para cadastro do prestador.
+     */
+    private fun setupServiceNicheChips() {
+        binding.chipGroupServiceNiches.removeAllViews()
+
+        ServiceNicheCatalog.providerSelectableNiches.forEach { niche ->
+            val chip = Chip(this).apply {
+                text = niche
+                isCheckable = true
+                isClickable = true
+                isFocusable = true
+                isCloseIconVisible = false
+            }
+            binding.chipGroupServiceNiches.addView(chip)
+        }
+
+        binding.chipGroupServiceNiches.setOnCheckedStateChangeListener { _, checkedIds ->
+            if (checkedIds.isNotEmpty()) {
+                binding.tvServiceNicheError.visibility = View.GONE
+            }
+        }
     }
 
     /**
@@ -76,6 +107,9 @@ class ProviderSignUpActivity : AppCompatActivity() {
         
         // Configurar spinner de estados
         setupStateSpinner()
+        
+        // Configurar formatação dinâmica da chave PIX
+        setupPixKeyFormatting()
     }
 
     /**
@@ -86,11 +120,6 @@ class ProviderSignUpActivity : AppCompatActivity() {
         val adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, states)
         binding.spinnerState.setAdapter(adapter)
         
-        // Configurar para mostrar a lista ao clicar
-        binding.spinnerState.setOnClickListener {
-            binding.spinnerState.showDropDown()
-        }
-        
         // Listener para quando um estado for selecionado
         binding.spinnerState.setOnItemClickListener { _, _, position, _ ->
             val selectedState = states[position]
@@ -99,8 +128,15 @@ class ProviderSignUpActivity : AppCompatActivity() {
             android.util.Log.d("ProviderSignUp", "Estado selecionado: $selectedState (Código: $stateCode)")
         }
         
-        // Configurar threshold para mostrar sugestões
-        binding.spinnerState.threshold = 1
+        // Configurar threshold para mostrar todas as opções ao clicar
+        binding.spinnerState.threshold = 1000 // Valor alto para não filtrar
+        
+        // Configurar para mostrar dropdown quando ganhar foco
+        binding.spinnerState.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                binding.spinnerState.showDropDown()
+            }
+        }
     }
 
     /**
@@ -121,14 +157,119 @@ class ProviderSignUpActivity : AppCompatActivity() {
         binding.btnBack.setOnClickListener {
             finish()
         }
+        
+        // Ler Termos de Uso
+        binding.tvReadTerms.setOnClickListener {
+            startActivity(Intent(this, TermsOfServiceActivity::class.java))
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out)
+        }
     }
 
     /**
-     * Configura os chips de serviços
+     * Configura o spinner de tipo de chave PIX
      */
-    private fun setupServiceChips() {
-        // Para o novo layout, os serviços são inseridos manualmente
-        // Esta função pode ser expandida no futuro
+    private fun setupPixKeyTypeSpinner() {
+        val pixKeyTypes = listOf("Celular", "CPF", "CNPJ", "Email")
+        val adapter = android.widget.ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, pixKeyTypes)
+        binding.spinnerPixKeyType.setAdapter(adapter)
+        
+        // Configurar threshold para mostrar todas as opções ao clicar
+        binding.spinnerPixKeyType.threshold = 1000
+        
+        // Configurar para mostrar dropdown quando ganhar foco
+        binding.spinnerPixKeyType.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) {
+                binding.spinnerPixKeyType.showDropDown()
+            }
+        }
+        
+        // Listener para quando um tipo for selecionado
+        binding.spinnerPixKeyType.setOnItemClickListener { _, _, position, _ ->
+            val selectedType = pixKeyTypes[position]
+            pixKeyType = selectedType.lowercase()
+            android.util.Log.d("ProviderSignUp", "Tipo de chave PIX selecionado: $selectedType")
+            
+            // Atualizar formatação e hint do campo
+            updatePixKeyField()
+        }
+    }
+    
+    /**
+     * Configura formatação dinâmica da chave PIX baseada no tipo selecionado
+     */
+    private fun setupPixKeyFormatting() {
+        binding.etPixKey.addTextChangedListener(object : android.text.TextWatcher {
+            private var isUpdating = false
+            
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                if (isUpdating) return
+                
+                val formatted = when (pixKeyType) {
+                    "cpf" -> {
+                        val text = s.toString().replace(Regex("[^\\d]"), "")
+                        when {
+                            text.length <= 3 -> text
+                            text.length <= 6 -> "${text.substring(0, 3)}.${text.substring(3)}"
+                            text.length <= 9 -> "${text.substring(0, 3)}.${text.substring(3, 6)}.${text.substring(6)}"
+                            text.length <= 11 -> "${text.substring(0, 3)}.${text.substring(3, 6)}.${text.substring(6, 9)}-${text.substring(9)}"
+                            else -> "${text.substring(0, 3)}.${text.substring(3, 6)}.${text.substring(6, 9)}-${text.substring(9, 11)}"
+                        }
+                    }
+                    "cnpj" -> {
+                        val text = s.toString().replace(Regex("[^\\d]"), "")
+                        when {
+                            text.length <= 2 -> text
+                            text.length <= 5 -> "${text.substring(0, 2)}.${text.substring(2)}"
+                            text.length <= 8 -> "${text.substring(0, 2)}.${text.substring(2, 5)}.${text.substring(5)}"
+                            text.length <= 12 -> "${text.substring(0, 2)}.${text.substring(2, 5)}.${text.substring(5, 8)}/${text.substring(8)}"
+                            text.length <= 14 -> "${text.substring(0, 2)}.${text.substring(2, 5)}.${text.substring(5, 8)}/${text.substring(8, 12)}-${text.substring(12)}"
+                            else -> "${text.substring(0, 2)}.${text.substring(2, 5)}.${text.substring(5, 8)}/${text.substring(8, 12)}-${text.substring(12, 14)}"
+                        }
+                    }
+                    "celular" -> {
+                        s.toString().replace(Regex("[^\\d]"), "")
+                    }
+                    "email" -> {
+                        s.toString()
+                    }
+                    else -> s.toString()
+                }
+                
+                isUpdating = true
+                binding.etPixKey.setText(formatted)
+                binding.etPixKey.setSelection(formatted.length)
+                isUpdating = false
+            }
+            
+            override fun afterTextChanged(s: android.text.Editable?) {}
+        })
+    }
+    
+    /**
+     * Atualiza o campo de chave PIX baseado no tipo selecionado
+     */
+    private fun updatePixKeyField() {
+        when (pixKeyType) {
+            "cpf" -> {
+                binding.tilPixKey.hint = "CPF"
+                binding.etPixKey.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            }
+            "cnpj" -> {
+                binding.tilPixKey.hint = "CNPJ"
+                binding.etPixKey.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            }
+            "celular" -> {
+                binding.tilPixKey.hint = "Celular (apenas números)"
+                binding.etPixKey.inputType = android.text.InputType.TYPE_CLASS_NUMBER
+            }
+            "email" -> {
+                binding.tilPixKey.hint = "Email"
+                binding.etPixKey.inputType = android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+            }
+        }
+        binding.etPixKey.text?.clear()
     }
 
     /**
@@ -150,6 +291,15 @@ class ProviderSignUpActivity : AppCompatActivity() {
         val complement = binding.etComplement.text?.toString()?.trim()
         val city = binding.etCity.text?.toString()?.trim() ?: ""
         val state = binding.spinnerState.text?.toString()?.trim() ?: ""
+        val pixKeyTypeSelected = binding.spinnerPixKeyType.text?.toString()?.trim() ?: ""
+        var pixKey = binding.etPixKey.text?.toString()?.trim() ?: ""
+        val selectedServices = getSelectedServiceNiches()
+        
+        // Remover formatação da chave PIX celular antes de salvar
+        if (pixKeyTypeSelected.lowercase() == "celular") {
+            pixKey = pixKey.replace(Regex("[^\\d]"), "")
+        }
+        
         val termsAccepted = binding.cbTerms.isChecked
         
         // Obter dados do usuário logado
@@ -159,13 +309,13 @@ class ProviderSignUpActivity : AppCompatActivity() {
             return
         }
         
-        android.util.Log.d("ProviderSignUp", "Dados coletados:")
-        android.util.Log.d("ProviderSignUp", "- Email: ${currentUser.email}")
-        android.util.Log.d("ProviderSignUp", "- Termos aceitos: $termsAccepted")
+        android.util.Log.d("ProviderSignUp", "Dados do cadastro coletados")
         
         // Validar dados de entrada
         if (!validateInputs(termsAccepted) ||
-            !validateProviderDetails(fullName, phone, cpf, cep, street, number, city, state)) {
+            !validateProviderDetails(fullName, phone, cpf, cep, street, number, city, state) ||
+            !validateSelectedServices(selectedServices) ||
+            !validatePixKey(pixKeyTypeSelected, pixKey)) {
             android.util.Log.e("ProviderSignUp", "❌ VALIDAÇÃO FALHOU - Dados inválidos")
             return
         }
@@ -187,7 +337,6 @@ class ProviderSignUpActivity : AppCompatActivity() {
         }
         
         // Criar conta de prestador
-        val selectedServices = getSelectedServices()
         createProviderAccountFull(
             email = currentUser.email,
             password = "", // Não precisamos da senha
@@ -207,20 +356,76 @@ class ProviderSignUpActivity : AppCompatActivity() {
                 agency = "",
                 account = ""
             ),
-            services = selectedServices
+            services = selectedServices,
+            pixKey = pixKey,
+            pixKeyType = pixKeyTypeSelected.lowercase()
         )
     }
 
-    private fun getSelectedServices(): List<String> {
-        val chips = mutableListOf<String>()
-        val group = binding.chipGroupServices
-        for (i in 0 until group.childCount) {
-            val view = group.getChildAt(i)
-            if (view is com.google.android.material.chip.Chip && view.isChecked) {
-                chips.add(view.text.toString())
+    private fun getSelectedServiceNiches(): List<String> {
+        val selected = mutableListOf<String>()
+
+        for (i in 0 until binding.chipGroupServiceNiches.childCount) {
+            val child = binding.chipGroupServiceNiches.getChildAt(i)
+            if (child is Chip && child.isChecked) {
+                selected.add(child.text?.toString().orEmpty())
             }
         }
-        return chips
+
+        return ServiceNicheCatalog.canonicalizeProviderServices(selected)
+    }
+
+    private fun validateSelectedServices(selectedServices: List<String>): Boolean {
+        return if (selectedServices.isEmpty()) {
+            binding.tvServiceNicheError.visibility = View.VISIBLE
+            false
+        } else {
+            binding.tvServiceNicheError.visibility = View.GONE
+            true
+        }
+    }
+
+    /**
+     * Valida a chave PIX
+     */
+    private fun validatePixKey(pixKeyType: String, pixKey: String): Boolean {
+        if (pixKeyType.isEmpty()) {
+            binding.tilPixKeyType.error = "Selecione o tipo de chave PIX"
+            return false
+        }
+        
+        if (pixKey.isEmpty()) {
+            binding.tilPixKey.error = "Informe a chave PIX"
+            return false
+        }
+        
+        val isValid = when (pixKeyType.lowercase()) {
+            "cpf" -> {
+                val cleanKey = com.example.loginapp.utils.TextFormatter.removeFormatting(pixKey)
+                cleanKey.length == 11 && com.example.loginapp.utils.TextFormatter.isValidCpf(pixKey)
+            }
+            "cnpj" -> {
+                val cleanKey = pixKey.replace(Regex("[^\\d]"), "")
+                cleanKey.length == 14
+            }
+            "celular" -> {
+                val cleanKey = pixKey.replace(Regex("[^\\d]"), "")
+                cleanKey.length == 11
+            }
+            "email" -> {
+                android.util.Patterns.EMAIL_ADDRESS.matcher(pixKey).matches()
+            }
+            else -> false
+        }
+        
+        if (!isValid) {
+            binding.tilPixKey.error = "Chave PIX inválida"
+            return false
+        }
+        
+        binding.tilPixKeyType.error = null
+        binding.tilPixKey.error = null
+        return true
     }
 
     /**
@@ -256,7 +461,9 @@ class ProviderSignUpActivity : AppCompatActivity() {
         cpf: String,
         address: FirebaseProviderManager.Address,
         bank: FirebaseProviderManager.BankInfo,
-        services: List<String>
+        services: List<String>,
+        pixKey: String,
+        pixKeyType: String
     ) {
         lifecycleScope.launch {
             try {
@@ -279,6 +486,8 @@ class ProviderSignUpActivity : AppCompatActivity() {
                     address = address,
                     bank = bank,
                     services = services,
+                    pixKey = pixKey,
+                    pixKeyType = pixKeyType,
                     verificationStatus = "pending",
                     profileImageUrl = currentUser.profileImageUrl
                 )
@@ -408,7 +617,17 @@ class ProviderSignUpActivity : AppCompatActivity() {
      * Limpa todos os erros dos campos
      */
     private fun clearErrors() {
-        // Não há mais campos de email e senha para limpar
+        binding.tilFullName.error = null
+        binding.tilPhone.error = null
+        binding.tilCpf.error = null
+        binding.tilCep.error = null
+        binding.tilStreet.error = null
+        binding.tilNumber.error = null
+        binding.tilCity.error = null
+        binding.tilState.error = null
+        binding.tilPixKeyType.error = null
+        binding.tilPixKey.error = null
+        binding.tvServiceNicheError.visibility = View.GONE
     }
 
     /**
@@ -461,14 +680,15 @@ class ProviderSignUpActivity : AppCompatActivity() {
                     name = "Endereço Principal - $fullName",
                     address = "${address.street}, ${address.number}",
                     complement = address.complement ?: "",
-                    neighborhood = "", // Pode ser preenchido se necessário
+                    neighborhood = "",
                     city = address.city,
                     state = address.state,
                     zipCode = address.cep,
-                    coordinates = address.coordinates?.let { 
-                        GeoPoint(it["latitude"] ?: 0.0, it["longitude"] ?: 0.0) 
+                    coordinates = address.coordinates?.let {
+                        GeoPoint(it["latitude"] ?: 0.0, it["longitude"] ?: 0.0)
                     },
-                    isDefault = true // Endereço principal do prestador
+                    isDefault = true,
+                    userType = SavedAddress.USER_TYPE_PROVIDER
                 )
                 
                 val result = FirebaseAddressManager().saveAddress(savedAddress)
