@@ -1,5 +1,6 @@
 const { verifyFirebaseToken } = require('../config/firebase');
 const HttpError = require('../utils/http-error');
+const logger = require('../utils/logger');
 
 async function authenticateRequest(req, _res, next) {
   try {
@@ -20,8 +21,21 @@ async function authenticateRequest(req, _res, next) {
     }
 
     req.user = await verifyFirebaseToken(idToken);
+    logger.info('Autenticacao validada', {
+      requestId: req.requestId,
+      method: req.method,
+      path: req.originalUrl,
+      uid: req.user.uid
+    });
     next();
   } catch (error) {
+    logger.warn('Falha de autenticacao', {
+      requestId: req.requestId,
+      method: req.method,
+      path: req.originalUrl,
+      error: error.message
+    });
+
     if (error instanceof HttpError) {
       next(error);
       return;

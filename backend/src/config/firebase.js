@@ -1,6 +1,7 @@
 const admin = require('firebase-admin');
 
 const { loadEnv } = require('./env');
+const logger = require('../utils/logger');
 
 function initializeFirebase() {
   if (admin.apps.length > 0) {
@@ -15,6 +16,10 @@ function initializeFirebase() {
       clientEmail: config.firebaseClientEmail,
       privateKey: config.firebasePrivateKey
     }),
+    projectId: config.firebaseProjectId
+  });
+
+  logger.info('Firebase Admin inicializado', {
     projectId: config.firebaseProjectId
   });
 

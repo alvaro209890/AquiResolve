@@ -28,10 +28,14 @@ Copie `backend/.env.example` para `.env` em desenvolvimento local e preencha:
 - `FIREBASE_PROJECT_ID`
 - `FIREBASE_CLIENT_EMAIL`
 - `FIREBASE_PRIVATE_KEY`
+- `KEEP_ALIVE_ENABLED` (opcional, padrão `true` em produção)
+- `KEEP_ALIVE_URL` (opcional, usa `RENDER_EXTERNAL_URL` quando disponível)
+- `KEEP_ALIVE_INTERVAL_MS` (opcional, padrão `840000`)
 
 Observação:
 
 - `FIREBASE_PRIVATE_KEY` deve ser inserida como string única. O backend converte `\\n` em quebras de linha reais automaticamente.
+- O keep-alive interno ajuda a reduzir períodos ociosos, mas se a plataforma suspender totalmente a instância, um ping externo agendado continua sendo a opção mais confiável.
 
 ## Execução local
 
