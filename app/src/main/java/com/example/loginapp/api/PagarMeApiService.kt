@@ -12,46 +12,36 @@ import retrofit2.http.POST
 import retrofit2.http.Path
 
 /**
- * Interface da API Pagar.me para Retrofit
+ * Interface da API de pagamentos do backend para Retrofit
  */
 interface PagarMeApiService {
-    
+
     /**
-     * Criar uma ordem de pagamento com cartão
-     * @param authorization Token de autenticação (API Key)
-     * @param paymentRequest Dados da transação
-     * @return Resposta da transação
+     * Cria um pagamento com cartão via backend.
      */
-    @POST("orders")
+    @POST("card")
     suspend fun createOrder(
         @Header("Authorization") authorization: String,
         @Body paymentRequest: PaymentRequest
     ): Response<PaymentResponse>
-    
+
     /**
-     * Criar uma ordem de pagamento PIX
-     * @param authorization Token de autenticação (API Key)
-     * @param pixPaymentRequest Dados da transação PIX
-     * @return Resposta da transação PIX
+     * Cria um pagamento PIX via backend.
      */
-    @POST("orders")
+    @POST("pix")
     suspend fun createPixOrder(
         @Header("Authorization") authorization: String,
         @Body pixPaymentRequest: PixPaymentRequest
     ): Response<PixPaymentResponse>
-    
+
     /**
-     * Consultar status de uma ordem
-     * @param authorization Token de autenticação
-     * @param orderId ID da ordem
-     * @return Status da ordem
+     * Consulta o status de uma ordem no backend.
      */
-    @GET("orders/{orderId}")
+    @GET("{orderId}/status")
     suspend fun getOrderStatus(
         @Header("Authorization") authorization: String,
         @Path("orderId") orderId: String
     ): Response<PixPaymentResponse>
 }
-
 
 

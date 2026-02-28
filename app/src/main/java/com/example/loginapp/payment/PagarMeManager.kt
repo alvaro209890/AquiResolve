@@ -2,33 +2,32 @@ package com.example.loginapp.payment
 
 import android.content.Context
 import android.util.Log
+import com.example.loginapp.BuildConfig
 import com.example.loginapp.api.PagarMeApiService
 import com.example.loginapp.models.payment.*
+import com.example.loginapp.utils.awaitCurrentUser
+import com.google.firebase.auth.FirebaseAuth
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+import kotlinx.coroutines.suspendCancellableCoroutine
 
 /**
- * Manager para integração com a API Pagar.me
+ * Manager para integração com o backend de pagamentos
  */
 class PagarMeManager(private val context: Context) {
-    
+
     companion object {
         private const val TAG = "PagarMeManager"
-        private const val BASE_URL = "https://api.pagar.me/core/v5/"
-        
-        // Credencial final fornecida pelo usuário
-        private const val SECRET_KEY = "sk_ca99e01207604a10858f6d6e81393b24"
-        
-        // ⚠️ ATENÇÃO SEGURANÇA:
-        // Em produção, a SECRET_KEY deve estar apenas no backend (servidor)
-        // Este código está usando a chave secreta diretamente no app apenas para testes
-        // Recomendação: Criar um backend intermediário que processe os pagamentos
+        private const val BASE_URL = BuildConfig.PAYMENTS_API_BASE_URL
     }
-    
+
     private val apiService: PagarMeApiService
-    
+    private val auth: FirebaseAuth = FirebaseAuth.getInstance()
+
     init {
         // Configurar cliente HTTP
         val okHttpClient = OkHttpClient.Builder()
@@ -108,19 +107,15 @@ class PagarMeManager(private val context: Context) {
                 metadata = metadata,
                 closed = true
             )
-            
-            // Fazer requisição para API usando SECRET_KEY para processamento completo
-            val authToken = "Basic " + android.util.Base64.encodeToString(
-                "$SECRET_KEY:".toByteArray(),
-                android.util.Base64.NO_WRAP
-            )
-            Log.d(TAG, "Enviando requisição para Pagar.me...")
-            
+
+            val authToken = getAuthorizationHeader()
+            Log.d(TAG, "Enviando requisição para backend de pagamentos...")
+
             val response = apiService.createOrder(authToken, paymentRequest)
-            
+
             if (response.isSuccessful) {
                 val paymentResponse = response.body()
-                
+
                 if (paymentResponse != null) {
                     when (paymentResponse.status) {
                         "paid" -> {
@@ -223,20 +218,15 @@ class PagarMeManager(private val context: Context) {
                 metadata = metadata,
                 closed = true
             )
-            
-            // Fazer requisição para API
-            val authToken = "Basic " + android.util.Base64.encodeToString(
-                "$SECRET_KEY:".toByteArray(),
-                android.util.Base64.NO_WRAP
-            )
-            
+
+            val authToken = getAuthorizationHeader()
             Log.d(TAG, "Enviando requisição PIX")
-            
+
             val response = apiService.createPixOrder(authToken, pixRequest)
-            
+
             if (response.isSuccessful) {
                 val pixResponse = response.body()
-                
+
                 if (pixResponse != null) {
                     // Extrair QR Code da resposta
                     val qrCode = pixResponse.charges?.firstOrNull()?.lastTransaction?.qrCode
@@ -294,15 +284,11 @@ class PagarMeManager(private val context: Context) {
      */
     suspend fun checkPixPaymentStatus(transactionId: String): PixPaymentResult {
         return try {
-            val authToken = "Basic " + android.util.Base64.encodeToString(
-                "$SECRET_KEY:".toByteArray(),
-                android.util.Base64.NO_WRAP
-            )
-            
+            val authToken = getAuthorizationHeader()
             Log.d(TAG, "Consultando status do pagamento PIX")
-            
+
             val response = apiService.getOrderStatus(authToken, transactionId)
-            
+
             if (response.isSuccessful) {
                 val pixResponse = response.body()
 
@@ -357,6 +343,37 @@ class PagarMeManager(private val context: Context) {
             Log.e(TAG, "Exceção ao consultar status do PIX", e)
             PixPaymentResult.Error("Erro de conexão: ${e.localizedMessage}")
         }
+    }
+
+    private suspend fun getAuthorizationHeader(): String {
+        val currentUser = auth.awaitCurrentUser()
+            ?: throw IllegalStateException("Usuário não autenticado. Faça login novamente.")
+
+        val idToken = suspendCancellableCoroutine<String> { continuation ->
+            currentUser.getIdToken(false)
+                .addOnSuccessListener { result ->
+                    val token = result.token
+                    if (token.isNullOrBlank()) {
+                        if (continuation.isActive) {
+                            continuation.resumeWithException(
+                                IllegalStateException("Não foi possível obter o token de autenticação.")
+                            )
+                        }
+                        return@addOnSuccessListener
+                    }
+
+                    if (continuation.isActive) {
+                        continuation.resume(token)
+                    }
+                }
+                .addOnFailureListener { error ->
+                    if (continuation.isActive) {
+                        continuation.resumeWithException(error)
+                    }
+                }
+        }
+
+        return "Bearer $idToken"
     }
     
     /**
