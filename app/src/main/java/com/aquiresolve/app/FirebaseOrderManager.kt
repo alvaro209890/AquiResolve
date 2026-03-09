@@ -8,6 +8,7 @@ import com.aquiresolve.app.utils.awaitCurrentUser
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
 import java.util.*
 
@@ -19,6 +20,13 @@ class FirebaseOrderManager {
         private const val TAG = "FirebaseOrderManager"
         private const val ORDERS_COLLECTION = "orders"
     }
+
+    data class DetailedRatings(
+        val qualityRating: Int? = null,
+        val punctualityRating: Int? = null,
+        val communicationRating: Int? = null,
+        val cleanlinessRating: Int? = null
+    )
     
     /**
      * Cria um novo pedido no Firebase
@@ -344,32 +352,146 @@ class FirebaseOrderManager {
     }
     
     /**
-     * Avalia um pedido concluído
+     * Submete avaliação de pedido concluído com validação de regras de negócio.
+     *
+     * Regras:
+     * - Apenas cliente dono do pedido pode avaliar.
+     * - Pedido precisa estar concluído.
+     * - Apenas uma avaliação por pedido (imutável).
+     * - Atualiza média pública do prestador com base em pedidos reais avaliados.
      */
-    suspend fun rateOrder(orderId: String, rating: Int, review: String? = null): Result<Unit> {
+    suspend fun submitOrderRating(
+        orderId: String,
+        rating: Int,
+        review: String? = null,
+        detailedRatings: DetailedRatings = DetailedRatings()
+    ): Result<Unit> {
+        if (orderId.isBlank()) {
+            return Result.failure(IllegalArgumentException("ID do pedido inválido"))
+        }
+        if (rating !in 1..5) {
+            return Result.failure(IllegalArgumentException("A nota geral deve estar entre 1 e 5 estrelas"))
+        }
+
+        val detailedValues = listOf(
+            detailedRatings.qualityRating,
+            detailedRatings.punctualityRating,
+            detailedRatings.communicationRating,
+            detailedRatings.cleanlinessRating
+        )
+        if (detailedValues.any { it != null && it !in 1..5 }) {
+            return Result.failure(IllegalArgumentException("As notas detalhadas devem estar entre 1 e 5 estrelas"))
+        }
+
         return try {
-            val updates = mutableMapOf<String, Any>(
-                "rating" to rating,
-                "reviewedAt" to Timestamp.now(),
-                "updatedAt" to Timestamp.now()
-            )
-            
-            if (review != null) {
-                updates["review"] = review
+            val user = auth.awaitCurrentUser()
+                ?: return Result.failure(IllegalStateException("Usuário não autenticado"))
+
+            val orderRef = db.collection(ORDERS_COLLECTION).document(orderId)
+            var providerIdToUpdate: String? = null
+
+            db.runTransaction { transaction ->
+                val orderDoc = transaction.get(orderRef)
+                if (!orderDoc.exists()) {
+                    throw IllegalStateException("Pedido não encontrado")
+                }
+
+                val clientId = orderDoc.getString("clientId")
+                if (clientId != user.uid) {
+                    throw SecurityException("Somente o cliente dono do pedido pode avaliar")
+                }
+
+                val status = orderDoc.getString("status")
+                if (status != OrderData.STATUS_COMPLETED) {
+                    throw IllegalStateException("Somente pedidos concluídos podem ser avaliados")
+                }
+
+                val existingRating = orderDoc.getLong("rating")?.toInt()
+                    ?: orderDoc.getDouble("rating")?.toInt()
+                if (existingRating != null && existingRating > 0) {
+                    throw IllegalStateException("Este pedido já foi avaliado")
+                }
+
+                providerIdToUpdate = orderDoc.getString("assignedProvider")
+
+                val updates = mutableMapOf<String, Any>(
+                    "rating" to rating,
+                    "reviewedAt" to Timestamp.now(),
+                    "updatedAt" to Timestamp.now()
+                )
+
+                val normalizedReview = review?.trim()
+                if (!normalizedReview.isNullOrEmpty()) {
+                    updates["review"] = normalizedReview
+                }
+
+                detailedRatings.qualityRating?.let { updates["qualityRating"] = it }
+                detailedRatings.punctualityRating?.let { updates["punctualityRating"] = it }
+                detailedRatings.communicationRating?.let { updates["communicationRating"] = it }
+                detailedRatings.cleanlinessRating?.let { updates["cleanlinessRating"] = it }
+
+                transaction.update(orderRef, updates)
+            }.await()
+
+            // Recalcula a nota pública usando os pedidos reais avaliados do prestador.
+            providerIdToUpdate?.takeIf { it.isNotBlank() }?.let { providerId ->
+                updateProviderAverageRatingFromOrders(providerId)
             }
-            
-            db.collection(ORDERS_COLLECTION)
-                .document(orderId)
-                .update(updates)
-                .await()
-            
-            Log.d(TAG, "Pedido avaliado: $orderId -> $rating estrelas")
+
+            Log.d(TAG, "Pedido avaliado com sucesso: $orderId -> $rating estrelas")
             Result.success(Unit)
-            
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Avaliação não autorizada: ${e.message}")
+            Result.failure(e)
+        } catch (e: IllegalStateException) {
+            Log.e(TAG, "Erro de regra ao avaliar pedido: ${e.message}")
+            Result.failure(e)
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao avaliar pedido: ${e.message}")
             Result.failure(e)
         }
+    }
+
+    @Deprecated(
+        message = "Use submitOrderRating para validação completa e persistência de notas detalhadas",
+        replaceWith = ReplaceWith("submitOrderRating(orderId, rating, review)")
+    )
+    suspend fun rateOrder(orderId: String, rating: Int, review: String? = null): Result<Unit> {
+        return submitOrderRating(orderId, rating, review)
+    }
+
+    private suspend fun updateProviderAverageRatingFromOrders(providerId: String) {
+        val ratedOrders = db.collection(ORDERS_COLLECTION)
+            .whereEqualTo("assignedProvider", providerId)
+            .get()
+            .await()
+
+        var totalRating = 0.0
+        var totalRatings = 0
+
+        for (doc in ratedOrders.documents) {
+            val ratingValue = doc.getLong("rating")?.toInt()
+                ?: doc.getDouble("rating")?.toInt()
+                ?: continue
+            if (ratingValue in 1..5) {
+                totalRating += ratingValue
+                totalRatings++
+            }
+        }
+
+        val average = if (totalRatings > 0) totalRating / totalRatings else 0.0
+
+        db.collection("providers")
+            .document(providerId)
+            .set(
+                mapOf(
+                    "rating" to average,
+                    "totalRatings" to totalRatings,
+                    "updatedAt" to Date()
+                ),
+                SetOptions.merge()
+            )
+            .await()
     }
     
     /**

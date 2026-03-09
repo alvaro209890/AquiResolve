@@ -128,7 +128,7 @@ class ProviderChatActivity : AppCompatActivity() {
         binding.tvOrderBudget.text = "Orçamento: ${orderBudget ?: "A definir"}"
         
         // Status online/offline
-        updateClientStatus(true)
+        updateClientStatus(false)
         
         // Carregar foto do cliente
         binding.ivClientPhoto.visibility = View.VISIBLE
@@ -245,6 +245,18 @@ class ProviderChatActivity : AppCompatActivity() {
         val messageText = binding.etMessage.text.toString().trim()
         if (messageText.isEmpty()) return
 
+        val oId = orderId
+        if (oId.isNullOrBlank()) {
+            showErrorMessage("Pedido inválido para envio de mensagem")
+            return
+        }
+        val currentUserId = getCurrentUserId()
+        if (currentUserId.isNullOrBlank()) {
+            showErrorMessage("Faça login novamente para enviar mensagens")
+            return
+        }
+        val currentUserName = getCurrentUserName()
+
         // Limpar input imediatamente; UI será atualizada via listener
         binding.etMessage.text?.clear()
 
@@ -252,9 +264,9 @@ class ProviderChatActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val result = chatManager.sendMessage(
                 FirebaseChatManager.ChatMessage(
-                    orderId = orderId ?: "unknown",
-                    senderId = getCurrentUserId(),
-                    senderName = getCurrentUserName(),
+                    orderId = oId,
+                    senderId = currentUserId,
+                    senderName = currentUserName,
                     senderType = "provider",
                     message = messageText
                 )
@@ -332,6 +344,7 @@ class ProviderChatActivity : AppCompatActivity() {
                 val online = snapshot.child("online").getValue(Boolean::class.java) ?: false
                 val lastSeenTs = snapshot.child("lastSeen").getValue(Long::class.java)
                 runOnUiThread {
+                    isClientOnline = online
                     if (online) {
                         binding.tvClientStatus.text = "Online"
                         binding.tvClientStatus.setTextColor(ContextCompat.getColor(this@ProviderChatActivity, R.color.success_color))
@@ -359,20 +372,19 @@ class ProviderChatActivity : AppCompatActivity() {
      * Mostra diálogo de informações do cliente
      */
     private fun showClientInfoDialog() {
+        val statusText = if (isClientOnline) "Online" else "Offline"
         AlertDialog.Builder(this)
             .setTitle("Informações do Cliente")
             .setMessage("""
                 Nome: ${clientName ?: "Não informado"}
-                Status: ${if (isClientOnline) "Online" else "Offline"}
+                Status: $statusText
                 
                 Serviço atual:
                 • ${orderTitle ?: "Serviço"}
                 • ${orderDescription ?: "Descrição não disponível"}
                 • Orçamento: ${orderBudget ?: "A definir"}
             """.trimIndent())
-            .setPositiveButton("Ver Histórico") { _, _ ->
-                // TODO: Abrir histórico do cliente
-            }
+            .setPositiveButton("OK", null)
             .setNegativeButton("Fechar", null)
             .show()
     }
@@ -437,12 +449,18 @@ class ProviderChatActivity : AppCompatActivity() {
     private fun uploadAndSendImage(uri: android.net.Uri) {
         lifecycleScope.launch {
             try {
+                val currentUserId = getCurrentUserId()
+                if (currentUserId.isNullOrBlank()) {
+                    showErrorMessage("Faça login novamente para enviar imagens")
+                    return@launch
+                }
+
                 val imageManager = FirebaseImageManager()
                 val uploadData = FirebaseImageManager.ImageUploadData(
                     uri = uri,
                     fileName = "chat_${System.currentTimeMillis()}.jpg",
                     folder = FirebaseImageManager.FOLDER_CHAT_IMAGES,
-                    userId = getCurrentUserId()
+                    userId = currentUserId
                 )
                 val result = imageManager.uploadImage(this@ProviderChatActivity, uploadData)
                 when (result) {
@@ -479,14 +497,24 @@ class ProviderChatActivity : AppCompatActivity() {
         Toast.makeText(this, message, Toast.LENGTH_LONG).show()
     }
 
-    // Métodos auxiliares (implementar conforme necessário)
-    private fun getCurrentUserId(): String = FirebaseAuth.getInstance().currentUser?.uid ?: "provider_id"
-    private fun getCurrentUserName(): String = FirebaseAuth.getInstance().currentUser?.displayName ?: "Prestador"
+    private fun getCurrentUserId(): String? = FirebaseAuth.getInstance().currentUser?.uid
+    private fun getCurrentUserName(): String {
+        val user = FirebaseAuth.getInstance().currentUser
+        return user?.displayName
+            ?: user?.email?.substringBefore("@")
+            ?: "Usuário"
+    }
+
     private fun loadMessagesFromFirestore() {
         val oId = orderId ?: return
         lifecycleScope.launch {
             chatManager.getMessagesFlow(oId).collectLatest { remoteMessages ->
                 val currentUserId = getCurrentUserId()
+                if (currentUserId.isNullOrBlank()) {
+                    showErrorMessage("Sessão expirada. Entre novamente para acessar o chat.")
+                    finish()
+                    return@collectLatest
+                }
                 val hasUnreadFromOther = remoteMessages.any { !it.isRead && it.senderId != currentUserId }
                 messages.clear()
                 messages.addAll(remoteMessages.map { rm ->
@@ -522,10 +550,15 @@ class ProviderChatActivity : AppCompatActivity() {
         }
     }
     private fun openChatImagePicker() {
+        val currentUserId = getCurrentUserId()
+        if (currentUserId.isNullOrBlank()) {
+            showErrorMessage("Faça login novamente para enviar imagens")
+            return
+        }
         val intent = ImagePickerActivity.createIntent(
             context = this,
             folder = FirebaseImageManager.FOLDER_CHAT_IMAGES,
-            userId = getCurrentUserId(),
+            userId = currentUserId,
             orderId = orderId,
             maxImages = 1
         )
@@ -533,11 +566,23 @@ class ProviderChatActivity : AppCompatActivity() {
     }
     
     private fun sendChatImageMessage(imageUrl: String) {
+        val oId = orderId
+        if (oId.isNullOrBlank()) {
+            showErrorMessage("Pedido inválido para envio de imagem")
+            return
+        }
+        val currentUserId = getCurrentUserId()
+        if (currentUserId.isNullOrBlank()) {
+            showErrorMessage("Faça login novamente para enviar imagens")
+            return
+        }
+        val currentUserName = getCurrentUserName()
+
         val message = ChatMessage(
             id = "img_${System.currentTimeMillis()}",
-            orderId = orderId ?: "unknown",
-            senderId = getCurrentUserId(),
-            senderName = getCurrentUserName(),
+            orderId = oId,
+            senderId = currentUserId,
+            senderName = currentUserName,
             message = "📷 Imagem enviada",
             timestamp = Date(),
             type = MessageType.SENT,

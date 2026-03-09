@@ -59,11 +59,9 @@ object ChatManager {
                 }
             }
             else -> {
-                // Fallback para o chat genérico
+                // Fallback seguro: ChatActivity agora redireciona para o chat real com base no pedido.
                 Intent(context, ChatActivity::class.java).apply {
                     putExtra("order_id", orderId)
-                    putExtra("provider_id", otherUserId)
-                    putExtra("provider_name", otherUserName)
                 }
             }
         }

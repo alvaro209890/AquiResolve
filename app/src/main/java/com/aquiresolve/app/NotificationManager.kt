@@ -207,7 +207,7 @@ object NotificationManager {
             type = NotificationType.CHAT_MESSAGE,
             targetId = orderId,
             channelId = CHANNEL_CHAT,
-            intent = Intent(context, ChatActivity::class.java).apply {
+            intent = Intent(context, OrderDetailsActivity::class.java).apply {
                 putExtra("order_id", orderId)
             }
         )

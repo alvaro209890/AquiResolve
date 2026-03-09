@@ -9,6 +9,7 @@ import android.view.View
 import android.widget.Toast
 import android.location.Location
 import android.os.Looper
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -79,6 +80,13 @@ class OrderDetailsActivity : AppCompatActivity() {
     private var lastProviderPoint: GeoPoint? = null
     private var currentClientPoint: GeoPoint? = null
     private var providerLocationListener: com.google.firebase.firestore.ListenerRegistration? = null
+    private val ratingResultLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            loadOrderDetails()
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -438,9 +446,9 @@ class OrderDetailsActivity : AppCompatActivity() {
                 OrderData.STATUS_IN_PROGRESS -> "Confirmar Conclusão" to "Reportar Problema"
                 OrderData.STATUS_COMPLETED -> {
                     if (order.rating != null && order.rating > 0) {
-                        "⭐ Já Avaliado (${order.rating} estrelas)" to "Solicitar Revisão"
+                        "⭐ Já Avaliado (${order.rating} estrelas)" to "Ver Avaliação"
                     } else {
-                        "Avaliar Serviço" to "Solicitar Revisão"
+                        "Avaliar Serviço" to "—"
                     }
                 }
                 OrderData.STATUS_CANCELLED -> "Ver Detalhes" to "Criar Novo Pedido"
@@ -545,9 +553,8 @@ class OrderDetailsActivity : AppCompatActivity() {
                         } else {
                             val intent = Intent(this, RatingActivity::class.java)
                             intent.putExtra("order_id", order.id)
-                            intent.putExtra("provider_id", order.assignedProvider)
                             intent.putExtra("provider_name", order.assignedProviderName)
-                            startActivity(intent)
+                            ratingResultLauncher.launch(intent)
                         }
                     }
                     OrderData.STATUS_CANCELLED, OrderData.STATUS_EXPIRED -> {
@@ -689,7 +696,7 @@ class OrderDetailsActivity : AppCompatActivity() {
                 when (order.status) {
                     OrderData.STATUS_DISTRIBUTING, OrderData.STATUS_PENDING, "quotes_received", OrderData.STATUS_ASSIGNED -> showCancelOrderDialog(order)
                     OrderData.STATUS_IN_PROGRESS -> showReportProblemDialog(order)
-                    OrderData.STATUS_COMPLETED -> showRequestRevisionDialog(order)
+                    OrderData.STATUS_COMPLETED -> showRatingDetailsDialog(order)
                     OrderData.STATUS_CANCELLED, OrderData.STATUS_EXPIRED -> createNewOrder()
                     else -> showCancelOrderDialog(order)
                 }
@@ -1029,11 +1036,37 @@ class OrderDetailsActivity : AppCompatActivity() {
     }
 
     /**
-     * Mostra diálogo de solicitar revisão
+     * Mostra os detalhes da avaliação do pedido (somente leitura)
      */
-    private fun showRequestRevisionDialog(order: OrderData) {
-        // TODO: Implementar diálogo de solicitar revisão
-        showToast("🔄 Funcionalidade de solicitar revisão em desenvolvimento")
+    private fun showRatingDetailsDialog(order: OrderData) {
+        if (order.rating == null || order.rating <= 0) {
+            showToast("Este pedido ainda não possui avaliação")
+            return
+        }
+
+        val detailed = mutableListOf<String>()
+        order.qualityRating?.let { detailed.add("Qualidade: $it/5") }
+        order.punctualityRating?.let { detailed.add("Pontualidade: $it/5") }
+        order.communicationRating?.let { detailed.add("Comunicação: $it/5") }
+        order.cleanlinessRating?.let { detailed.add("Limpeza: $it/5") }
+
+        val message = buildString {
+            append("Nota geral: ${order.rating}/5")
+            if (detailed.isNotEmpty()) {
+                append("\n\nDetalhes:\n")
+                append(detailed.joinToString("\n"))
+            }
+            if (!order.review.isNullOrBlank()) {
+                append("\n\nComentário:\n")
+                append(order.review)
+            }
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Avaliação do Serviço")
+            .setMessage(message)
+            .setPositiveButton("Fechar", null)
+            .show()
     }
 
     /**

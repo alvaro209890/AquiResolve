@@ -115,6 +115,14 @@ data class OrderData(
     // Avaliação
     @PropertyName("rating")
     val rating: Int? = null,
+    @PropertyName("qualityRating")
+    val qualityRating: Int? = null,
+    @PropertyName("punctualityRating")
+    val punctualityRating: Int? = null,
+    @PropertyName("communicationRating")
+    val communicationRating: Int? = null,
+    @PropertyName("cleanlinessRating")
+    val cleanlinessRating: Int? = null,
     @PropertyName("review")
     val review: String? = null,
     @PropertyName("reviewedAt")

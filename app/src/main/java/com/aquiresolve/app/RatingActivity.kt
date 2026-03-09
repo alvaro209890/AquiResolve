@@ -9,7 +9,6 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.aquiresolve.app.databinding.ActivityRatingBinding
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.tasks.await
 
 /**
  * RatingActivity - Tela de avaliação de prestadores
@@ -29,7 +28,6 @@ class RatingActivity : AppCompatActivity() {
     private var isLoading = false
     private var currentRating = 0
     private var orderId: String? = null
-    private var providerId: String? = null
     private var providerName: String? = null
     
     // Avaliações por categoria
@@ -47,7 +45,6 @@ class RatingActivity : AppCompatActivity() {
         
         // Obter dados da intent
         orderId = intent.getStringExtra("order_id")
-        providerId = intent.getStringExtra("provider_id")
         providerName = intent.getStringExtra("provider_name")
         
         // Configurar a interface
@@ -197,23 +194,30 @@ class RatingActivity : AppCompatActivity() {
         
         lifecycleScope.launch {
             try {
-                val orderManager = FirebaseOrderManager()
-
-                // 1. Salvar avaliação no pedido
-                val rateResult = orderManager.rateOrder(
-                    orderId = orderId ?: "",
-                    rating = currentRating,
-                    review = comment.ifEmpty { null }
-                )
-
-                if (rateResult.isFailure) {
-                    showToast("❌ Erro ao salvar avaliação")
+                val selectedOrderId = orderId
+                if (selectedOrderId.isNullOrBlank()) {
+                    showToast("❌ ID do pedido não encontrado")
                     return@launch
                 }
 
-                // 2. Atualizar nota média do prestador
-                if (!providerId.isNullOrEmpty()) {
-                    updateProviderAverageRating(providerId!!)
+                val orderManager = FirebaseOrderManager()
+
+                val rateResult = orderManager.submitOrderRating(
+                    orderId = selectedOrderId,
+                    rating = currentRating,
+                    review = comment.ifEmpty { null },
+                    detailedRatings = FirebaseOrderManager.DetailedRatings(
+                        qualityRating = qualityRating.takeIf { it > 0 },
+                        punctualityRating = punctualityRating.takeIf { it > 0 },
+                        communicationRating = communicationRating.takeIf { it > 0 },
+                        cleanlinessRating = cleanlinessRating.takeIf { it > 0 }
+                    )
+                )
+
+                if (rateResult.isFailure) {
+                    val errorMessage = rateResult.exceptionOrNull()?.message ?: "Não foi possível salvar sua avaliação"
+                    showToast("❌ $errorMessage")
+                    return@launch
                 }
 
                 showToast("✅ Avaliação enviada com sucesso!")
@@ -227,48 +231,6 @@ class RatingActivity : AppCompatActivity() {
                 binding.btnSubmitRating.isEnabled = true
                 binding.progressBar.visibility = View.GONE
             }
-        }
-    }
-
-    /**
-     * Calcula e atualiza a nota média do prestador no Firebase
-     */
-    private suspend fun updateProviderAverageRating(providerId: String) {
-        try {
-            val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
-
-            // Buscar todos os pedidos avaliados deste prestador
-            val ratedOrders = db.collection("orders")
-                .whereEqualTo("assignedProvider", providerId)
-                .whereGreaterThan("rating", 0)
-                .get()
-                .await()
-
-            if (ratedOrders.isEmpty) return
-
-            var totalRating = 0.0
-            var count = 0
-            for (doc in ratedOrders.documents) {
-                val r = doc.getLong("rating")?.toDouble() ?: continue
-                totalRating += r
-                count++
-            }
-
-            if (count == 0) return
-            val average = totalRating / count
-
-            // Salvar nota média e total de avaliações no perfil do prestador
-            db.collection("providers").document(providerId)
-                .update(
-                    mapOf(
-                        "rating" to average,
-                        "totalRatings" to count,
-                        "updatedAt" to java.util.Date()
-                    )
-                )
-                .await()
-        } catch (e: Exception) {
-            android.util.Log.e("RatingActivity", "Erro ao atualizar média: ${e.message}")
         }
     }
 

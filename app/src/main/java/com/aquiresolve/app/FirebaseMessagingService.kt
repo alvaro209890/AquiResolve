@@ -50,7 +50,7 @@ class FirebaseMessagingService : FirebaseMessagingService() {
         if (remoteMessage.data.isNotEmpty()) {
             val title = remoteMessage.data["title"] ?: "Nova notificação"
             val message = remoteMessage.data["message"] ?: "Você tem uma nova notificação"
-            val orderId = remoteMessage.data["orderId"]
+            val orderId = remoteMessage.data["order_id"] ?: remoteMessage.data["orderId"]
             val type = remoteMessage.data["type"] // order, chat, payment
             sendNotification(title, message, orderId, type)
         } else {
@@ -134,7 +134,7 @@ class FirebaseMessagingService : FirebaseMessagingService() {
     ) {
         val intent = if (orderId != null) {
             Intent(this, OrderDetailsActivity::class.java).apply {
-                putExtra("orderId", orderId)
+                putExtra("order_id", orderId)
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
         } else {
