@@ -32,6 +32,17 @@ class FirebaseCartManager {
         private const val ITEMS_COLLECTION = "items"
     }
 
+    private fun resolveItemPrice(item: CartItemData): Double {
+        if (item.estimatedPrice > 0) {
+            return item.estimatedPrice
+        }
+
+        return com.aquiresolve.app.models.ServicePricing.getPrice(
+            category = item.serviceNiche,
+            serviceType = item.serviceType
+        ) ?: com.aquiresolve.app.models.ServicePricing.getDefaultPrice(item.serviceNiche)
+    }
+
     suspend fun addItem(item: CartItemData): Result<String> {
         return try {
             val userId = item.clientId.ifBlank { auth.currentUser?.uid ?: "" }
@@ -201,11 +212,16 @@ class FirebaseCartManager {
             val batch = db.batch()
             val createdOrderIds = mutableListOf<String>()
             val cartItemIds = items.map { it.id }
-            val totalAmount = items.sumOf { it.estimatedPrice }
+            val totalAmount = items.sumOf(::resolveItemPrice)
+
+            if (totalAmount <= 0) {
+                return Result.failure(Exception("Carrinho com valor inválido para pagamento"))
+            }
 
             items.forEach { item ->
                 val orderRef = db.collection("orders").document()
                 createdOrderIds.add(orderRef.id)
+                val effectivePrice = resolveItemPrice(item)
 
                 val providerCommission = com.aquiresolve.app.models.ServicePricing.getProviderValue(
                     category = item.serviceNiche,
@@ -227,7 +243,7 @@ class FirebaseCartManager {
                     "state" to item.state,
                     "status" to OrderData.STATUS_AWAITING_PAYMENT,
                     "paymentStatus" to OrderData.STATUS_AWAITING_PAYMENT,
-                    "estimatedPrice" to item.estimatedPrice,
+                    "estimatedPrice" to effectivePrice,
                     "providerCommission" to providerCommission,
                     "images" to item.imageUrls,
                     "cartCheckoutCode" to checkoutCode,

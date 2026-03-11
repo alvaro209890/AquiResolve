@@ -8,6 +8,7 @@ import com.aquiresolve.app.models.payment.*
 import com.aquiresolve.app.utils.awaitCurrentUser
 import com.google.firebase.auth.FirebaseAuth
 import okhttp3.OkHttpClient
+import org.json.JSONObject
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
@@ -44,6 +45,29 @@ class PagarMeManager(private val context: Context) {
             .build()
         
         apiService = retrofit.create(PagarMeApiService::class.java)
+    }
+
+    private fun extractApiErrorMessage(responseBody: okhttp3.ResponseBody?): String? {
+        val rawBody = responseBody?.string()?.trim().orEmpty()
+        if (rawBody.isBlank()) {
+            return null
+        }
+
+        return try {
+            val json = JSONObject(rawBody)
+            json.optString("message")
+                .trim()
+                .ifBlank {
+                    json.optJSONArray("errors")
+                        ?.optJSONObject(0)
+                        ?.optString("message")
+                        ?.trim()
+                        .orEmpty()
+                }
+                .ifBlank { null }
+        } catch (_: Exception) {
+            rawBody
+        }
     }
     
     /**
@@ -178,6 +202,9 @@ class PagarMeManager(private val context: Context) {
             
             // Converter valor para centavos
             val amountInCents = (amount * 100).toLong()
+            if (amountInCents <= 0L) {
+                return PixPaymentResult.Error("Valor inválido para gerar PIX")
+            }
             
             // Criar item do pedido
             val item = com.aquiresolve.app.models.payment.PaymentItem(
@@ -264,9 +291,11 @@ class PagarMeManager(private val context: Context) {
             } else {
                 Log.e(TAG, "Erro na requisição PIX: ${response.code()}")
                 
-                val errorMessage = when (response.code()) {
+                val apiErrorMessage = extractApiErrorMessage(response.errorBody())
+                val errorMessage = apiErrorMessage ?: when (response.code()) {
                     400 -> "Dados do pagamento PIX inválidos"
                     401 -> "Erro de autenticação com gateway de pagamento"
+                    422 -> "Não foi possível validar os dados do pagamento PIX"
                     500 -> "Erro no servidor de pagamento"
                     else -> "Erro ao gerar PIX (${response.code()})"
                 }

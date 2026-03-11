@@ -46,6 +46,17 @@ class ClientCartActivity : AppCompatActivity() {
     private var checkoutInProgress = false
     private var checkoutResultProcessed = false
 
+    private fun resolveItemPrice(item: CartItemData): Double {
+        if (item.estimatedPrice > 0) {
+            return item.estimatedPrice
+        }
+
+        return com.aquiresolve.app.models.ServicePricing.getPrice(
+            category = item.serviceNiche,
+            serviceType = item.serviceType
+        ) ?: com.aquiresolve.app.models.ServicePricing.getDefaultPrice(item.serviceNiche)
+    }
+
     private val paymentLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -125,7 +136,7 @@ class ClientCartActivity : AppCompatActivity() {
     }
 
     private fun updateSummary() {
-        val total = cartItems.sumOf { it.estimatedPrice }
+        val total = cartItems.sumOf(::resolveItemPrice)
 
         binding.tvCartItemsCount.text = "${cartItems.size} item(ns)"
         binding.tvCartTotal.text = String.format("R$ %.2f", total)
@@ -172,12 +183,36 @@ class ClientCartActivity : AppCompatActivity() {
                 return
             }
 
+        val currentUser = com.google.firebase.auth.FirebaseAuth.getInstance().currentUser
         val user = authManager.getLocalUserData()
-        val clientName = user?.fullName?.ifBlank { "Usuário" } ?: "Usuário"
-        val clientEmail = user?.email ?: ""
-        val clientPhone = user?.phone
-            ?: com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.phoneNumber
+        val clientName = user?.fullName
+            ?.takeIf { it.isNotBlank() }
+            ?: currentUser?.displayName?.takeIf { it.isNotBlank() }
+            ?: currentUser?.email?.substringBefore('@')?.takeIf { it.isNotBlank() }
+            ?: "Usuário"
+        val clientEmail = user?.email
+            ?.takeIf { it.isNotBlank() }
+            ?: currentUser?.email
+            ?.takeIf { it.isNotBlank() }
             ?: ""
+        val clientPhone = user?.phone
+            ?.takeIf { it.isNotBlank() }
+            ?: currentUser?.phoneNumber
+            ?.takeIf { it.isNotBlank() }
+            ?: ""
+        val totalAmount = cartItems.sumOf(::resolveItemPrice)
+
+        if (totalAmount <= 0) {
+            checkoutInProgress = false
+            showToast("❌ O carrinho tem itens sem valor válido para pagamento")
+            return
+        }
+
+        if (clientEmail.isBlank()) {
+            checkoutInProgress = false
+            showToast("❌ Não foi possível identificar o e-mail do cliente para o pagamento")
+            return
+        }
 
         checkoutInProgress = true
         checkoutResultProcessed = false
@@ -213,7 +248,7 @@ class ClientCartActivity : AppCompatActivity() {
                         PaymentActivity.EXTRA_ORDER_DESCRIPTION,
                         "Carrinho (${session.orderCount} serviços)"
                     )
-                    putExtra(PaymentActivity.EXTRA_ORDER_AMOUNT, session.totalAmount)
+                    putExtra(PaymentActivity.EXTRA_ORDER_AMOUNT, totalAmount)
                     putExtra(PaymentActivity.EXTRA_CLIENT_NAME, clientName)
                     putExtra(PaymentActivity.EXTRA_CLIENT_EMAIL, clientEmail)
                     putExtra(PaymentActivity.EXTRA_CLIENT_PHONE, clientPhone)

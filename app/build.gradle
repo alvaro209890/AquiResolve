@@ -5,10 +5,19 @@ plugins {
 }
 
 import groovy.json.JsonSlurper
+import java.util.Properties
 
 def expectedApplicationId = "com.aquiresolve.app"
 def googleServicesRelativePath = "app/google-services.json"
 def googleServicesFile = file("google-services.json")
+def uploadKeystoreCredentialsFile = rootProject.file("keystore/upload-keystore.credentials.txt")
+def uploadKeystoreCredentials = new Properties()
+
+if (uploadKeystoreCredentialsFile.exists()) {
+    uploadKeystoreCredentialsFile.withInputStream { stream ->
+        uploadKeystoreCredentials.load(stream)
+    }
+}
 
 def validateGoogleServicesConfig = tasks.register("validateGoogleServicesConfig") {
     group = "verification"
@@ -83,14 +92,25 @@ tasks.named("preBuild").configure {
 
 android {
     namespace 'com.aquiresolve.app'
-    compileSdk 34
+    compileSdk 35
+
+    signingConfigs {
+        release {
+            if (uploadKeystoreCredentialsFile.exists()) {
+                storeFile rootProject.file(uploadKeystoreCredentials.getProperty("keystore_path"))
+                storePassword uploadKeystoreCredentials.getProperty("store_password")
+                keyAlias uploadKeystoreCredentials.getProperty("alias")
+                keyPassword uploadKeystoreCredentials.getProperty("key_password")
+            }
+        }
+    }
 
     defaultConfig {
         applicationId "com.aquiresolve.app"
         minSdk 24
-        targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        targetSdk 35
+        versionCode 20260310
+        versionName "1.2.1"
         
         // Configuração do servidor para cada build type
         buildConfigField "String", "PAYMENTS_API_BASE_URL", "\"https://aquiresolve.onrender.com/api/payments/\""
@@ -105,6 +125,7 @@ android {
         release {
             minifyEnabled true
             shrinkResources true
+            signingConfig signingConfigs.release
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             buildConfigField "String", "PAYMENTS_API_BASE_URL", "\"https://aquiresolve.onrender.com/api/payments/\""
         }

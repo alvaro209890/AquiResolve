@@ -6,6 +6,11 @@
  */
 object ServicePricing {
 
+    private fun deriveClientPriceFromProvider(providerValue: Double): Double? {
+        if (providerValue <= 0) return null
+        return kotlin.math.round(providerValue * 200.0) / 100.0
+    }
+
     private fun normalizeCategory(category: String): String {
         return when {
             category.equals("Hidráulica", ignoreCase = true) -> "Encanador"
@@ -18,7 +23,7 @@ object ServicePricing {
 
     private val pricingTable = mapOf(
         "Elétrica" to mapOf(
-            "Instalação de lâmpadas" to Pair(0.10, 0.05),
+            "Instalação de lâmpadas" to Pair(110.0, 55.0),
             "Instalação de tomada" to Pair(110.0, 55.0),
             "Troca de disjuntor" to Pair(150.0, 75.0),
             "Instalação de interruptor" to Pair(110.0, 55.0),
@@ -155,10 +160,14 @@ object ServicePricing {
         if (categoryPrices != null) {
             val pair = categoryPrices[serviceType]
             if (pair != null && pair.first > 0) return pair.first
+            if (pair != null) return deriveClientPriceFromProvider(pair.second)
 
             categoryPrices.forEach { (key, value) ->
                 if (key.equals(serviceType, ignoreCase = true) && value.first > 0) {
                     return value.first
+                }
+                if (key.equals(serviceType, ignoreCase = true)) {
+                    deriveClientPriceFromProvider(value.second)?.let { return it }
                 }
             }
         }
@@ -167,6 +176,9 @@ object ServicePricing {
             services.forEach { (key, value) ->
                 if (key.equals(serviceType, ignoreCase = true) && value.first > 0) {
                     return value.first
+                }
+                if (key.equals(serviceType, ignoreCase = true)) {
+                    deriveClientPriceFromProvider(value.second)?.let { return it }
                 }
             }
         }
@@ -216,12 +228,12 @@ object ServicePricing {
             category.contains("Estofado", ignoreCase = true) -> 215.0
             category.contains("Chaveiro", ignoreCase = true) -> 180.0
             category.contains("Automotivo", ignoreCase = true) -> 115.0
-            category.contains("Montagem", ignoreCase = true) -> 0.0
+            category.contains("Montagem", ignoreCase = true) -> 150.0
             category.contains("Ar condicionado", ignoreCase = true) -> 650.0
             category.contains("Caça-vazamento", ignoreCase = true) -> 550.0
             category.contains("Caixa", ignoreCase = true) -> 150.0
             category.contains("Eletrodoméstico", ignoreCase = true) -> 160.0
-            else -> 100.0
+            else -> deriveClientPriceFromProvider(getDefaultProviderValue(category)) ?: 100.0
         }
     }
 
