@@ -159,6 +159,30 @@ class CreateOrderActivity : AppCompatActivity() {
         if (!effectiveCategory.isNullOrEmpty()) {
             binding.spinnerServiceNiche.setText(effectiveCategory)
             setupServiceTypesForNiche(effectiveCategory!!)
+            
+            // Verificar se veio com search_query para tentar pré-selecionar o tipo de serviço
+            val searchQuery = intent.getStringExtra("search_query")
+            if (!searchQuery.isNullOrEmpty()) {
+                val searchResults = com.aquiresolve.app.utils.ServiceSearchHelper.search(searchQuery)
+                val matchedService = searchResults.firstOrNull()
+                if (matchedService != null && matchedService.category.equals(effectiveCategory, ignoreCase = true)) {
+                    // Pré-selecionar o tipo de serviço encontrado
+                    binding.spinnerServiceType.post {
+                        // Buscar e selecionar o item no dropdown
+                        val adapter = binding.spinnerServiceType.adapter
+                        if (adapter != null) {
+                            for (i in 0 until adapter.count) {
+                                val item = adapter.getItem(i).toString()
+                                if (item.contains(matchedService.serviceType, ignoreCase = true)) {
+                                    binding.spinnerServiceType.setText(item)
+                                    break
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
             // Abrir a lista de tipos automaticamente para facilitar a seleção
             binding.spinnerServiceType.post { binding.spinnerServiceType.showDropDown() }
         }

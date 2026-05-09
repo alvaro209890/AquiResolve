@@ -8,6 +8,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.aquiresolve.app.databinding.ActivityHomeBinding
+import com.aquiresolve.app.utils.NotificationBadgeHelper
+import com.aquiresolve.app.utils.ServiceSearchHelper
 import kotlinx.coroutines.launch
 
 /**
@@ -41,6 +43,17 @@ class HomeActivity : AppCompatActivity() {
         
         // Verificar se pode alternar para prestador
         checkProviderSwitchOption()
+        
+        // Iniciar badge de notificações
+        NotificationBadgeHelper.startListening(
+            bottomNav = binding.bottomNavigation,
+            menuItemId = R.id.navigation_orders
+        )
+    }
+    
+    override fun onDestroy() {
+        super.onDestroy()
+        NotificationBadgeHelper.stopListening()
     }
 
     /**
@@ -61,9 +74,12 @@ class HomeActivity : AppCompatActivity() {
      * Configura os listeners de clique para todos os elementos interativos
      */
     private fun setupClickListeners() {
-        // Barra de pesquisa
+        // Barra de pesquisa - agora com busca inteligente
         binding.etSearch.setOnEditorActionListener { _, _, _ ->
-            showToast("🔍 Funcionalidade de busca em desenvolvimento")
+            val query = binding.etSearch.text.toString().trim()
+            if (query.isNotEmpty()) {
+                performSearch(query)
+            }
             true
         }
         
@@ -120,13 +136,27 @@ class HomeActivity : AppCompatActivity() {
     }
 
     /**
-     * Executa a pesquisa
+     * Executa a pesquisa inteligente
      */
-    private fun performSearch() {
-        val query = binding.etSearch.text.toString().trim()
-        if (query.isNotEmpty()) {
-            showToast("🔍 Pesquisando por: $query")
-            // TODO: Implementar pesquisa real
+    private fun performSearch(query: String) {
+        if (query.isBlank()) return
+        
+        // Buscar categoria correspondente
+        val matchedCategory = ServiceSearchHelper.getCategoryForSearch(query)
+        
+        if (matchedCategory != null) {
+            // Navegar direto pra categoria encontrada (service_category_name tem prioridade sobre service_niche)
+            val intent = Intent(this, CreateOrderActivity::class.java).apply {
+                putExtra("service_category_name", matchedCategory)
+                putExtra("search_query", query)
+            }
+            startActivity(intent)
+        } else {
+            // Ir pra tela de serviços com a busca preenchida
+            val intent = Intent(this, ServicesActivity::class.java).apply {
+                putExtra("search_query", query)
+            }
+            startActivity(intent)
         }
     }
 
@@ -273,11 +303,4 @@ class HomeActivity : AppCompatActivity() {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
-    /**
-     * Limpa os recursos quando a activity é destruída
-     */
-    override fun onDestroy() {
-        super.onDestroy()
-        // Limpar recursos se necessário
-    }
 }

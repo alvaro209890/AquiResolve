@@ -18,6 +18,7 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.request.RequestOptions
 import com.aquiresolve.app.databinding.ActivityClientHomeBinding
 import com.aquiresolve.app.models.OrderData
+import com.aquiresolve.app.utils.NotificationBadgeHelper
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
@@ -53,6 +54,18 @@ class ClientHomeActivity : AppCompatActivity() {
         ProviderNewOrderAlertManager.refreshMonitoring()
         loadProfileImage()
         loadRecentOrders()
+        
+        // Iniciar monitoramento de notificações para mostrar badge
+        NotificationBadgeHelper.startListening(
+            bottomNav = binding.bottomNavigation,
+            menuItemId = R.id.navigation_orders
+        )
+    }
+    
+    override fun onPause() {
+        super.onPause()
+        // Parar listener quando sair da tela pra evitar vazamento
+        NotificationBadgeHelper.stopListening()
     }
 
     private fun setupUI() {

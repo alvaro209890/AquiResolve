@@ -55,6 +55,9 @@ class DetailedOrdersAdapter(
             // Status do Pedido
             setupOrderStatus(order.status)
 
+            // Preço do Pedido
+            setupOrderPrice(order)
+
             // Detalhes do Serviço
             binding.tvServiceType.text = order.serviceType.ifEmpty { "Não especificado" }
             binding.tvServiceNiche.text = order.serviceName.ifEmpty { "Não especificado" }
@@ -138,6 +141,24 @@ class DetailedOrdersAdapter(
             }
             
             binding.tvOrderStatus.setTextColor(ContextCompat.getColor(context, textColor))
+        }
+
+        private fun setupOrderPrice(order: OrderData) {
+            // Preço estimado para o cliente
+            if (order.estimatedPrice > 0) {
+                binding.tvOrderPrice.text = "R$ ${String.format("%.2f", order.estimatedPrice).replace(".", ",")}"
+            } else if (order.finalPrice != null && order.finalPrice > 0) {
+                binding.tvOrderPrice.text = "R$ ${String.format("%.2f", order.finalPrice).replace(".", ",")}"
+            } else {
+                binding.tvOrderPrice.text = "A consultar"
+            }
+            
+            // Comissão do prestador
+            if (order.providerCommission > 0) {
+                binding.tvProviderCommission.text = "R$ ${String.format("%.2f", order.providerCommission).replace(".", ",")}"
+            } else {
+                binding.tvProviderCommission.text = "—"
+            }
         }
 
         private fun setupDistributionInfo(order: OrderData) {

@@ -14,6 +14,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
 import com.aquiresolve.app.databinding.ActivityServicesBinding
+import com.aquiresolve.app.utils.ServiceSearchHelper
 import kotlinx.coroutines.launch
 
 /**
@@ -44,6 +45,13 @@ class ServicesActivity : AppCompatActivity() {
         setupClickListeners()
         setupSearchListener()
         populateSampleDataIfNeeded()
+        
+        // Verificar se veio com busca pré-preenchida
+        val searchQueryFromIntent = intent.getStringExtra("search_query")
+        if (!searchQueryFromIntent.isNullOrEmpty()) {
+            binding.etSearch.setText(searchQueryFromIntent)
+            binding.etSearch.setSelection(searchQueryFromIntent.length)
+        }
     }
 
     /**
@@ -179,10 +187,24 @@ class ServicesActivity : AppCompatActivity() {
             }
             hideEmptyState()
         } else {
-            // Filtrar cards baseado na busca
+            // Usar busca inteligente: tentar match com serviços reais primeiro
+            val searchResults = ServiceSearchHelper.search(searchQuery)
+            val cardsToShow = mutableSetOf<String>()
+            
+            if (searchResults.isNotEmpty()) {
+                // Se achou serviços específicos, mostrar card da categoria relevante
+                cardsToShow.addAll(searchResults.map { it.category })
+            } else {
+                // Fallback: busca por categoria
+                val matchedCategory = ServiceSearchHelper.searchCategory(searchQuery)
+                if (matchedCategory != null) {
+                    cardsToShow.add(matchedCategory)
+                }
+            }
+            
             var visibleCards = 0
             cards.forEach { (card, name) ->
-                if (name.contains(searchQuery, ignoreCase = true)) {
+                if (name in cardsToShow || name.contains(searchQuery, ignoreCase = true)) {
                     card.visibility = View.VISIBLE
                     visibleCards++
                 } else {

@@ -6,6 +6,7 @@ const morgan = require('morgan');
 
 const healthRoutes = require('./routes/health.routes');
 const paymentsRoutes = require('./routes/payments.routes');
+const cronRoutes = require('./routes/cron.routes');
 const { notFoundHandler, errorHandler } = require('./middlewares/error-handler');
 
 function createCorsOptions(config) {
@@ -53,6 +54,7 @@ function createApp({ config }) {
 
   app.use('/api/health', healthRoutes);
   app.use('/api/payments', paymentsRoutes);
+  app.use('/api/cron', cronRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
