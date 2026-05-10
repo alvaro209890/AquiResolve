@@ -131,7 +131,7 @@ object ServiceSearchHelper {
                                 categoryName.contains("montagem", ignoreCase = true) -> "Montagem de móveis"
                                 categoryName.contains("pintura", ignoreCase = true) -> "Pintura"
                                 categoryName.contains("faxina", ignoreCase = true) -> "Faxina"
-                                categoryName.contains("limpeza", ignoreCase = true) -> "Limpeza"
+                                categoryName.contains("limpeza", ignoreCase = true) -> "Faxina"
                                 categoryName.contains("desentupimento", ignoreCase = true) -> "Desentupimento manual"
                                 else -> categoryName.replaceFirstChar { it.uppercase() }
                             },
@@ -176,7 +176,7 @@ object ServiceSearchHelper {
                     categoryName.contains("montagem", ignoreCase = true) -> "Montagem de móveis"
                     categoryName.contains("pintura", ignoreCase = true) -> "Pintura"
                     categoryName.contains("faxina", ignoreCase = true) -> "Faxina"
-                    categoryName.contains("limpeza", ignoreCase = true) -> "Limpeza"
+                    categoryName.contains("limpeza", ignoreCase = true) -> "Faxina"
                     categoryName.contains("desentupimento", ignoreCase = true) -> "Desentupimento manual"
                     categoryName.contains("eletrica", ignoreCase = true) -> "Elétrica"
                     else -> categoryName.replaceFirstChar { it.uppercase() }

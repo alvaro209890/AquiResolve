@@ -136,11 +136,8 @@ class HomeActivity : AppCompatActivity() {
     }
 
     /**
-     * Executa a pesquisa inteligente
-     */
-    /**
-     * Executa a pesquisa inteligente
-     * Agora sempre mostra resultados na ServicesActivity com preços
+     * Executa a pesquisa inteligente.
+     * Sempre mostra resultados na ServicesActivity com preços.
      */
     private fun performSearch(query: String) {
         if (query.isBlank()) return

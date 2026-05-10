@@ -229,7 +229,11 @@ class ClientHomeActivity : AppCompatActivity() {
     private fun performSearch() {
         val searchQuery = binding.etSearch.text.toString().trim()
         if (searchQuery.isNotEmpty()) {
-            showToast("Buscando por: $searchQuery")
+            // Redirecionar para ServicesActivity com a busca
+            val intent = Intent(this, ServicesActivity::class.java).apply {
+                putExtra("search_query", searchQuery)
+            }
+            startActivity(intent)
         }
     }
 
