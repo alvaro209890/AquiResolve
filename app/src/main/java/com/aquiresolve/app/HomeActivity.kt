@@ -138,26 +138,19 @@ class HomeActivity : AppCompatActivity() {
     /**
      * Executa a pesquisa inteligente
      */
+    /**
+     * Executa a pesquisa inteligente
+     * Agora sempre mostra resultados na ServicesActivity com preços
+     */
     private fun performSearch(query: String) {
         if (query.isBlank()) return
         
-        // Buscar categoria correspondente
-        val matchedCategory = ServiceSearchHelper.getCategoryForSearch(query)
-        
-        if (matchedCategory != null) {
-            // Navegar direto pra categoria encontrada (service_category_name tem prioridade sobre service_niche)
-            val intent = Intent(this, CreateOrderActivity::class.java).apply {
-                putExtra("service_category_name", matchedCategory)
-                putExtra("search_query", query)
-            }
-            startActivity(intent)
-        } else {
-            // Ir pra tela de serviços com a busca preenchida
-            val intent = Intent(this, ServicesActivity::class.java).apply {
-                putExtra("search_query", query)
-            }
-            startActivity(intent)
+        // Sempre navegar para ServicesActivity com a busca
+        // Lá ele exibirá a lista de serviços encontrados com preços
+        val intent = Intent(this, ServicesActivity::class.java).apply {
+            putExtra("search_query", query)
         }
+        startActivity(intent)
     }
 
     /**

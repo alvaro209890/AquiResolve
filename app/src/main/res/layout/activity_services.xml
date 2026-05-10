@@ -180,6 +180,15 @@
 
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- RecyclerView para resultados da busca (com preços) -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvSearchResults"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false"
+                android:visibility="gone"
+                android:layout_marginBottom="16dp" />
+
             <!-- Grid de nichos de serviços -->
             <GridLayout
                 android:id="@+id/serviceGrid"
@@ -738,7 +747,7 @@
 
             </GridLayout>
 
-            <!-- Estado Vazio -->
+            <!-- Estado Vazio (sem resultados) -->
             <LinearLayout
                 android:id="@+id/emptyState"
                 android:layout_width="match_parent"

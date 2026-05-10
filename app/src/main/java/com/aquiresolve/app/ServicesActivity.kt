@@ -13,7 +13,11 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
+import com.aquiresolve.app.adapters.ServiceTypesAdapter
 import com.aquiresolve.app.databinding.ActivityServicesBinding
+import com.aquiresolve.app.models.ServicePricing
+import com.aquiresolve.app.models.ServiceType
 import com.aquiresolve.app.utils.ServiceSearchHelper
 import kotlinx.coroutines.launch
 
@@ -31,6 +35,9 @@ class ServicesActivity : AppCompatActivity() {
     // Estado
     private var searchQuery = ""
     private var isLoading = false
+    
+    // Adapter para resultados da busca com preços
+    private var searchResultsAdapter: ServiceTypesAdapter? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -60,6 +67,9 @@ class ServicesActivity : AppCompatActivity() {
     private fun setupUI() {
         window.statusBarColor = ContextCompat.getColor(this, R.color.primary_color)
         window.navigationBarColor = ContextCompat.getColor(this, R.color.background_color)
+        
+        // Configurar RecyclerView para resultados da busca
+        binding.rvSearchResults.layoutManager = LinearLayoutManager(this)
         
         hideEmptyState()
         hideLoadingState()
@@ -160,7 +170,7 @@ class ServicesActivity : AppCompatActivity() {
     }
 
     /**
-     * Filtra os cards de serviços baseado na busca
+     * Filtra os cards e mostra resultados da busca com preços
      */
     private fun filterServiceCards() {
         val cards = listOf(
@@ -181,44 +191,119 @@ class ServicesActivity : AppCompatActivity() {
         )
         
         if (searchQuery.isEmpty()) {
-            // Mostrar todos os cards
+            // Sem busca: mostrar grid de cards, esconder resultados
             cards.forEach { (card, _) ->
                 card.visibility = View.VISIBLE
             }
+            binding.rvSearchResults.visibility = View.GONE
+            binding.serviceGrid.visibility = View.VISIBLE
             hideEmptyState()
         } else {
-            // Usar busca inteligente: tentar match com serviços reais primeiro
+            // Com busca: usar busca inteligente
             val searchResults = ServiceSearchHelper.search(searchQuery)
-            val cardsToShow = mutableSetOf<String>()
             
             if (searchResults.isNotEmpty()) {
-                // Se achou serviços específicos, mostrar card da categoria relevante
-                cardsToShow.addAll(searchResults.map { it.category })
+                // Achou serviços! Mostrar lista com preços
+                showSearchResultsWithPrices(searchResults)
+                
+                // Cards ficam visíveis só da categoria encontrada
+                val matchedCategories = searchResults.map { it.category }.toSet()
+                cards.forEach { (card, name) ->
+                    card.visibility = if (name in matchedCategories) View.VISIBLE else View.GONE
+                }
+                binding.serviceGrid.visibility = View.VISIBLE
+                hideEmptyState()
             } else {
                 // Fallback: busca por categoria
                 val matchedCategory = ServiceSearchHelper.searchCategory(searchQuery)
                 if (matchedCategory != null) {
-                    cardsToShow.add(matchedCategory)
-                }
-            }
-            
-            var visibleCards = 0
-            cards.forEach { (card, name) ->
-                if (name in cardsToShow || name.contains(searchQuery, ignoreCase = true)) {
-                    card.visibility = View.VISIBLE
-                    visibleCards++
+                    // Mostrar todos os serviços da categoria com preços
+                    showCategoryServicesWithPrices(matchedCategory)
+                    
+                    cards.forEach { (card, name) ->
+                        card.visibility = if (name == matchedCategory) View.VISIBLE else View.GONE
+                    }
+                    binding.serviceGrid.visibility = View.VISIBLE
+                    hideEmptyState()
                 } else {
-                    card.visibility = View.GONE
+                    // Nada encontrado
+                    binding.rvSearchResults.visibility = View.GONE
+                    cards.forEach { (card, _) -> card.visibility = View.GONE }
+                    binding.serviceGrid.visibility = View.GONE
+                    showEmptyState()
                 }
-            }
-            
-            // Mostrar estado vazio se nenhum card estiver visível
-            if (visibleCards == 0) {
-                showEmptyState()
-            } else {
-                hideEmptyState()
             }
         }
+    }
+    
+    /**
+     * Mostra os resultados da busca em formato de lista com preços
+     */
+    private fun showSearchResultsWithPrices(results: List<ServiceSearchHelper.SearchResult>) {
+        // Agrupar por categoria para evitar duplicatas
+        val seen = mutableSetOf<String>()
+        val serviceTypes = mutableListOf<ServiceType>()
+        
+        for (result in results) {
+            val key = "${result.category}|${result.serviceType}"
+            if (seen.add(key)) {
+                val price = ServicePricing.getPrice(result.category, result.serviceType)
+                serviceTypes.add(
+                    ServiceType(
+                        id = "search_${key.hashCode()}",
+                        categoryId = result.category,
+                        name = result.serviceType,
+                        description = "Categoria: ${result.category}",
+                        estimatedPrice = price ?: ServicePricing.getDefaultPrice(result.category),
+                        isActive = true
+                    )
+                )
+            }
+        }
+        
+        setupResultsAdapter(serviceTypes)
+        binding.rvSearchResults.visibility = View.VISIBLE
+    }
+    
+    /**
+     * Mostra todos os serviços de uma categoria com preços
+     */
+    private fun showCategoryServicesWithPrices(category: String) {
+        val serviceNames = ServicePricing.getServicesForCategory(category)
+        val serviceTypes = serviceNames.mapIndexed { index, name ->
+            val price = ServicePricing.getPrice(category, name)
+            ServiceType(
+                id = "cat_${category.hashCode()}_$index",
+                categoryId = category,
+                name = name,
+                description = "Categoria: $category",
+                estimatedPrice = price ?: ServicePricing.getDefaultPrice(category),
+                isActive = true
+            )
+        }
+        
+        setupResultsAdapter(serviceTypes)
+        binding.rvSearchResults.visibility = View.VISIBLE
+    }
+    
+    /**
+     * Configura o adapter de resultados com preços
+     */
+    private fun setupResultsAdapter(serviceTypes: List<ServiceType>) {
+        searchResultsAdapter = ServiceTypesAdapter(
+            serviceTypes = serviceTypes,
+            onServiceClick = { serviceType ->
+                // Navegar para CreateOrderActivity com o serviço selecionado
+                val intent = Intent(this, CreateOrderActivity::class.java).apply {
+                    putExtra("service_category_name", serviceType.categoryId)
+                    putExtra("search_query", serviceType.name)
+                }
+                startActivity(intent)
+            },
+            onFavoriteClick = { _, _ -> /* sem ação de favorito na busca */ },
+            serviceManager = serviceManager
+        )
+        binding.rvSearchResults.adapter = searchResultsAdapter
     }
 
     /**
