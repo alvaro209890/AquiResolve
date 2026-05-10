@@ -13,6 +13,7 @@ import com.aquiresolve.app.adapters.ImageAdapter
 import com.aquiresolve.app.databinding.ItemOrderDetailedBinding
 import com.aquiresolve.app.models.OrderData
 import com.aquiresolve.app.utils.ProtocolGenerator
+import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -144,18 +145,20 @@ class DetailedOrdersAdapter(
         }
 
         private fun setupOrderPrice(order: OrderData) {
+            val currencyFormat = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
+            
             // Preço estimado para o cliente
             if (order.estimatedPrice > 0) {
-                binding.tvOrderPrice.text = "R$ ${String.format("%.2f", order.estimatedPrice).replace(".", ",")}"
+                binding.tvOrderPrice.text = currencyFormat.format(order.estimatedPrice)
             } else if (order.finalPrice != null && order.finalPrice > 0) {
-                binding.tvOrderPrice.text = "R$ ${String.format("%.2f", order.finalPrice).replace(".", ",")}"
+                binding.tvOrderPrice.text = currencyFormat.format(order.finalPrice)
             } else {
                 binding.tvOrderPrice.text = "A consultar"
             }
             
             // Comissão do prestador
             if (order.providerCommission > 0) {
-                binding.tvProviderCommission.text = "R$ ${String.format("%.2f", order.providerCommission).replace(".", ",")}"
+                binding.tvProviderCommission.text = currencyFormat.format(order.providerCommission)
             } else {
                 binding.tvProviderCommission.text = "—"
             }

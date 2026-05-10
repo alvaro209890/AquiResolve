@@ -99,6 +99,9 @@ class CreateOrderActivity : AppCompatActivity() {
         loadSavedAddresses()
     }
     
+    // Nome puro do serviço selecionado (sem o preço)
+    private var selectedPureServiceType: String = ""
+
     // Constantes para câmera e pagamento
     companion object {
         private const val REQUEST_CAMERA = 1001
@@ -496,7 +499,16 @@ class CreateOrderActivity : AppCompatActivity() {
         val adapter = ServiceTypeDropdownAdapter(options)
         binding.spinnerServiceType.setAdapter(adapter)
         
+        // Listener para guardar o nome puro do serviço selecionado
+        binding.spinnerServiceType.setOnItemClickListener { _, _, position, _ ->
+            val option = adapter.getItem(position)
+            if (option != null) {
+                selectedPureServiceType = option.name
+            }
+        }
+        
         // Limpar seleção atual
+        selectedPureServiceType = ""
         binding.spinnerServiceType.setText("")
     }
 
@@ -820,7 +832,8 @@ class CreateOrderActivity : AppCompatActivity() {
     }
 
     private fun collectOrderFormData(): OrderFormData? {
-        val serviceType = binding.spinnerServiceType.text.toString().trim()
+        val serviceType = if (selectedPureServiceType.isNotBlank()) selectedPureServiceType
+            else binding.spinnerServiceType.text.toString().trim()
         val serviceNiche = binding.spinnerServiceNiche.text.toString().ifEmpty {
             intent.getStringExtra("service_category_name") ?: ""
         }.trim()
