@@ -346,29 +346,28 @@ class CreateOrderActivity : AppCompatActivity() {
     private fun setupServiceTypesForNiche(niche: String) {
         val serviceTypes = when (niche) {
             "Elétrica" -> listOf(
-                "Instalação de lâmpadas",
-                "Instalação de tomadas",
+                "Instalação de lâmpada",
+                "Instalação de tomada",
                 "Troca de disjuntor",
                 "Instalação de chuveiro",
                 "Instalação de resistência",
-                "Instalação de luminárias",
-                "Instalação de interruptores",
+                "Instalação de luminária",
+                "Instalação de interruptor",
                 "Instalação de spots",
                 "Revisão Elétrica (até 7 pontos)"
             )
             "Encanador", "Hidráulica" -> listOf(
-                "Troca de torneiras",
+                "Troca de torneira",
                 "Troca de rabicho",
-                "Troca de sifões",
-                "Troca de registros",
-                "Troca de Filtros",
-                "troca de reparos de registros",
-                "Troca de reparos de torneiras",
+                "Troca de sifão",
+                "Troca de reparos de registro",
+                "Troca de Filtro",
+                "Troca de reparos de torneira",
                 "Troca kit de caixa acoplada",
                 "Reparos de descarga de parede",
-                "Revisão hidráulica até 7 pontos",
+                "Revisão hidráulica (até 7 pontos)",
                 "Vazamentos",
-                "troca de torneira monobloco"
+                "Troca de torneira monobloco"
             )
             "Instalação" -> listOf(
                 "Instalação de Suporte de tv",
@@ -377,7 +376,8 @@ class CreateOrderActivity : AppCompatActivity() {
                 "Instalação de Lava louça",
                 "Instalação de Fogão Cooktop",
                 "Instalação de Purificador",
-                "Conversão de gás para fogão cooktop"
+                "Conversão de gás para fogão cooktop",
+                "Varal de teto"
             )
             "Pintura" -> listOf(
                 "Pintura de parede interna",
@@ -414,9 +414,8 @@ class CreateOrderActivity : AppCompatActivity() {
                 "Desentupimento vaso"
             )
             "Desentupimento com maquinário até 2 m" -> listOf(
-                "Desentupimento de pia",
-                "Desentupimento ralo",
-                "Desentupimento vaso"
+                "Até 2 metros",
+                "Adicional por Metro"
             )
             "Caça-vazamentos" -> listOf(
                 "Selecione a necessidade no descritivo"
@@ -424,14 +423,12 @@ class CreateOrderActivity : AppCompatActivity() {
             "Limpeza de estofados", "Estofados" -> listOf(
                 "Limpeza de sofá 2 lugares",
                 "Limpeza de sofá 3 lugares",
-                "Limpeza de sofá 4 lugares",
                 "Limpeza de sofá retrátil",
                 "Limpeza de sofá de canto",
                 "Limpeza de poltronas estofadas",
                 "Limpeza de cadeiras estofadas",
-                "Limpeza de tapetes (até 2 m)",
-                "Limpeza de cadeiras estofadas",
-                "Limpeza de carpetes pequenos (até 2 m)",
+                "Limpeza de tapetes pequenos (até 2 mts)",
+                "Limpeza de carpetes pequenos (até 2mts)",
                 "Higienização de colchões Casal",
                 "Colchão solteiro",
                 "Colchão king",
@@ -439,10 +436,10 @@ class CreateOrderActivity : AppCompatActivity() {
                 "Impermeabilização"
             )
             "Ar condicionado" -> listOf(
-                "Instalação de ar condicionado",
-                "Manutenção preventiva",
-                "Limpeza e profunda (filtros e serpentinas)",
-                "Recarga de gás"
+                "9 a 12 mil BTUs split",
+                "18 a 30 mil BTUs",
+                "Ar de janela",
+                "Higienização de 9 a 30 mil BTUs"
             )
             "Eletrodomésticos" -> listOf(
                 "Conserto de micro-ondas",
@@ -481,10 +478,9 @@ class CreateOrderActivity : AppCompatActivity() {
                 "Objetos de banheiro"
             )
             "Faxina" -> listOf(
-                "Faxina Básica (apt pequeno 1 a 2 quartos)",
-                "Faxina completa (apt/casa média 2 a 3 quartos)",
-                "Faxina pesada (casa grande, pós-obra, mudança)",
-                "Faxina expressa (só manutenção)"
+                "Faxina Básica (apt pequeno 1 a 2 quartos) - 4h a 5h",
+                "Faxina completa (apt/casa média 2 a 3 quartos) - 6h a 8h",
+                "Faxina pesada (casa grande, pós-obra, mudança) - 10h"
             )
             else -> listOf("Selecione um nicho primeiro")
         }

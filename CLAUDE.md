@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-AppServiço — Android marketplace app connecting clients with service providers. Built with Kotlin, Firebase backend, Pagar.me payment integration. Package: `com.example.loginapp`.
+AquiResolve — Android marketplace app connecting clients with service providers. Built with Kotlin, Firebase backend, Pagar.me payment integration. Package: `com.aquiresolve.app`.
 
 ## Build Commands
 
