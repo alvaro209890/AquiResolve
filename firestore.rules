@@ -3,26 +3,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ===== FUNÇÕES AUXILIARES =====
+
     function isSignedIn() {
       return request.auth != null;
     }
 
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
-    }
-
-    function providerDocumentOwner() {
-      return isSignedIn() && (
-        resource.data.userId == request.auth.uid ||
-        resource.data.providerId == request.auth.uid
-      );
-    }
-
-    function providerDocumentPayloadOwner() {
-      return isSignedIn() && (
-        request.resource.data.userId == request.auth.uid ||
-        request.resource.data.providerId == request.auth.uid
-      );
     }
 
     function orderDeleteAllowed() {
@@ -32,8 +20,8 @@ service cloud.firestore {
       );
     }
 
-    // Compatibilidade primeiro: users ainda é legível para autenticados,
-    // mas somente o dono pode criar/editar/remover o próprio documento.
+    // ===== USUÁRIOS =====
+
     match /users/{userId} {
       allow read: if isSignedIn();
       allow create: if isOwner(userId)
@@ -46,8 +34,8 @@ service cloud.firestore {
       allow delete: if isOwner(userId);
     }
 
-    // providers mistura dados públicos e privados no mesmo documento.
-    // Mantemos leitura autenticada para não quebrar o app atual.
+    // ===== PRESTADORES =====
+
     match /providers/{providerId} {
       allow read: if isSignedIn();
       allow create: if isOwner(providerId)
@@ -60,18 +48,32 @@ service cloud.firestore {
       allow delete: if isOwner(providerId);
     }
 
-    // Coleção compatível com dois schemas usados no app:
-    // - userId (FirebaseProviderDocumentManager)
-    // - providerId (ProviderVerificationManager)
+    // ===== DOCUMENTOS DE PRESTADORES =====
+
     match /provider_documents/{documentId} {
-      allow read: if providerDocumentOwner();
-      allow create: if providerDocumentPayloadOwner();
-      allow update: if providerDocumentOwner() && providerDocumentPayloadOwner();
-      allow delete: if providerDocumentOwner();
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.providerId == request.auth.uid
+      );
+      allow create: if isSignedIn() && (
+        request.resource.data.userId == request.auth.uid ||
+        request.resource.data.providerId == request.auth.uid
+      );
+      allow update: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.providerId == request.auth.uid
+      ) && (
+        request.resource.data.userId == request.auth.uid ||
+        request.resource.data.providerId == request.auth.uid
+      );
+      allow delete: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.providerId == request.auth.uid
+      );
     }
 
-    // Compatibilidade máxima: prestadores fazem queries amplas por status,
-    // então orders precisa continuar legível para autenticados.
+    // ===== PEDIDOS =====
+
     match /orders/{orderId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn()
@@ -88,14 +90,27 @@ service cloud.firestore {
       }
     }
 
+    // ===== CHAT =====
+
     match /chatRooms/{chatRoomId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn() && resource.data.participants != null
+        && resource.data.participants.hasAny([request.auth.uid]);
+      allow create: if isSignedIn()
+        && request.resource.data.participants != null
+        && request.resource.data.participants.hasAny([request.auth.uid]);
+      allow update: if isSignedIn() && resource.data.participants != null
+        && resource.data.participants.hasAny([request.auth.uid]);
+      allow delete: if isSignedIn() && resource.data.participants != null
+        && resource.data.participants.hasAny([request.auth.uid]);
     }
 
-    // Coleção legada ainda usada em rotinas de exclusão de conta.
+    // Coleção legada ainda usada em rotinas de exclusão de conta
     match /chats/{chatId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
+
+    // ===== NOTIFICAÇÕES =====
 
     match /notifications/{notificationId} {
       allow read, update, delete: if isSignedIn()
@@ -105,8 +120,11 @@ service cloud.firestore {
     }
 
     match /userTokens/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId);
     }
+
+    // ===== CARRINHO =====
 
     match /carts/{userId} {
       allow read, write: if isOwner(userId);
@@ -115,6 +133,8 @@ service cloud.firestore {
         allow read, write: if isOwner(userId);
       }
     }
+
+    // ===== PRIVACIDADE =====
 
     match /privacy_settings/{userId} {
       allow read, write: if isOwner(userId);
@@ -127,19 +147,47 @@ service cloud.firestore {
         && resource.data.userData.uid == request.auth.uid;
     }
 
-    // Catálogo de serviços e prestadores de exemplo.
-    // service_categories/types/service_providers permanecem graváveis
-    // para não quebrar a rotina de popular dados de exemplo do app.
+    // ===== DADOS BANCÁRIOS =====
+
+    match /provider_bank_data/{docId} {
+      allow read: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn()
+        && resource.data.userId == request.auth.uid;
+    }
+
+    // ===== ENDEREÇOS SALVOS =====
+
+    match /saved_addresses/{addressId} {
+      allow read: if isSignedIn()
+        && resource.data.clientId == request.auth.uid;
+      allow create: if isSignedIn()
+        && request.resource.data.clientId == request.auth.uid;
+      allow update: if isSignedIn()
+        && resource.data.clientId == request.auth.uid;
+      allow delete: if isSignedIn()
+        && resource.data.clientId == request.auth.uid;
+    }
+
+    // ===== CATÁLOGO DE SERVIÇOS =====
+
     match /service_categories/{docId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
 
     match /service_types/{docId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
 
     match /service_providers/{docId} {
-      allow read, write: if isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
     }
 
     match /provider_reviews/{reviewId} {
@@ -150,8 +198,6 @@ service cloud.firestore {
         && resource.data.clientId == request.auth.uid;
     }
 
-    // Ainda não há fluxo ativo consolidado no app.
-    // Mantemos leitura autenticada e bloqueamos mutações por padrão.
     match /service_quotes/{quoteId} {
       allow read: if isSignedIn();
     }
@@ -162,6 +208,8 @@ service cloud.firestore {
       allow create: if isSignedIn()
         && request.resource.data.userId == request.auth.uid;
     }
+
+    // ===== NEGA TUDO QUE NÃO FOI EXPLICITAMENTE PERMITIDO =====
 
     match /{document=**} {
       allow read, write: if false;

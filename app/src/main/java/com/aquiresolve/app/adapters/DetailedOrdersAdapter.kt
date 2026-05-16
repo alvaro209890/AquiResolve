@@ -12,8 +12,8 @@ import com.aquiresolve.app.R
 import com.aquiresolve.app.adapters.ImageAdapter
 import com.aquiresolve.app.databinding.ItemOrderDetailedBinding
 import com.aquiresolve.app.models.OrderData
+import com.aquiresolve.app.utils.PriceFormatter
 import com.aquiresolve.app.utils.ProtocolGenerator
-import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -33,6 +33,18 @@ class DetailedOrdersAdapter(
     private val dateOnlyFormatter = SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR"))
 
     inner class OrderViewHolder(private val binding: ItemOrderDetailedBinding) : RecyclerView.ViewHolder(binding.root) {
+
+        private val imageAdapter: ImageAdapter by lazy {
+            ImageAdapter(
+                context = context,
+                imageUrls = emptyList(),
+                onImageClick = { imageUrl, position -> },
+                onImageLongClick = { imageUrl, position -> }
+            ).also {
+                binding.rvOrderImages.layoutManager = GridLayoutManager(context, 3)
+                binding.rvOrderImages.adapter = it
+            }
+        }
         
         fun bind(order: OrderData) {
             // ID e Data do Pedido
@@ -62,6 +74,7 @@ class DetailedOrdersAdapter(
             // Detalhes do Serviço
             binding.tvServiceType.text = order.serviceType.ifEmpty { "Não especificado" }
             binding.tvServiceNiche.text = order.serviceName.ifEmpty { "Não especificado" }
+            binding.tvServicePrice.text = formatOrderPrice(order)
             binding.tvDescription.text = order.description.ifEmpty { "Descrição não fornecida" }
 
             // Localização
@@ -144,21 +157,20 @@ class DetailedOrdersAdapter(
             binding.tvOrderStatus.setTextColor(ContextCompat.getColor(context, textColor))
         }
 
+        @Suppress("DEPRECATION")
         private fun setupOrderPrice(order: OrderData) {
-            val currencyFormat = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
-            
             // Preço estimado para o cliente
             if (order.estimatedPrice > 0) {
-                binding.tvOrderPrice.text = currencyFormat.format(order.estimatedPrice)
+                binding.tvOrderPrice.text = PriceFormatter.format(order.estimatedPrice)
             } else if (order.finalPrice != null && order.finalPrice > 0) {
-                binding.tvOrderPrice.text = currencyFormat.format(order.finalPrice)
+                binding.tvOrderPrice.text = PriceFormatter.format(order.finalPrice)
             } else {
                 binding.tvOrderPrice.text = "A consultar"
             }
-            
+
             // Comissão do prestador
             if (order.providerCommission > 0) {
-                binding.tvProviderCommission.text = currencyFormat.format(order.providerCommission)
+                binding.tvProviderCommission.text = PriceFormatter.format(order.providerCommission)
             } else {
                 binding.tvProviderCommission.text = "—"
             }
@@ -202,24 +214,9 @@ class DetailedOrdersAdapter(
         
         private fun setupOrderImages(order: OrderData) {
             val imageUrls = order.images ?: emptyList()
-            
             if (imageUrls.isNotEmpty()) {
                 binding.layoutImages.visibility = View.VISIBLE
-                
-                // Configurar RecyclerView de imagens
-                val imageAdapter = ImageAdapter(
-                    context = context,
-                    imageUrls = imageUrls,
-                    onImageClick = { imageUrl, position ->
-                        // TODO: Abrir visualizador de imagens
-                    },
-                    onImageLongClick = { imageUrl, position ->
-                        // TODO: Mostrar opções da imagem
-                    }
-                )
-                
-                binding.rvOrderImages.layoutManager = GridLayoutManager(context, 3)
-                binding.rvOrderImages.adapter = imageAdapter
+                imageAdapter.updateImages(imageUrls)
             } else {
                 binding.layoutImages.visibility = View.GONE
             }
@@ -303,6 +300,10 @@ class DetailedOrdersAdapter(
                     }
                 }
             }
+        }
+
+        private fun formatOrderPrice(order: OrderData): String {
+            return PriceFormatter.formatOrderPrice(order)
         }
     }
 

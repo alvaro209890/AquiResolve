@@ -9,7 +9,7 @@ Aplicativo Android para conectar clientes a prestadores de serviços. Clientes e
 | Kotlin | 1.9.22 |
 | Compile/Target SDK | 35 |
 | Min SDK | 24 |
-| Gradle | 8.13.2 |
+| Gradle | 8.8.0 |
 | Firebase BOM | 32.7.0 |
 | Retrofit | 2.9.0 |
 | OkHttp | 4.12.0 |
@@ -29,11 +29,13 @@ Activities → Managers → Firebase
 - **Managers:** Toda a lógica de negócio em classes separadas (Firebase e negócio)
 - **Models:** Anotados com `@PropertyName` do Firestore
 - **Adapters:** ~15 RecyclerView adapters
+- **Utils:** `PriceFormatter`, `ProtocolGenerator`, `NotificationBadgeHelper`, `TextFormatter`, `LocationPermissionHelper`, `ServiceSearchHelper`, `ServiceNicheCatalog`
 
 ## Funcionalidades
 
 ### Autenticação
 - Cadastro e login para **cliente** e **prestador** (fluxos separados)
+- Telefone obrigatório no cadastro de cliente
 - Recuperação de senha
 - Firebase Authentication
 
@@ -48,6 +50,12 @@ Activities → Managers → Firebase
 - **Cartão de crédito:** Validação Luhn, detecção de bandeira
 - **PIX:** Geração de QR Code (ZXing), polling automático a cada 5s
 - API em `https://aquiresolve.onrender.com/api/payments/`
+
+### Segurança
+- Network security config com domains confiáveis
+- ProGuard ativado no release build
+- reCAPTCHA Enterprise 18.4.0
+- Regras de segurança Firestore e Storage versionadas
 
 ### Chat
 - Tempo real via Firestore listeners
@@ -71,11 +79,15 @@ Activities → Managers → Firebase
 - Privacidade na entrega
 
 ### Outros
-- Agendamento de serviços (SchedulingManager)
-- Avaliações (RatingManager)
+- Agendamento de serviços
+- Avaliações
 - Histórico de serviços
 - Documentos do prestador (upload e verificação)
 - Gerenciamento de endereços
+- Localização em foreground (ProviderLocationForegroundService)
+- Dados bancários do prestador
+- Privacidade e exportação de dados (GDPR)
+- Favoritos
 
 ## Pré-requisitos
 
@@ -83,6 +95,7 @@ Activities → Managers → Firebase
 - Android SDK 35
 - JDK 17
 - Conta Firebase com projeto configurado
+- Firebase CLI (opcional, para deploy de regras/índices)
 
 ## Configuração
 
@@ -93,7 +106,11 @@ git clone git@github.com:alvaro209890/AquiResolve.git
 
 2. Adicione o arquivo `app/google-services.json` do Firebase Console
 
-3. (Opcional) Configure keystore de release em `keystore/upload-keystore.credentials.properties`
+3. Configure keystore de release em `keystore/upload-keystore.credentials.txt`
+4. (Opcional) Deploy das regras Firebase:
+```bash
+firebase --project aplicativoservico-143c2 deploy --only firestore:rules,firestore:indexes,storage:rules
+```
 
 ## Build
 
@@ -117,12 +134,19 @@ app/
 │   ├── models/            # Data classes Firestore
 │   │   └── payment/       # Modelos de pagamento
 │   ├── payment/           # Lógica Pagar.me
-│   ├── utils/             # Helpers (permissões, código, formatação)
+│   ├── utils/             # Helpers (PriceFormatter, ProtocolGenerator, permissões)
 │   ├── *.kt               # Activities + Managers
-│   └── AppApplication.kt # Application class
+│   └── AppApplication.kt  # Application class
 ├── google-services.json   # Config Firebase
 ├── build.gradle           # Build do módulo
-└── proguard-rules.pro     # Regras ProGuard
+├── proguard-rules.pro     # Regras ProGuard
+├── firestore.rules        # Regras Firestore
+├── firestore.indexes.json # Índices compostos Firestore
+├── storage.rules          # Regras Storage
+├── keystore/              # Keystore de release
+├── docs/                  # Documentação complementar
+├── backend/               # Backend Node.js (Render)
+└── web/                   # Página web auxiliar
 ```
 
 ## Firebase

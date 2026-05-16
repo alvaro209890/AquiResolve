@@ -19,6 +19,7 @@ import com.bumptech.glide.request.RequestOptions
 import com.aquiresolve.app.databinding.ActivityClientHomeBinding
 import com.aquiresolve.app.models.OrderData
 import com.aquiresolve.app.utils.NotificationBadgeHelper
+import com.aquiresolve.app.utils.PriceFormatter
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.launch
@@ -190,16 +191,15 @@ class ClientHomeActivity : AppCompatActivity() {
                             .inflate(R.layout.item_recent_order, binding.containerRecentOrders, false)
 
                         card.findViewById<TextView>(R.id.tvOrderService).text =
-                            order.serviceName.ifEmpty { "Serviço" }
+                            order.serviceType.ifEmpty { order.serviceName.ifEmpty { "Serviço" } }
                         card.findViewById<TextView>(R.id.tvOrderStatus).text =
                             getStatusText(order.status)
                         card.findViewById<TextView>(R.id.tvOrderPrice).text =
-                            if (order.estimatedPrice > 0) "R$ %.2f".format(order.estimatedPrice).replace(".", ",")
-                            else "Aguardando"
+                            PriceFormatter.formatOrderPrice(order)
 
                         card.setOnClickListener {
                             val intent = Intent(this@ClientHomeActivity, OrderDetailsActivity::class.java)
-                            intent.putExtra("orderId", order.id)
+                            intent.putExtra("order_id", order.id)
                             startActivity(intent)
                         }
 

@@ -65,37 +65,36 @@ service firebase.storage {
         );
     }
 
-    // Fotos de perfil organizadas por usuário.
+    // ===== FOTOS DE PERFIL =====
     match /profile_images/{userId}/{fileName} {
       allow read: if isOwner(userId);
       allow write: if ownerCanModifyImage(userId, 10 * 1024 * 1024);
     }
 
-    // Pasta legada usada pelo FirebaseStorageManager.
+    // ===== PASTAS LEGADAS (acesso amplo para compatibilidade) =====
     match /profiles/{fileName} {
       allow read: if isSignedIn();
       allow write: if signedInCanModifyImage(10 * 1024 * 1024);
     }
 
-    // Upload genérico legado.
     match /images/{fileName} {
       allow read: if isSignedIn();
       allow write: if signedInCanModifyImage(10 * 1024 * 1024);
     }
 
-    // Upload genérico legado.
+    // ===== DOCUMENTOS GERAIS =====
     match /documents/{fileName} {
       allow read: if isSignedIn();
       allow write: if signedInCanModifyImageOrPdf(10 * 1024 * 1024);
     }
 
-    // Imagens de serviços e catálogo visual.
+    // ===== IMAGENS DE SERVIÇOS =====
     match /service_images/{serviceId}/{fileName} {
       allow read: if isSignedIn();
       allow write: if signedInCanModifyImage(10 * 1024 * 1024);
     }
 
-    // Caminho legado mantido por compatibilidade.
+    // ===== IMAGENS DE CHAT =====
     match /chat_images/{orderId}/{fileName} {
       allow read: if isSignedIn();
       allow write: if signedInCanModifyImage(10 * 1024 * 1024);
@@ -106,6 +105,7 @@ service firebase.storage {
       allow write: if signedInCanModifyImage(10 * 1024 * 1024);
     }
 
+    // ===== IMAGENS DE PEDIDOS =====
     match /order_images/{orderId}/{fileName} {
       allow read: if isSignedIn();
       allow write: if signedInCanModifyImage(10 * 1024 * 1024);
@@ -116,7 +116,6 @@ service firebase.storage {
       allow write: if signedInCanModifyImage(10 * 1024 * 1024);
     }
 
-    // Caminhos legados do FirebaseStorageManager.
     match /orders/{orderId}/images/{fileName} {
       allow read: if isSignedIn();
       allow write: if signedInCanModifyImage(10 * 1024 * 1024);
@@ -127,6 +126,7 @@ service firebase.storage {
       allow write: if signedInCanModifyImageOrPdf(10 * 1024 * 1024);
     }
 
+    // ===== DOCUMENTOS POR USUÁRIO =====
     match /Documentos/{userId}/{fileName} {
       allow read: if isOwner(userId);
       allow write: if ownerCanModifyImageOrPdf(userId, 10 * 1024 * 1024);
@@ -142,6 +142,7 @@ service firebase.storage {
       allow write: if ownerCanModifyImageOrPdf(userId, 10 * 1024 * 1024);
     }
 
+    // ===== SELFIES =====
     match /selfies/{userId}/{fileName} {
       allow read: if isOwner(userId);
       allow write: if ownerCanModifyImage(userId, 5 * 1024 * 1024);

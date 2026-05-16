@@ -148,6 +148,34 @@
 
             </LinearLayout>
 
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="6dp">
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Valor:"
+                    android:textSize="13sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:id="@+id/tvServicePrice"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="R$ 110,00"
+                    android:textSize="15sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_color"
+                    android:layout_marginStart="8dp" />
+
+            </LinearLayout>
+
             <!-- Descrição -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -594,4 +622,3 @@
     </LinearLayout>
 
 </com.google.android.material.card.MaterialCardView>
-
