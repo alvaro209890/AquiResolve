@@ -107,13 +107,14 @@ class ClientSignUpActivity : AppCompatActivity() {
         // Obter dados dos campos
         val fullName = binding.etFullName.text.toString().trim()
         val username = binding.etUsername.text.toString().trim()
+        val phone = binding.etPhone.text.toString().trim()
         val email = binding.etEmail.text.toString().trim()
         val password = binding.etPassword.text.toString().trim()
         val confirmPassword = binding.etConfirmPassword.text.toString().trim()
         val termsAccepted = binding.cbTerms.isChecked
         
         // Validar dados de entrada
-        if (!validateInputs(fullName, username, email, password, confirmPassword, termsAccepted)) {
+        if (!validateInputs(fullName, username, phone, email, password, confirmPassword, termsAccepted)) {
             android.util.Log.e("ClientSignUp", "❌ VALIDAÇÃO FALHOU - Dados inválidos")
             return
         }
@@ -128,7 +129,7 @@ class ClientSignUpActivity : AppCompatActivity() {
         android.util.Log.d("ClientSignUp", "🔄 INICIANDO CRIAÇÃO DE CONTA...")
         
         // Criar conta de cliente
-        createClientAccount(fullName, username, email, password)
+        createClientAccount(fullName, username, phone, email, password)
         
         // Timeout de segurança (30 segundos)
         timeoutRunnable = Runnable {
@@ -145,6 +146,7 @@ class ClientSignUpActivity : AppCompatActivity() {
      * 
      * @param fullName Nome completo
      * @param username Nome de usuário
+     * @param phone Telefone
      * @param email Email
      * @param password Senha
      * @param confirmPassword Confirmação de senha
@@ -152,7 +154,7 @@ class ClientSignUpActivity : AppCompatActivity() {
      * @return true se todos os campos são válidos, false caso contrário
      */
     private fun validateInputs(
-        fullName: String, username: String, email: String, password: String, confirmPassword: String, termsAccepted: Boolean
+        fullName: String, username: String, phone: String, email: String, password: String, confirmPassword: String, termsAccepted: Boolean
     ): Boolean {
         android.util.Log.d("ClientSignUp", "=== INICIANDO VALIDAÇÃO ===")
         
@@ -182,6 +184,20 @@ class ClientSignUpActivity : AppCompatActivity() {
             isValid = false
         } else {
             android.util.Log.d("ClientSignUp", "✅ Nome de usuário válido")
+        }
+
+        // Validar telefone
+        val cleanPhone = phone.replace(Regex("[^0-9]"), "")
+        if (phone.isEmpty()) {
+            android.util.Log.e("ClientSignUp", "❌ ERRO: Telefone vazio")
+            binding.tilPhone.error = "Telefone é obrigatório"
+            isValid = false
+        } else if (cleanPhone.length !in 10..11) {
+            android.util.Log.e("ClientSignUp", "❌ ERRO: Telefone inválido")
+            binding.tilPhone.error = "Informe um telefone válido com DDD"
+            isValid = false
+        } else {
+            android.util.Log.d("ClientSignUp", "✅ Telefone válido")
         }
         
         // Validar email
@@ -248,7 +264,7 @@ class ClientSignUpActivity : AppCompatActivity() {
     /**
      * Cria conta de cliente com Firebase
      */
-    private fun createClientAccount(fullName: String, username: String, email: String, password: String) {
+    private fun createClientAccount(fullName: String, username: String, phone: String, email: String, password: String) {
         lifecycleScope.launch {
             try {
                 android.util.Log.d("ClientSignUp", "🔄 VERIFICANDO NOME DE USUÁRIO...")
@@ -269,7 +285,7 @@ class ClientSignUpActivity : AppCompatActivity() {
                     email = email,
                     fullName = fullName,
                     username = username,
-                    phone = "", // Telefone vazio, será preenchido depois
+                    phone = phone,
                     userType = FirebaseAuthManager.USER_TYPE_CLIENT,
                     isVerified = false
                 )
@@ -353,6 +369,7 @@ class ClientSignUpActivity : AppCompatActivity() {
     private fun clearErrors() {
         binding.tilFullName.error = null
         binding.tilUsername.error = null
+        binding.tilPhone.error = null
         binding.tilEmail.error = null
         binding.tilPassword.error = null
         binding.tilConfirmPassword.error = null
