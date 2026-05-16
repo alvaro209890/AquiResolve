@@ -71,7 +71,8 @@ object LocationPermissionHelper {
             .setMessage(
                 "Para que você possa receber pedidos próximos à sua localização, " +
                 "precisamos acessar sua localização em tempo real.\n\n" +
-                "Sua localização será atualizada a cada 5 minutos apenas quando o aplicativo estiver aberto.\n\n" +
+                "Sua localização será atualizada em segundo plano enquanto o rastreamento estiver ativo, " +
+                "com uma notificação fixa do AquiResolve.\n\n" +
                 "Você pode desativar o compartilhamento de localização a qualquer momento nas configurações."
             )
             .setPositiveButton("Permitir") { _, _ ->

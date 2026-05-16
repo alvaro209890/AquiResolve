@@ -31,8 +31,8 @@ class ProviderDashboardActivity : AppCompatActivity() {
     private lateinit var binding: ActivityProviderDashboardBinding
     private lateinit var authManager: FirebaseAuthManager
     private lateinit var pagerAdapter: ProviderDashboardPagerAdapter
-    private lateinit var locationService: ProviderLocationService
     private lateinit var orderManager: FirebaseOrderManager
+    private var isLocationTrackingRequested = false
     
     companion object {
         private const val TAG = "ProviderDashboard"
@@ -48,7 +48,6 @@ class ProviderDashboardActivity : AppCompatActivity() {
         
         // Inicializar managers
         authManager = FirebaseAuthManager(this)
-        locationService = ProviderLocationService.getInstance(this)
         orderManager = FirebaseOrderManager()
         
         // Inicializar ViewBinding
@@ -208,8 +207,9 @@ class ProviderDashboardActivity : AppCompatActivity() {
             return
         }
         
-        Log.d(TAG, "🌍 Iniciando rastreamento de localização...")
-        locationService.startLocationTracking()
+        Log.d(TAG, "🌍 Iniciando rastreamento foreground de localização...")
+        ProviderLocationForegroundService.start(this)
+        isLocationTrackingRequested = true
         showToast("📍 Rastreamento de localização ativado")
     }
     
@@ -217,8 +217,9 @@ class ProviderDashboardActivity : AppCompatActivity() {
      * Para o rastreamento de localização
      */
     private fun stopLocationTracking() {
-        Log.d(TAG, "🛑 Parando rastreamento de localização...")
-        locationService.stopLocationTracking()
+        Log.d(TAG, "🛑 Parando rastreamento foreground de localização...")
+        ProviderLocationForegroundService.stop(this)
+        isLocationTrackingRequested = false
     }
     
     /**
@@ -267,7 +268,7 @@ class ProviderDashboardActivity : AppCompatActivity() {
                 if (userData?.userType == FirebaseAuthManager.USER_TYPE_PROVIDER && 
                     verificationStatus?.status == ProviderVerificationManager.VerificationStatus.APPROVED &&
                     LocationPermissionHelper.hasLocationPermission(this@ProviderDashboardActivity) &&
-                    !locationService.isTracking()) {
+                    !isLocationTrackingRequested) {
                     
                     if (LocationPermissionHelper.isLocationEnabled(this@ProviderDashboardActivity)) {
                         Log.d(TAG, "🔄 Retomando rastreamento de localização...")

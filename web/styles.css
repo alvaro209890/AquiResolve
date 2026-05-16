@@ -1,0 +1,136 @@
+:root {
+  color-scheme: light;
+  --bg: #f7fbfa;
+  --surface: #ffffff;
+  --text: #12312d;
+  --muted: #5c706d;
+  --primary: #0f766e;
+  --primary-dark: #0b5f59;
+  --border: #dbe7e4;
+  --shadow: 0 18px 50px rgba(15, 118, 110, 0.12);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  line-height: 1.65;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top left, rgba(15, 118, 110, 0.12), transparent 34rem),
+    var(--bg);
+}
+
+a {
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.container {
+  width: min(960px, calc(100% - 32px));
+  margin: 0 auto;
+}
+
+.hero {
+  padding: 72px 0 48px;
+  background: linear-gradient(135deg, #063f3a, #0f766e);
+  color: #ffffff;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  opacity: 0.85;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(2.25rem, 6vw, 4rem);
+  line-height: 1.05;
+}
+
+.subtitle {
+  max-width: 720px;
+  margin: 18px 0 0;
+  font-size: 1.1rem;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.updated {
+  display: inline-flex;
+  margin: 24px 0 0;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.content {
+  padding: 32px 0 56px;
+}
+
+.card {
+  margin: 18px 0;
+  padding: clamp(20px, 4vw, 32px);
+  border: 1px solid var(--border);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: var(--shadow);
+}
+
+.notice {
+  border-color: rgba(15, 118, 110, 0.28);
+  background: #effaf8;
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-size: 1.4rem;
+  color: #083b37;
+}
+
+p {
+  margin: 0 0 12px;
+}
+
+ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+li + li {
+  margin-top: 8px;
+}
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  color: #ffffff;
+  text-decoration: none;
+  background: var(--primary);
+}
+
+.button:hover {
+  background: var(--primary-dark);
+}
+
+footer {
+  padding: 28px 0;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  background: #ffffff;
+}
+
+footer p {
+  margin: 0;
+}
