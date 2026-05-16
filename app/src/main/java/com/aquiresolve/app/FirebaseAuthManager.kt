@@ -109,7 +109,11 @@ class FirebaseAuthManager(private val context: Context) {
                 android.util.Log.d("FirebaseAuthManager", "🎉 CADASTRO COMPLETADO COM SUCESSO!")
             }
             
-            Result.success(result.user!!)
+            val user = result.user
+            if (user == null) {
+                return Result.failure(Exception("Falha ao criar conta: usuário não retornado pelo Firebase"))
+            }
+            Result.success(user)
         } catch (e: Exception) {
             android.util.Log.e("FirebaseAuthManager", "❌ ERRO NO CADASTRO:", e)
             
@@ -219,11 +223,11 @@ class FirebaseAuthManager(private val context: Context) {
     fun signOut() {
         android.util.Log.d("FirebaseAuthManager", "🔄 Iniciando logout...")
         
-        // Registrar hora de logout no Firestore
+        // Registrar hora de logout no Firestore (sem bloquear a main thread)
         try {
             val currentUserId = auth.currentUser?.uid
             if (currentUserId != null) {
-                kotlinx.coroutines.runBlocking {
+                kotlinx.coroutines.GlobalScope.launch {
                     updateUserOnlineStatus(currentUserId, isOnline = false)
                 }
             }

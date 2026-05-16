@@ -18,6 +18,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.tasks.await
 
 /**
@@ -44,6 +45,7 @@ class ClientOrdersActivity : AppCompatActivity() {
     // Firebase
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
+    private var ordersListener: ListenerRegistration? = null
     private lateinit var orderManager: FirebaseOrderManager
     
     // ViewPager e Adapter
@@ -258,7 +260,8 @@ class ClientOrdersActivity : AppCompatActivity() {
     private fun setupRealtimeListener() {
         val currentUser = auth.currentUser ?: return
         
-        db.collection("orders")
+        ordersListener?.remove() // Remove listener anterior se existir
+        ordersListener = db.collection("orders")
             .whereEqualTo("clientId", currentUser.uid)
             .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
@@ -325,5 +328,11 @@ class ClientOrdersActivity : AppCompatActivity() {
             // Recarregar pedidos após avaliação
             loadOrders()
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        ordersListener?.remove()
+        ordersListener = null
     }
 }

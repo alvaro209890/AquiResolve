@@ -319,7 +319,7 @@ class ClientChatActivity : AppCompatActivity() {
             }
             override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
         }
-        connectedRef.addValueEventListener(connectedListener!!)
+        connectedRef.addValueEventListener(connectedListener ?: return)
     }
 
     private fun setOffline() {
@@ -353,7 +353,7 @@ class ClientChatActivity : AppCompatActivity() {
             }
             override fun onCancelled(error: com.google.firebase.database.DatabaseError) {}
         }
-        userRef.addValueEventListener(presenceListener!!)
+        userRef.addValueEventListener(presenceListener ?: return)
     }
 
     private fun formatBrt(date: java.util.Date): String {
