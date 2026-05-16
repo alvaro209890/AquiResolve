@@ -12,6 +12,7 @@ import com.google.firebase.firestore.GeoPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.concurrent.TimeUnit
@@ -137,6 +138,16 @@ class ProviderLocationService(private val context: Context) {
         
         locationCallback = null
         isTracking = false
+    }
+
+    /**
+     * Libera todos os recursos: para tracking + cancela scope.
+     * Deve ser chamado quando o prestador faz logout ou o app é destruído.
+     */
+    fun shutdown() {
+        stopLocationTracking()
+        scope.cancel()
+        Log.d(TAG, "🔌 ProviderLocationService encerrado")
     }
     
     /**

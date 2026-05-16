@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Configuração de segurança de rede para o AquiResolve.
+  Android 9+ (API 28+) bloqueia cleartext HTTP por padrão.
+  Apenas domínios explicitamente autorizados podem usar HTTP.
+-->
+<network-security-config>
+    <!-- Produção: apenas HTTPS -->
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <!-- Backend de pagamentos no Render (HTTPS nativo) -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">aquiresolve.onrender.com</domain>
+        <domain includeSubdomains="true">onrender.com</domain>
+    </domain-config>
+
+    <!-- APIs Firebase (HTTPS nativo) -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">firebaseio.com</domain>
+        <domain includeSubdomains="true">googleapis.com</domain>
+        <domain includeSubdomains="true">google.com</domain>
+    </domain-config>
+
+    <!-- API Pagar.me (HTTPS nativo) -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">pagar.me</domain>
+    </domain-config>
+
+    <!-- Debug: permitir HTTP local apenas em builds de desenvolvimento -->
+    <debug-overrides>
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </debug-overrides>
+</network-security-config>

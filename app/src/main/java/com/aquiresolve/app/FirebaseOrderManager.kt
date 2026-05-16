@@ -145,6 +145,18 @@ class FirebaseOrderManager {
      */
     suspend fun startService(orderId: String): Result<Unit> {
         return try {
+            // Validar que o pedido existe e está em estado compatível
+            val orderDoc = db.collection(ORDERS_COLLECTION).document(orderId).get().await()
+            if (!orderDoc.exists()) {
+                return Result.failure(Exception("Pedido não encontrado"))
+            }
+            val currentStatus = orderDoc.getString("status") ?: ""
+            val allowedStatuses = setOf(OrderData.STATUS_ASSIGNED)
+            if (currentStatus !in allowedStatuses) {
+                Log.w(TAG, "startService bloqueado: pedido $orderId está em status '$currentStatus'")
+                return Result.failure(Exception("Pedido não está em estado que permita iniciar serviço"))
+            }
+
             val updates = mapOf(
                 "status" to OrderData.STATUS_IN_PROGRESS,
                 "startedAt" to Timestamp.now(),
