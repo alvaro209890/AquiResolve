@@ -9,7 +9,6 @@ object PriceFormatter {
     private val CURRENCY_FORMAT = NumberFormat.getCurrencyInstance(Locale("pt", "BR"))
 
     fun format(value: Double): String {
-        DebugPrice.overrideAmount?.let { return CURRENCY_FORMAT.format(it) }
         return CURRENCY_FORMAT.format(value)
     }
 

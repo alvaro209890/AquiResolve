@@ -84,27 +84,19 @@ class PagarMeManager(private val context: Context) {
                 val body = response.body()
                 if (body != null && body.estimatedPrice > 0 && body.providerCommission >= 0) {
                     PricingResult.Success(
-                        estimatedPrice = if (com.aquiresolve.app.BuildConfig.PRICE_OVERRIDE) 0.20 else body.estimatedPrice,
-                        providerCommission = if (com.aquiresolve.app.BuildConfig.PRICE_OVERRIDE) 0.10 else body.providerCommission,
+                        estimatedPrice = body.estimatedPrice,
+                        providerCommission = body.providerCommission,
                         source = body.source ?: "backend"
                     )
                 } else {
                     PricingResult.Error("Resposta de precificação inválida")
                 }
             } else {
-                if (com.aquiresolve.app.BuildConfig.PRICE_OVERRIDE) {
-                    fallbackLocalPricing(category, serviceType)
-                } else {
-                    PricingResult.Error(extractApiErrorMessage(response.errorBody()) ?: "Erro ao calcular preço (${response.code()})")
-                }
+                fallbackLocalPricing(category, serviceType)
             }
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao calcular preço no backend", e)
-            if (com.aquiresolve.app.BuildConfig.PRICE_OVERRIDE) {
-                fallbackLocalPricing(category, serviceType)
-            } else {
-                PricingResult.Error("Erro de conexão ao calcular preço: ${e.localizedMessage}")
-            }
+            fallbackLocalPricing(category, serviceType)
         }
     }
 
@@ -114,9 +106,9 @@ class PagarMeManager(private val context: Context) {
         val providerValue = com.aquiresolve.app.models.ServicePricing.getProviderValue(category, serviceType)
             ?: com.aquiresolve.app.models.ServicePricing.getDefaultProviderValue(category)
         return PricingResult.Success(
-            estimatedPrice = 0.20,
-            providerCommission = 0.10,
-            source = "local_debug"
+            estimatedPrice = clientPrice,
+            providerCommission = providerValue,
+            source = "tabela_local"
         )
     }
     

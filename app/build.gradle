@@ -126,7 +126,7 @@ android {
 
     buildTypes {
         debug {
-            buildConfigField "String", "PAYMENTS_API_BASE_URL", "\"https://aquiresolve.onrender.com/api/payments/\"" // TODO: usar URL de dev/staging aqui quando tiver
+            buildConfigField "String", "PAYMENTS_API_BASE_URL", "\"https://aquiresolve.onrender.com/api/payments/\""
         }
         release {
             minifyEnabled true
