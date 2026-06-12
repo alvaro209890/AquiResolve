@@ -189,9 +189,9 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow create: if isOwner(userId)
         && request.resource.data.uid == userId;
-      allow update: if isOwner(userId)
-        && (request.resource.data.uid == userId || resource.data.uid == null);
-      allow delete: if isOwner(userId);
+      allow update: if isAdmin()
+        || (isOwner(userId) && (request.resource.data.uid == userId || resource.data.uid == null));
+      allow delete: if isAdmin() || isOwner(userId);
 
       match /cashback_transactions/{txId} {
         allow read: if isOwner(userId);
@@ -206,11 +206,11 @@ service cloud.firestore {
 
     match /providers/{providerId} {
       allow read: if isSignedIn();
-      allow create: if isOwner(providerId)
-        && request.resource.data.uid == providerId;
-      allow update: if isOwner(providerId)
-        && (request.resource.data.uid == providerId || resource.data.uid == null);
-      allow delete: if isOwner(providerId);
+      allow create: if isAdmin()
+        || (isOwner(providerId) && request.resource.data.uid == providerId);
+      allow update: if isAdmin()
+        || (isOwner(providerId) && (request.resource.data.uid == providerId || resource.data.uid == null));
+      allow delete: if isAdmin() || isOwner(providerId);
     }
 
     match /provider_verifications/{verificationId} {

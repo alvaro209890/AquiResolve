@@ -315,26 +315,15 @@ export const useDocumentVerification = () => {
         })
       }
 
-      // 2) Atualizar verificationStatus no documento do prestador (verified = apto ao app)
-      const providerRef = doc(db, 'providers', verification.providerId)
-      const providerSnap = await getDoc(providerRef)
-      if (providerSnap.exists()) {
-        await updateDoc(providerRef, {
-          verificationStatus: 'verificado',
-          isVerified: true,
-          ativo: true,
-          updatedAt: serverTimestamp(),
-        })
-      } else {
-        const userRef = doc(db, 'users', verification.providerId)
-        const userSnap = await getDoc(userRef)
-        if (userSnap.exists()) {
-          await updateDoc(userRef, {
-            verificationStatus: 'verificado',
-            isVerified: true,
-            updatedAt: serverTimestamp(),
-          })
-        }
+      // 2) Atualizar verificationStatus via Admin SDK (regras do Firestore bloqueiam client SDK em providers/)
+      const verifyRes = await fetch(`/api/providers/${verification.providerId}/verify`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'approved' }),
+      })
+      if (!verifyRes.ok) {
+        const err = await verifyRes.json().catch(() => ({}))
+        throw new Error(err.error || 'Falha ao atualizar status do prestador')
       }
 
       // Atualizar estado local
@@ -401,25 +390,15 @@ export const useDocumentVerification = () => {
         })
       }
 
-      // 2) Atualizar provider (status em lowercase)
-      const providerRef = doc(db, 'providers', verification.providerId)
-      const providerSnap = await getDoc(providerRef)
-      if (providerSnap.exists()) {
-        await updateDoc(providerRef, {
-          verificationStatus: 'rejected',
-          isVerified: false,
-          updatedAt: serverTimestamp(),
-        })
-      } else {
-        const userRef = doc(db, 'users', verification.providerId)
-        const userSnap = await getDoc(userRef)
-        if (userSnap.exists()) {
-          await updateDoc(userRef, {
-            verificationStatus: 'rejected',
-            isVerified: false,
-            updatedAt: serverTimestamp(),
-          })
-        }
+      // 2) Atualizar provider via Admin SDK (regras do Firestore bloqueiam client SDK em providers/)
+      const verifyRes = await fetch(`/api/providers/${verification.providerId}/verify`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'rejected', rejectionReason }),
+      })
+      if (!verifyRes.ok) {
+        const err = await verifyRes.json().catch(() => ({}))
+        throw new Error(err.error || 'Falha ao atualizar status do prestador')
       }
 
       // Atualizar estado local

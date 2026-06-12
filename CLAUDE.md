@@ -163,9 +163,18 @@ Todas as rotas estão em `dashboard_admin/app/api/`:
 | `/api/auth/master-login` | POST | Login do admin (verifica `adminmaster/master`) |
 | `/api/setup-adminmaster` | POST | Cria documento inicial do admin no Firestore |
 | `/api/orders` | GET | Lista pedidos do Firestore |
+| `/api/orders/[id]` | GET | Retorna um pedido |
+| `/api/orders/[id]` | PATCH | Atualiza status de pedido (Admin SDK — bypassa regras) |
+| `/api/users/[id]` | GET | Retorna dados de um usuário |
+| `/api/users/[id]` | PATCH | Atualiza/bloqueia usuário (Admin SDK) |
+| `/api/users/[id]` | DELETE | Bloqueia conta do usuário |
 | `/api/providers` | GET | Lista prestadores via Storage |
 | `/api/providers/firebase-admin` | GET | Lista prestadores via Admin SDK |
-| `/api/providers/real-images` | GET | Imagens de prestadores |
+| `/api/providers/[id]/verify` | GET | Status de verificação do prestador |
+| `/api/providers/[id]/verify` | PATCH | Aprova ou rejeita prestador (Admin SDK) |
+| `/api/cashback-config` | GET | Lê configuração AquiCash |
+| `/api/cashback-config` | POST | Salva configuração AquiCash (Admin SDK) |
+| `/api/notifications/send` | POST | Envia FCM push notification |
 | `/api/financial/providers` | GET | Saldo/ganhos dos prestadores |
 | `/api/financial/transactions` | GET | Transações financeiras |
 | `/api/financial/accounts` | GET | Contas financeiras |
@@ -357,13 +366,48 @@ Cashback é uma configuração financeira crítica. Só o Firebase Admin SDK (vi
 
 | Problema | Causa | Solução |
 |---|---|---|
-| Firebase Admin não inicializa | `FIREBASE_SERVICE_ACCOUNT` não configurado | Preencher `.env.local` |
+| Firebase Admin não inicializa | `FIREBASE_SERVICE_ACCOUNT` não configurado | Preencher `.env.local` no painel / variáveis no Vercel |
+| Backend Render não autentica | Valores quebrados com prefixos JSON no env | Ver seção "Render — Env Vars Corretas" abaixo |
+| Aprovação de prestador falha com 403 | Client SDK não pode escrever em `providers/` (Firestore rules) | O hook agora usa `PATCH /api/providers/[id]/verify` (Admin SDK) |
+| Cashback não atualiza no app | Admin não tinha UI para configurar `app_config/cashback` | Acesse `/dashboard/configuracoes/aquicash` |
+| Admin não consegue atualizar usuário | Firestore rules exigiam `isOwner` | Regra corrigida: `isAdmin()` pode atualizar qualquer `users/` |
 | Login falha no painel | Usuário não existe no Firebase Auth | Criar usuário no Firebase Console |
 | `adminmaster/master` not found | Setup não executado | Chamar `POST /api/setup-adminmaster` |
 | Providers aparecem vazios | Firestore `providers` vazio ou SDK não autenticado | Verificar auth e dados no Firestore |
 | Pedidos não aparecem | `NEXT_PUBLIC_FIREBASE_*` não configurados | Preencher `.env.local` |
 | Pagar.me falha | Chave de API incorreta ou expirada | Verificar `API_KEY_PRIVATE_PAGARME` |
 | Storage Upload falha | `storageBucket` incorreto | Verificar `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` |
+
+### Render — Env Vars Corretas
+
+O backend de pagamentos (`aquiresolve.onrender.com`) precisa das variáveis abaixo. Os valores corretos **sem** prefixos JSON:
+
+```
+NODE_ENV=production
+PORT=10000
+PAGARME_BASE_URL=https://api.pagar.me/core/v5
+PAGARME_SECRET_KEY=sk_...       # chave secreta Pagar.me
+FIREBASE_PROJECT_ID=aplicativoservico-143c2
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-fbsvc@aplicativoservico-143c2.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----\nMIIEvgI...-----END PRIVATE KEY-----\n
+CORS_ORIGIN=*
+KEEP_ALIVE_ENABLED=true
+KEEP_ALIVE_URL=https://aquiresolve.onrender.com/api/health
+KEEP_ALIVE_INTERVAL_MS=840000
+```
+
+**Atenção:** `FIREBASE_PRIVATE_KEY` deve conter a chave PEM completa com `\n` literal (não quebras de linha reais). O `env.js` do backend faz o `replace(/\\n/g, '\n')` automaticamente.
+
+### Custom Claims — Admin
+
+Para que o painel admin tenha `isAdmin()` nas Firestore rules via client SDK, o usuário admin precisa do custom claim:
+
+```js
+// No Firebase Console > Functions ou via Admin SDK uma vez:
+await admin.auth().setCustomUserClaims(uid, { role: 'admin' })
+```
+
+Sem isso, o admin loga mas as Firestore rules rejeitam escritas via client SDK. As API Routes no servidor (Admin SDK) funcionam independentemente dos claims.
 
 ---
 
