@@ -1,6 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAdminFirestore } from '@/lib/firebase-admin'
+import { getAdminFirestore, adminApp } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+
+async function pushAndPersist(
+  db: admin.firestore.Firestore,
+  userId: string,
+  title: string,
+  body: string,
+  type: string
+) {
+  try {
+    const tokenSnap = await db.collection('userTokens').doc(userId).get()
+    const fcmToken = tokenSnap.data()?.token || tokenSnap.data()?.fcmToken
+    if (fcmToken && adminApp) {
+      await admin.messaging(adminApp).send({ token: fcmToken, notification: { title, body }, data: { type } }).catch(() => null)
+    }
+    await db.collection('notifications').add({
+      userId,
+      title,
+      message: body,
+      isRead: false,
+      type,
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    })
+  } catch {
+    // notificação não bloqueia a operação principal
+  }
+}
 
 const VALID_STATUSES = [
   'awaiting_payment',
@@ -148,6 +174,27 @@ export async function PATCH(
     }
 
     await orderRef.update(updateData)
+
+    // Auto-notificações por mudança de status
+    if (status) {
+      const freshSnap = await orderRef.get()
+      const freshData = freshSnap.data()
+      const clientId = freshData?.clientId as string | undefined
+      const providerId = freshData?.assignedProvider as string | undefined
+      const svcName = (freshData?.serviceName || freshData?.serviceType || 'Serviço') as string
+
+      if (status === 'assigned' && clientId) {
+        await pushAndPersist(db, clientId, 'Prestador a caminho!', `Seu ${svcName} foi atribuído e o prestador está a caminho.`, 'order')
+      } else if (status === 'in_progress' && clientId) {
+        await pushAndPersist(db, clientId, 'Serviço iniciado', `Seu ${svcName} está em andamento.`, 'order')
+      } else if (status === 'completed') {
+        if (clientId) await pushAndPersist(db, clientId, 'Serviço concluído!', `Seu ${svcName} foi concluído. Avalie o prestador.`, 'order')
+        if (providerId) await pushAndPersist(db, providerId, 'Serviço finalizado', `O ${svcName} foi concluído. Seu saldo foi atualizado.`, 'payment')
+      } else if (status === 'cancelled') {
+        if (clientId) await pushAndPersist(db, clientId, 'Pedido cancelado', `Seu pedido de ${svcName} foi cancelado.`, 'order')
+        if (providerId) await pushAndPersist(db, providerId, 'Atendimento cancelado', `O pedido de ${svcName} foi cancelado pelo administrador.`, 'order')
+      }
+    }
 
     // Log de auditoria para cancelamentos
     if (status === 'cancelled') {

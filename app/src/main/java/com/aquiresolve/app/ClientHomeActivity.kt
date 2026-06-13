@@ -122,7 +122,7 @@ class ClientHomeActivity : AppCompatActivity() {
         }
 
         binding.btnNotifications.setOnClickListener {
-            startActivity(Intent(this, NotificationSettingsActivity::class.java))
+            startActivity(Intent(this, NotificationHistoryActivity::class.java))
         }
 
         binding.btnCart.setOnClickListener {

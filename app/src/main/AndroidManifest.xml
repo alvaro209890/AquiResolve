@@ -74,6 +74,10 @@
             android:exported="false"
             android:theme="@style/Theme.LoginApp" />
         <activity
+            android:name=".NotificationHistoryActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LoginApp" />
+        <activity
             android:name=".PersonalDataActivity"
             android:exported="false"
             android:theme="@style/Theme.LoginApp" />

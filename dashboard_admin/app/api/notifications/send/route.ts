@@ -96,6 +96,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Persiste no Firestore para que o sino do app e o histórico funcionem
+    const notifTargets = userId ? [userId] : userIds || []
+    if (notifTargets.length > 0) {
+      const batch = db.batch()
+      for (const uid of notifTargets) {
+        const ref = db.collection('notifications').doc()
+        batch.set(ref, {
+          userId: uid,
+          title,
+          message: bodyMessage,
+          isRead: false,
+          type: data?.type || 'general',
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        })
+      }
+      await batch.commit().catch(() => null) // não falha o envio se o log falhar
+    }
+
     return NextResponse.json({
       success: true,
       results,
