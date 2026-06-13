@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, type MouseEvent } from "react"
+import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -150,14 +151,12 @@ export function OrderDetailsModalFixed({ order, isOpen, onClose, onOrderUpdated 
     }
   }
 
-  return (
+  const modal = (
     <div
-      className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm p-4"
-      style={{ zIndex: 50 }}
+      className="fixed inset-0 z-[9999] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
       onClick={handleBackdropClick}
     >
-      <div className="mx-auto flex h-full w-full max-w-4xl items-center justify-center">
-        <div className="flex w-full max-h-[88vh] flex-col overflow-hidden rounded-xl border border-border bg-card shadow-2xl">
+      <div className="w-full max-w-4xl max-h-[90vh] flex flex-col rounded-xl border border-border bg-card shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border bg-muted/50 p-6">
           <div className="space-y-1">
@@ -170,7 +169,7 @@ export function OrderDetailsModalFixed({ order, isOpen, onClose, onOrderUpdated 
         </div>
 
         {/* Content com abas */}
-        <div className="overflow-y-auto">
+        <div className="flex-1 min-h-0 overflow-y-auto">
           <Tabs defaultValue="detalhes" className="w-full">
             <div className="border-b px-6 pt-2">
               <TabsList className="h-auto bg-transparent p-0 gap-1">
@@ -340,8 +339,8 @@ export function OrderDetailsModalFixed({ order, isOpen, onClose, onOrderUpdated 
           </Tabs>
         </div>
       </div>
-      </div>
-
     </div>
   )
+
+  return createPortal(modal, document.body)
 }
