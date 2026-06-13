@@ -102,6 +102,10 @@
             android:exported="false"
             android:theme="@style/Theme.LoginApp" />
         <activity
+            android:name=".ProviderFinancialActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LoginApp" />
+        <activity
             android:name=".OrderDetailsActivity"
             android:exported="false"
             android:theme="@style/Theme.LoginApp" />

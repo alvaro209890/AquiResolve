@@ -81,11 +81,18 @@ export function useUsers(filters?: UserFilters) {
     }
   }
 
-  const blockUser = async (userId: string) => {
+  const blockUser = async (userId: string, reason?: string) => {
     try {
-      await UsersService.updateUser(userId, { isActive: false })
-      setUsers(prev => prev.map(user => 
-        user.id === userId ? { ...user, isActive: false } : user
+      // Usa Admin SDK via API route (não depende de custom claims)
+      const res = await fetch(`/api/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ blocked: true, isActive: false, blockedReason: reason ?? 'Bloqueado pelo administrador' }),
+      })
+      const data = await res.json()
+      if (!data.success) throw new Error(data.error)
+      setUsers(prev => prev.map(user =>
+        user.id === userId ? { ...user, isActive: false, blocked: true } : user
       ))
     } catch (err) {
       console.error('Erro ao bloquear usuário:', err)
@@ -96,9 +103,15 @@ export function useUsers(filters?: UserFilters) {
 
   const unblockUser = async (userId: string) => {
     try {
-      await UsersService.updateUser(userId, { isActive: true })
-      setUsers(prev => prev.map(user => 
-        user.id === userId ? { ...user, isActive: true } : user
+      const res = await fetch(`/api/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ blocked: false, isActive: true }),
+      })
+      const data = await res.json()
+      if (!data.success) throw new Error(data.error)
+      setUsers(prev => prev.map(user =>
+        user.id === userId ? { ...user, isActive: true, blocked: false } : user
       ))
     } catch (err) {
       console.error('Erro ao desbloquear usuário:', err)

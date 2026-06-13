@@ -1,326 +1,236 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { useState, useEffect, useCallback } from "react"
+import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { 
-  Eye, 
-  Printer, 
-  Info, 
-  Filter, 
-  RefreshCw, 
-  Upload, 
-  Search,
-  ChevronUp,
-  ChevronDown,
-  Folder,
-  Phone,
-  MapPin,
-  Calendar,
-  Building,
-  FileText,
-  Car,
-  User,
-  Lock,
-  Plus
-} from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { useToast } from "@/hooks/use-toast"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Search, RefreshCw, Eye, ArrowRightLeft, XCircle, ChevronLeft, ChevronRight, AlertTriangle, User, MapPin } from "lucide-react"
+import Link from "next/link"
 
-interface Servico {
+const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  awaiting_payment: { label: "Aguardando Pagamento", color: "bg-yellow-100 text-yellow-800" },
+  pending:          { label: "Pendente",             color: "bg-blue-100 text-blue-800" },
+  distributing:     { label: "Distribuindo",         color: "bg-purple-100 text-purple-800" },
+  assigned:         { label: "Atribuído",            color: "bg-indigo-100 text-indigo-800" },
+  in_progress:      { label: "Em Andamento",         color: "bg-orange-100 text-orange-800" },
+  completed:        { label: "Concluído",            color: "bg-green-100 text-green-800" },
+  cancelled:        { label: "Cancelado",            color: "bg-red-100 text-red-800" },
+}
+
+interface Order {
   id: string
-  dataHora: string
-  empresa: string
-  protocolo: string
-  cnpj: string
-  veiculo: string
-  placa: string
-  renavam: string
-  beneficiario: string
-  senha: string
-  telefone: string
-  origemCidade: string
-  destinoLogradouro: string
-  destinoBairro: string
-  destinoCidade: string
+  protocol?: string
+  clientName?: string
+  assignedProviderName?: string
+  serviceName?: string
+  serviceType?: string
+  address?: string
+  status?: string
+  estimatedPrice?: number
 }
 
 export default function VisualizarServicosPage() {
-  const [sortField, setSortField] = useState<string>("")
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc")
-  const [currentPage, setCurrentPage] = useState(1)
-  const [searchTerm, setSearchTerm] = useState("")
+  const [orders, setOrders] = useState<Order[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [page, setPage] = useState(1)
+  const [statusFilter, setStatusFilter] = useState("all")
+  const [searchInput, setSearchInput] = useState("")
+  const [search, setSearch] = useState("")
+  const [redirectOrder, setRedirectOrder] = useState<Order | null>(null)
+  const [redirectReason, setRedirectReason] = useState("")
+  const [redirecting, setRedirecting] = useState(false)
+  const [cancelOrder, setCancelOrder] = useState<Order | null>(null)
+  const [cancelReason, setCancelReason] = useState("")
+  const [cancelling, setCancelling] = useState(false)
+  const { toast } = useToast()
+  const LIMIT = 15
 
-  const servicos: Servico[] = [
-    {
-      id: "1",
-      dataHora: "13/08/2025 11:00",
-      empresa: "MONDIAL AS...",
-      protocolo: "49910674/2",
-      cnpj: "43.246.176/0001-30",
-      veiculo: "",
-      placa: "",
-      renavam: "",
-      beneficiario: "PABLO MARTINS BOURGUIGNON",
-      senha: "6836",
-      telefone: "(27) 99962-6836",
-      origemCidade: "VILA VELHA - ES",
-      destinoLogradouro: "",
-      destinoBairro: "",
-      destinoCidade: ""
-    },
-    {
-      id: "2",
-      dataHora: "13/08/2025 12:00",
-      empresa: "IKE ASSIST...",
-      protocolo: "20250730391982/1",
-      cnpj: "43.246.176/0001-30",
-      veiculo: "",
-      placa: "",
-      renavam: "",
-      beneficiario: "DOUGLAS KONRADO DE OLIVEIRA LOIOLA",
-      senha: "****",
-      telefone: "(27) 99926-****",
-      origemCidade: "VILA VELHA - ES",
-      destinoLogradouro: "",
-      destinoBairro: "",
-      destinoCidade: ""
-    },
-    {
-      id: "3",
-      dataHora: "13/08/2025 15:00",
-      empresa: "MONDIAL AS...",
-      protocolo: "49919929/1",
-      cnpj: "43.246.176/0001-30",
-      veiculo: "",
-      placa: "",
-      renavam: "",
-      beneficiario: "SONIA MARCIA PINTO CHAGAS",
-      senha: "****",
-      telefone: "(27) 99873-5122",
-      origemCidade: "VILA VELHA - ES",
-      destinoLogradouro: "",
-      destinoBairro: "",
-      destinoCidade: ""
-    }
-  ]
+  const fetchOrders = useCallback(async () => {
+    setLoading(true)
+    try {
+      const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) })
+      if (statusFilter !== "all") params.set("status", statusFilter)
+      if (search) params.set("cliente", search)
+      const res = await fetch(`/api/orders?${params}`)
+      const data = await res.json()
+      if (data.success) { setOrders(data.data ?? []); setTotal(data.pagination?.total ?? 0) }
+    } catch { toast({ title: "Erro ao carregar pedidos", variant: "destructive" }) }
+    finally { setLoading(false) }
+  }, [page, statusFilter, search, toast])
 
-  const columns = [
-    { key: "dataHora", label: "Data e Hora", sortable: true },
-    { key: "empresa", label: "Empresa", sortable: true },
-    { key: "protocolo", label: "Protocolo", sortable: true },
-    { key: "cnpj", label: "CNPJ", sortable: true },
-    { key: "veiculo", label: "Veículo / Objeto", sortable: true },
-    { key: "placa", label: "Placa", sortable: true },
-    { key: "renavam", label: "Renavam", sortable: true },
-    { key: "beneficiario", label: "Beneficiário", sortable: true },
-    { key: "senha", label: "Senha", sortable: true },
-    { key: "telefone", label: "Telefone", sortable: true },
-    { key: "origemCidade", label: "O. Cidade", sortable: true },
-    { key: "destinoLogradouro", label: "D. Logradouro", sortable: true },
-    { key: "destinoBairro", label: "D. Bairro", sortable: true },
-    { key: "destinoCidade", label: "D. Cidade", sortable: true }
-  ]
+  useEffect(() => { fetchOrders() }, [fetchOrders])
 
-  const handleSort = (field: string) => {
-    if (sortField === field) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
-    } else {
-      setSortField(field)
-      setSortDirection("asc")
-    }
+  async function doRedirect() {
+    if (!redirectOrder || !redirectReason.trim()) return
+    setRedirecting(true)
+    try {
+      const res = await fetch(`/api/orders/${redirectOrder.id}/redirect`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: redirectReason }),
+      })
+      const data = await res.json()
+      if (!data.success) throw new Error(data.error)
+      toast({ title: "Pedido redirecionado", description: "Prestador removido — voltou para distribuição." })
+      setRedirectOrder(null); setRedirectReason(""); fetchOrders()
+    } catch (e: unknown) {
+      toast({ title: "Erro", description: e instanceof Error ? e.message : String(e), variant: "destructive" })
+    } finally { setRedirecting(false) }
   }
 
-  const getSortIcon = (field: string) => {
-    if (sortField !== field) {
-      return <ChevronUp className="h-4 w-4 text-muted-foreground/60" />
-    }
-    return sortDirection === "asc" ? 
-      <ChevronUp className="h-4 w-4 text-blue-600" /> : 
-      <ChevronDown className="h-4 w-4 text-blue-600" />
+  async function doCancel() {
+    if (!cancelOrder) return
+    setCancelling(true)
+    try {
+      const res = await fetch(`/api/orders/${cancelOrder.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: "cancelled", cancelledBy: "admin", cancellationReason: cancelReason }),
+      })
+      const data = await res.json()
+      if (!data.success) throw new Error(data.error)
+      toast({ title: "Pedido cancelado." })
+      setCancelOrder(null); setCancelReason(""); fetchOrders()
+    } catch (e: unknown) {
+      toast({ title: "Erro", description: e instanceof Error ? e.message : String(e), variant: "destructive" })
+    } finally { setCancelling(false) }
   }
 
-  const filteredServicos = servicos.filter(servico =>
-    Object.values(servico).some(value => 
-      value.toString().toLowerCase().includes(searchTerm.toLowerCase())
-    )
-  )
+  const totalPages = Math.ceil(total / LIMIT)
 
   return (
-    <main className="flex-1 space-y-6 p-6" style={{ backgroundColor: 'var(--background)', color: 'var(--foreground)' }}>
-      {/* Header */}
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-            <Eye className="h-6 w-6 text-green-600" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Serviços</h1>
-            <p className="text-sm text-muted-foreground">
-              autem.com.br &gt; serviços &gt; visualizar
-            </p>
-          </div>
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Serviços</h1>
+          <p className="text-sm text-muted-foreground">{total} pedido(s)</p>
         </div>
-        <Button className="bg-orange-500 hover:bg-orange-600 text-white">
-          <Plus className="h-4 w-4 mr-2" />
-          Novo Serviço
+        <Button variant="outline" size="sm" onClick={fetchOrders} disabled={loading} className="gap-2">
+          <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Atualizar
         </Button>
       </div>
 
-      {/* Barra de Ações */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm">
-            <Printer className="h-4 w-4 mr-1" />
-            Imprimir
-          </Button>
-          <Button variant="outline" size="sm">
-            <Info className="h-4 w-4 mr-1" />
-            Informações
-          </Button>
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4 mr-1" />
-            Filtrar
-          </Button>
-          <Button variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4 mr-1" />
-            Atualizar
-          </Button>
-          <Button variant="outline" size="sm">
-            <Upload className="h-4 w-4 mr-1" />
-            Importar
-          </Button>
+      <div className="flex gap-3 flex-wrap">
+        <div className="flex-1 min-w-[200px] relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input className="pl-9" placeholder="Buscar cliente, protocolo…" value={searchInput}
+            onChange={e => setSearchInput(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter") { setSearch(searchInput); setPage(1) } }} />
         </div>
-        <div className="flex items-center space-x-2">
-          <Input
-            placeholder="PROCURAR"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-64"
-          />
-          <Button variant="outline" size="sm">
-            <Search className="h-4 w-4" />
-          </Button>
-        </div>
+        <Select value={statusFilter} onValueChange={v => { setStatusFilter(v); setPage(1) }}>
+          <SelectTrigger className="w-52"><SelectValue placeholder="Status" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os status</SelectItem>
+            {Object.entries(STATUS_CONFIG).map(([k, v]) => <SelectItem key={k} value={k}>{v.label}</SelectItem>)}
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Tabela de Serviços */}
-      <Card style={{ backgroundColor: 'var(--card)', color: 'var(--card-foreground)', borderColor: 'var(--border)' }}>
+      <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b" style={{ borderColor: 'var(--border)' }}>
-                  {columns.map((column) => (
-                    <th
-                      key={column.key}
-                      className={`px-4 py-3 text-left text-sm font-medium text-foreground ${
-                        column.sortable ? 'cursor-pointer hover:bg-muted/50' : ''
-                      }`}
-                      onClick={() => column.sortable && handleSort(column.key)}
-                    >
-                      <div className="flex items-center space-x-1">
-                        <span>{column.label}</span>
-                        {column.sortable && getSortIcon(column.key)}
+          {loading ? (
+            <div className="flex items-center justify-center h-40"><RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+          ) : orders.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-40 gap-2">
+              <AlertTriangle className="h-6 w-6 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">Nenhum pedido encontrado</p>
+            </div>
+          ) : (
+            <div className="divide-y">
+              {orders.map(order => {
+                const sc = STATUS_CONFIG[order.status ?? ""] ?? { label: order.status ?? "—", color: "bg-muted text-muted-foreground" }
+                const canRedirect = ["assigned", "in_progress"].includes(order.status ?? "")
+                const canCancel = !["completed", "cancelled"].includes(order.status ?? "")
+                return (
+                  <div key={order.id} className="flex items-start gap-4 px-4 py-3 hover:bg-muted/30">
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-medium">{order.protocol ?? order.id.slice(0, 8)}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${sc.color}`}>{sc.label}</span>
                       </div>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filteredServicos.map((servico, index) => (
-                  <tr
-                    key={servico.id}
-                    className={`border-b hover:bg-muted/50/50 ${
-                      index % 2 === 0 ? 'bg-background' : 'bg-muted/50'
-                    }`}
-                    style={{ borderColor: 'var(--border)' }}
-                  >
-                    <td className="px-4 py-3 text-sm text-foreground">
-                      {servico.dataHora}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-foreground">
-                      {servico.empresa}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-foreground">
-                      <div className="flex items-center space-x-2">
-                        <Folder className="h-4 w-4 text-green-600" />
-                        <span>{servico.protocolo}</span>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                        <span className="flex items-center gap-1"><User className="h-3 w-3" />{order.clientName ?? "—"}</span>
+                        <span className="flex items-center gap-1"><User className="h-3 w-3" />{order.assignedProviderName ?? "Sem prestador"}</span>
+                        <span>{order.serviceName ?? order.serviceType ?? "—"}</span>
+                        {order.estimatedPrice != null && <span>R$ {Number(order.estimatedPrice).toFixed(2)}</span>}
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-foreground">
-                      {servico.cnpj}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {servico.veiculo || "-"}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {servico.placa || "-"}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {servico.renavam || "-"}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-foreground">
-                      {servico.beneficiario}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-foreground">
-                      {servico.senha}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-foreground">
-                      {servico.telefone}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-foreground">
-                      {servico.origemCidade}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {servico.destinoLogradouro || "-"}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {servico.destinoBairro || "-"}
-                    </td>
-                    <td className="px-4 py-3 text-sm text-muted-foreground">
-                      {servico.destinoCidade || "-"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      {order.address && <p className="text-xs text-muted-foreground flex items-center gap-1"><MapPin className="h-3 w-3" />{order.address}</p>}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" asChild title="Ver OS">
+                        <Link href={`/dashboard/servicos/os/${order.id}`}><Eye className="h-4 w-4" /></Link>
+                      </Button>
+                      {canRedirect && (
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-amber-600" title="Redirecionar"
+                          onClick={() => { setRedirectOrder(order); setRedirectReason("") }}>
+                          <ArrowRightLeft className="h-4 w-4" />
+                        </Button>
+                      )}
+                      {canCancel && (
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500" title="Cancelar"
+                          onClick={() => { setCancelOrder(order); setCancelReason("") }}>
+                          <XCircle className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Paginação */}
-      <div className="flex items-center justify-between">
-        <div className="text-sm text-muted-foreground">
-          Mostrando de 1 até {filteredServicos.length} de {filteredServicos.length} resultado(s)
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Página {page} de {totalPages}</span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setPage(p => p - 1)} disabled={page <= 1}><ChevronLeft className="h-4 w-4" /></Button>
+            <Button variant="outline" size="sm" onClick={() => setPage(p => p + 1)} disabled={page >= totalPages}><ChevronRight className="h-4 w-4" /></Button>
+          </div>
         </div>
-        <div className="flex items-center space-x-2">
-          <Button variant="outline" size="sm" disabled={currentPage === 1}>
-            &lt;
-          </Button>
-          <Button variant="outline" size="sm" className="bg-blue-600 text-white">
-            1
-          </Button>
-          <Button variant="outline" size="sm" disabled={filteredServicos.length <= 3}>
-            &gt;
-          </Button>
-        </div>
-      </div>
+      )}
 
-      {/* Botões Flutuantes */}
-      <div className="fixed bottom-6 right-6 flex flex-col space-y-2">
-        <Button className="w-12 h-12 rounded-full bg-orange-500 hover:bg-orange-600 text-white shadow-lg">
-          <Plus className="h-5 w-5" />
-        </Button>
-        <Button className="w-12 h-12 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg">
-          <Phone className="h-5 w-5" />
-        </Button>
-      </div>
+      <Dialog open={!!redirectOrder} onOpenChange={open => !open && setRedirectOrder(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><ArrowRightLeft className="h-5 w-5 text-amber-600" />Redirecionar Serviço</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">Prestador <strong>{redirectOrder?.assignedProviderName}</strong> será removido e o pedido voltará para distribuição.</p>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Motivo (obrigatório)</label>
+              <Textarea placeholder="Ex: Prestador não compareceu" value={redirectReason} onChange={e => setRedirectReason(e.target.value)} rows={3} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRedirectOrder(null)}>Cancelar</Button>
+            <Button onClick={doRedirect} disabled={redirecting || !redirectReason.trim()} className="gap-2">
+              {redirecting && <RefreshCw className="h-4 w-4 animate-spin" />} Redirecionar
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
-      {/* Footer */}
-      <div className="text-center text-sm text-muted-foreground mt-8">
-        Copyright © 2025 AutEM v2.2.1 Todos os direitos reservados
-      </div>
-    </main>
+      <Dialog open={!!cancelOrder} onOpenChange={open => !open && setCancelOrder(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle className="flex items-center gap-2"><XCircle className="h-5 w-5 text-red-500" />Cancelar Pedido</DialogTitle></DialogHeader>
+          <div className="space-y-3 py-2">
+            <p className="text-sm text-muted-foreground">Cancelar pedido <strong>{cancelOrder?.protocol}</strong>. Esta ação não pode ser desfeita.</p>
+            <div className="space-y-1">
+              <label className="text-sm font-medium">Motivo (opcional)</label>
+              <Textarea placeholder="Ex: Solicitação do cliente" value={cancelReason} onChange={e => setCancelReason(e.target.value)} rows={2} />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelOrder(null)}>Voltar</Button>
+            <Button variant="destructive" onClick={doCancel} disabled={cancelling} className="gap-2">
+              {cancelling && <RefreshCw className="h-4 w-4 animate-spin" />} Confirmar Cancelamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
   )
 }

@@ -81,6 +81,13 @@ awaiting_payment → pending → distributing → assigned → in_progress → c
                                                                    └→ cancelled
 ```
 
+### Tela Financeiro do Prestador (`ProviderFinancialActivity`)
+- Arquivo: `app/src/main/java/com/aquiresolve/app/ProviderFinancialActivity.kt`
+- Layout: `app/src/main/res/layout/activity_provider_financial.xml`
+- Lê `providerBalance` e `providerTotalEarned` de `providers/{uid}`
+- Lista pedidos concluídos (`status=completed`, `assignedProvider=uid`) com comissão de cada um
+- Disparar via: `startActivity(Intent(context, ProviderFinancialActivity::class.java))`
+
 ### Backend de Pagamentos (Pagar.me)
 - URL: `https://aquiresolve.onrender.com/api/payments/`
 - Configurada em `app/build.gradle` como `PAYMENTS_API_BASE_URL`
@@ -174,7 +181,9 @@ Todas as rotas estão em `dashboard_admin/app/api/`:
 | `/api/providers/[id]/verify` | PATCH | Aprova ou rejeita prestador (Admin SDK) |
 | `/api/cashback-config` | GET | Lê configuração AquiCash |
 | `/api/cashback-config` | POST | Salva configuração AquiCash (Admin SDK) |
-| `/api/notifications/send` | POST | Envia FCM push notification |
+| `/api/notifications/send` | POST | Envia FCM push notification por uid, userIds[], token, tokens[] ou topic |
+| `/api/orders/[id]/redirect` | POST | Remove prestador do pedido e retorna para distribuição (motivo obrigatório) |
+| `/api/checklists/[orderId]` | GET | Retorna checklist + dados do pedido para visualização da OS |
 | `/api/financial/providers` | GET | Saldo/ganhos dos prestadores |
 | `/api/financial/transactions` | GET | Transações financeiras |
 | `/api/financial/accounts` | GET | Contas financeiras |
@@ -183,6 +192,21 @@ Todas as rotas estão em `dashboard_admin/app/api/`:
 | `/api/lgpd/rights` | POST | Exercício de direitos LGPD |
 | `/api/adminmaster/users` | GET/POST | Gestão de usuários do painel |
 | `/api/reports/financial` | GET | Relatórios financeiros |
+
+### Páginas criadas/atualizadas (sessão atual)
+| Página | Rota | O que faz |
+|---|---|---|
+| Visualizar Serviços | `/dashboard/servicos/visualizar` | Lista pedidos reais do Firestore com paginação, filtros, redirecionamento e cancelamento |
+| Detalhe OS | `/dashboard/servicos/os/[orderId]` | Exibe checklist completo: GPS, fotos antes/durante/depois, assinaturas, comissão |
+| Notificações | `/dashboard/controle/notificacoes` | Envia FCM push para todos clientes, todos prestadores, todos usuários ou UID específico |
+| Rastreamento | `/dashboard/controle/autem-mobile/rastreamento` | Mapa ao vivo com pinos de prestadores + lista GPS com link Google Maps |
+| Cashback (AquiCash) | `/dashboard/configuracoes/aquicash` | Configura fases, tiers, combos e salva em `app_config/cashback` via Admin SDK |
+
+### Hooks atualizados
+| Hook | Mudança |
+|---|---|
+| `hooks/use-users.ts` | `blockUser`/`unblockUser` agora usam `PATCH /api/users/[id]` (Admin SDK) em vez de client SDK |
+| `hooks/use-document-verification.ts` | `approveVerification`/`rejectVerification` usam `PATCH /api/providers/[id]/verify` |
 
 ### Como as páginas buscam dados
 - **Firestore direto (client SDK):** `lib/firestore.ts` → `getCollection()`, `listenToCollection()`
@@ -373,6 +397,7 @@ Cashback é uma configuração financeira crítica. Só o Firebase Admin SDK (vi
 | Admin não consegue atualizar usuário | Firestore rules exigiam `isOwner` | Regra corrigida: `isAdmin()` pode atualizar qualquer `users/` |
 | Login falha no painel | Usuário não existe no Firebase Auth | Criar usuário no Firebase Console |
 | `adminmaster/master` not found | Setup não executado | Chamar `POST /api/setup-adminmaster` |
+| `providerBalance` sempre zero | Campo não era atualizado ao concluir pedido | CORRIGIDO: `PATCH /api/orders/[id]` com `status=completed` faz `FieldValue.increment(commission)` em `providers/{id}` e `users/{id}` |
 | Providers aparecem vazios | Firestore `providers` vazio ou SDK não autenticado | Verificar auth e dados no Firestore |
 | Pedidos não aparecem | `NEXT_PUBLIC_FIREBASE_*` não configurados | Preencher `.env.local` |
 | Pagar.me falha | Chave de API incorreta ou expirada | Verificar `API_KEY_PRIVATE_PAGARME` |

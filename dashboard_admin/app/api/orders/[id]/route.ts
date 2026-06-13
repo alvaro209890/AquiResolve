@@ -76,6 +76,32 @@ export async function PATCH(
 
       if (status === 'completed') {
         updateData.completedAt = admin.firestore.FieldValue.serverTimestamp()
+
+        // Acumula saldo do prestador ao concluir pedido
+        const orderSnap2 = await orderRef.get()
+        const orderData = orderSnap2.data()
+        const providerId = orderData?.assignedProvider
+        const commission = orderData?.providerCommission ?? 0
+        if (providerId && commission > 0) {
+          const provRef = db.collection('providers').doc(providerId)
+          const userRef2 = db.collection('users').doc(providerId)
+          const provSnap = await provRef.get()
+          if (provSnap.exists) {
+            await provRef.update({
+              providerBalance: admin.firestore.FieldValue.increment(commission),
+              providerTotalEarned: admin.firestore.FieldValue.increment(commission),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            })
+          }
+          const userSnap2 = await userRef2.get()
+          if (userSnap2.exists) {
+            await userRef2.update({
+              providerBalance: admin.firestore.FieldValue.increment(commission),
+              providerTotalEarned: admin.firestore.FieldValue.increment(commission),
+              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+            })
+          }
+        }
       }
 
       if (status === 'distributing') {
