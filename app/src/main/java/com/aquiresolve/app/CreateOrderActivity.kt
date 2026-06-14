@@ -854,6 +854,12 @@ class CreateOrderActivity : AppCompatActivity() {
             return null
         }
 
+        if (address.coordinates == null) {
+            showErrorMessage("Selecione a localização deste endereço no mapa antes de criar o pedido")
+            openAddressManagement()
+            return null
+        }
+
         clearErrors()
         if (!validateInputs(serviceType, serviceNiche, description)) {
             return null

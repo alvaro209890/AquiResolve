@@ -9,12 +9,15 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.location.Location
+import android.location.LocationManager
 import android.os.Build
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
@@ -64,8 +67,21 @@ class ProviderLocationForegroundService : Service() {
                 return START_NOT_STICKY
             }
             ACTION_START, null -> {
-                startForeground(NOTIFICATION_ID, buildNotification())
-                startTrackingIfAllowed()
+                if (!hasLocationPermission()) {
+                    Log.w(TAG, "Sem permissão de localização; foreground service não será iniciado")
+                    stopServiceAfterLocationDisabled()
+                    return START_NOT_STICKY
+                }
+                if (!isLocationEnabled()) {
+                    Log.w(TAG, "Localização do dispositivo desativada; foreground service não será iniciado")
+                    stopServiceAfterLocationDisabled()
+                    return START_NOT_STICKY
+                }
+                if (startForegroundForLocation()) {
+                    startTrackingIfAllowed()
+                } else {
+                    return START_NOT_STICKY
+                }
             }
         }
         return START_STICKY
@@ -207,6 +223,42 @@ class ProviderLocationForegroundService : Service() {
         return fine || coarse
     }
 
+    private fun isLocationEnabled(): Boolean {
+        val locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            locationManager.isLocationEnabled
+        } else {
+            @Suppress("DEPRECATION")
+            locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER) ||
+                locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER)
+        }
+    }
+
+    private fun startForegroundForLocation(): Boolean {
+        return try {
+            val foregroundServiceType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+            } else {
+                0
+            }
+            ServiceCompat.startForeground(
+                this,
+                NOTIFICATION_ID,
+                buildNotification(),
+                foregroundServiceType
+            )
+            true
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Falha ao iniciar foreground service de localização: ${e.message}", e)
+            stopServiceAfterLocationDisabled()
+            false
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao iniciar foreground service de localização: ${e.message}", e)
+            stopServiceAfterLocationDisabled()
+            false
+        }
+    }
+
     private fun buildNotification() = NotificationCompat.Builder(this, CHANNEL_ID)
         .setSmallIcon(R.drawable.ic_notification)
         .setContentTitle("AquiResolve compartilhando localização")
@@ -218,7 +270,7 @@ class ProviderLocationForegroundService : Service() {
             PendingIntent.getActivity(
                 this,
                 0,
-                Intent(this, ProviderDashboardActivity::class.java),
+                Intent(this, ProviderHomeActivity::class.java),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
         )
@@ -270,7 +322,11 @@ class ProviderLocationForegroundService : Service() {
             val intent = Intent(context, ProviderLocationForegroundService::class.java).apply {
                 action = ACTION_START
             }
-            ContextCompat.startForegroundService(context, intent)
+            try {
+                ContextCompat.startForegroundService(context, intent)
+            } catch (e: Exception) {
+                Log.e(TAG, "Erro ao iniciar foreground service: ${e.message}", e)
+            }
         }
 
         fun stop(context: Context) {

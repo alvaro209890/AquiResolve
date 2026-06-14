@@ -1,15 +1,19 @@
 package com.aquiresolve.app
 
+import android.Manifest
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.os.Bundle
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
 import com.aquiresolve.app.databinding.ActivityProviderHomeBinding
 import com.aquiresolve.app.models.OrderData
+import com.aquiresolve.app.utils.LocationPermissionHelper
+import com.aquiresolve.app.utils.PermissionHelper
 import com.aquiresolve.app.utils.ServiceNicheCatalog
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
@@ -54,6 +58,15 @@ class ProviderHomeActivity : AppCompatActivity() {
     private var providerServicesNormalized = emptySet<String>()
     private var isProviderAvailable = true
     private var isUpdatingAvailability = false
+    private var isLocationTrackingRequested = false
+    private var requestedLocationPermissionForTracking = false
+    private var requestedNotificationPermissionForTracking = false
+
+    private val requestNotificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) {
+        refreshProviderLocationTracking()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -82,6 +95,7 @@ class ProviderHomeActivity : AppCompatActivity() {
             loadProviderStats()
             loadAvailabilityState()
             loadAvailableOrders()
+            refreshProviderLocationTracking()
         }
     }
 
@@ -428,6 +442,7 @@ class ProviderHomeActivity : AppCompatActivity() {
                 applyAvailabilityUiState()
                 applyAvailableOrdersFilters(showToastResult = false)
                 ProviderNewOrderAlertManager.refreshMonitoring()
+                refreshProviderLocationTracking()
 
                 val message = if (nextAvailability) {
                     "Voce esta disponivel para novos pedidos."
@@ -479,6 +494,108 @@ class ProviderHomeActivity : AppCompatActivity() {
 
         binding.btnAvailability.text = if (isProviderAvailable) "Disponivel" else "Indisponivel"
         binding.btnAvailability.backgroundTintList = ColorStateList.valueOf(color)
+    }
+
+    private fun refreshProviderLocationTracking() {
+        val currentUser = auth.currentUser
+        if (currentUser == null) {
+            stopProviderLocationTracking("usuario nao autenticado")
+            return
+        }
+
+        lifecycleScope.launch {
+            try {
+                val verificationStatus = ProviderVerificationManager().getVerificationStatus(currentUser.uid)
+                if (verificationStatus?.status != ProviderVerificationManager.VerificationStatus.APPROVED) {
+                    stopProviderLocationTracking("prestador nao aprovado")
+                    return@launch
+                }
+
+                val providerDoc = db.collection("providers")
+                    .document(currentUser.uid)
+                    .get()
+                    .await()
+                val available = providerDoc.getBoolean("isAvailable") ?: true
+
+                val activeOrdersSnap = db.collection("orders")
+                    .whereEqualTo("assignedProvider", currentUser.uid)
+                    .whereIn("status", listOf(OrderData.STATUS_ASSIGNED, OrderData.STATUS_IN_PROGRESS))
+                    .get()
+                    .await()
+                val hasActiveOrder = !activeOrdersSnap.isEmpty
+
+                if (!available && !hasActiveOrder) {
+                    stopProviderLocationTracking("prestador indisponivel e sem pedido ativo")
+                    return@launch
+                }
+
+                if (!LocationPermissionHelper.hasLocationPermission(this@ProviderHomeActivity)) {
+                    stopProviderLocationTracking("sem permissao de localizacao")
+                    requestLocationPermissionForTracking()
+                    return@launch
+                }
+
+                if (!LocationPermissionHelper.isLocationEnabled(this@ProviderHomeActivity)) {
+                    stopProviderLocationTracking("gps desligado")
+                    LocationPermissionHelper.showEnableLocationDialog(this@ProviderHomeActivity)
+                    return@launch
+                }
+
+                if (
+                    PermissionHelper.needsNotificationPermission() &&
+                    !PermissionHelper.isNotificationPermissionGranted(this@ProviderHomeActivity) &&
+                    !requestedNotificationPermissionForTracking
+                ) {
+                    requestedNotificationPermissionForTracking = true
+                    requestNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    return@launch
+                }
+
+                ProviderLocationForegroundService.start(this@ProviderHomeActivity)
+                isLocationTrackingRequested = true
+            } catch (e: Exception) {
+                android.util.Log.e(TAG, "Erro ao atualizar rastreamento de localizacao: ${e.message}", e)
+            }
+        }
+    }
+
+    private fun requestLocationPermissionForTracking() {
+        if (requestedLocationPermissionForTracking) {
+            return
+        }
+
+        requestedLocationPermissionForTracking = true
+        if (LocationPermissionHelper.shouldShowRequestPermissionRationale(this)) {
+            LocationPermissionHelper.showPermissionRationaleDialog(this) {
+                LocationPermissionHelper.requestLocationPermission(this)
+            }
+        } else {
+            LocationPermissionHelper.requestLocationPermission(this)
+        }
+    }
+
+    private fun stopProviderLocationTracking(reason: String) {
+        android.util.Log.d(TAG, "Parando rastreamento de localizacao: $reason")
+        ProviderLocationForegroundService.stop(this)
+        isLocationTrackingRequested = false
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+
+        if (requestCode == LocationPermissionHelper.LOCATION_PERMISSION_REQUEST_CODE) {
+            if (LocationPermissionHelper.hasLocationPermission(this)) {
+                refreshProviderLocationTracking()
+            } else if (!LocationPermissionHelper.shouldShowRequestPermissionRationale(this)) {
+                LocationPermissionHelper.showPermissionDeniedDialog(this)
+            } else {
+                showToast("Permissao de localizacao necessaria para compartilhar rota em pedidos.")
+            }
+        }
     }
 
     private suspend fun loadProviderServices(providerId: String): Set<String> {

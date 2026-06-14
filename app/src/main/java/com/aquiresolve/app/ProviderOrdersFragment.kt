@@ -457,6 +457,11 @@ class ProviderOrdersFragment : Fragment() {
      * Aceita um pedido
      */
     private fun acceptOrder(order: OrderData) {
+        if (order.coordinates == null) {
+            showToast("❌ Pedido sem localização no mapa. O cliente precisa corrigir o endereço.")
+            return
+        }
+
         lifecycleScope.launch {
             if (!FirebaseConfig.isInitialized()) {
                 FirebaseConfig.initialize(requireContext())
@@ -465,6 +470,15 @@ class ProviderOrdersFragment : Fragment() {
             val result = FirebaseOrderManager().acceptOrderAsProvider(order.id)
             if (result.isSuccess) {
                 showToast("✅ Pedido aceito com sucesso!")
+                if (!isAdded) return@launch
+
+                ProviderLocationForegroundService.start(requireContext().applicationContext)
+
+                val intent = Intent(requireContext(), OrderDetailsActivity::class.java).apply {
+                    putExtra("order_id", order.id)
+                    putExtra("is_provider_view", true)
+                }
+                startActivity(intent)
                 loadOrders()
             } else {
                 showToast("❌ Erro ao aceitar pedido: ${result.exceptionOrNull()?.message ?: "erro desconhecido"}")

@@ -69,20 +69,20 @@ class ProviderOrdersAdapter(
             tvDate.text = dateFormat.format(order.createdAt.toDate())
             
             // Configurar status
-            when (order.status) {
+            when (order.status.lowercase(Locale.ROOT)) {
                 "pending" -> {
                     tvStatus.text = "Pendente"
                     tvStatus.setTextColor(ContextCompat.getColor(itemView.context, R.color.warning_color))
                     btnAccept.visibility = View.VISIBLE
                     btnReject.visibility = View.VISIBLE
                 }
-                "available" -> {
+                "available", "distributing" -> {
                     tvStatus.text = "Disponível"
                     tvStatus.setTextColor(ContextCompat.getColor(itemView.context, R.color.info_color))
                     btnAccept.visibility = View.VISIBLE
                     btnReject.visibility = View.VISIBLE
                 }
-                "accepted" -> {
+                "accepted", "assigned", "in_progress" -> {
                     tvStatus.text = "Aceito"
                     tvStatus.setTextColor(ContextCompat.getColor(itemView.context, R.color.success_color))
                     btnAccept.visibility = View.GONE

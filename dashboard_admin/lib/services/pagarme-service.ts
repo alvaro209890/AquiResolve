@@ -10,6 +10,7 @@ import {
   PagarmeSubscription,
   PagarmeCard,
   PagarmePlan,
+  PagarmeRecipient,
   PagarmeBalance,
   PagarmeTransfer,
   PagarmeApiResponse,
@@ -21,6 +22,21 @@ import {
 
 // Configuração da API
 const PAGARME_API_URL = 'https://api.pagar.me/core/v5'
+
+type PagarmeRawResponse<T> = {
+  data?: T
+  paging?: PagarmeApiResponse<T>['paging']
+}
+
+function buildBasicAuthHeader(apiKey: string): string {
+  const credentials = `${apiKey}:`
+  const encoded =
+    typeof Buffer !== 'undefined'
+      ? Buffer.from(credentials).toString('base64')
+      : btoa(credentials)
+
+  return `Basic ${encoded}`
+}
 
 // Classe de serviço do Pagar.me
 export class PagarmeService {
@@ -58,7 +74,7 @@ export class PagarmeService {
 
       const headers = {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`,
+        'Authorization': buildBasicAuthHeader(this.apiKey),
         ...options.headers,
       }
 
@@ -67,19 +83,26 @@ export class PagarmeService {
         headers,
       })
 
-      const data = await response.json()
+      const responseText = await response.text()
+      const data = responseText ? JSON.parse(responseText) : null
 
       if (!response.ok) {
         console.error('Erro Pagar.me:', data)
         return {
-          errors: data.errors || [{
+          errors: data?.errors || [{
             type: 'api_error',
-            message: data.message || 'Erro ao processar requisição'
+            message: data?.message || `Erro ao processar requisição (${response.status})`
           }]
         }
       }
 
-      return { data }
+      const rawData = data as PagarmeRawResponse<T>
+      return {
+        data: rawData && Object.prototype.hasOwnProperty.call(rawData, 'data')
+          ? rawData.data
+          : (data as T),
+        paging: rawData?.paging,
+      }
     } catch (error) {
       console.error('Erro na requisição Pagar.me:', error)
       return {
@@ -387,7 +410,19 @@ export class PagarmeService {
    * Busca saldo da conta
    */
   async getBalance(): Promise<PagarmeApiResponse<PagarmeBalance>> {
-    return this.request<PagarmeBalance>('/balance')
+    const recipientsResponse = await this.request<PagarmeRecipient[]>('/recipients?size=1')
+    const recipientId = recipientsResponse.data?.[0]?.id
+
+    if (recipientsResponse.errors || !recipientId) {
+      return {
+        errors: recipientsResponse.errors || [{
+          type: 'api_error',
+          message: 'Nenhum recebedor Pagar.me encontrado para consultar saldo'
+        }]
+      }
+    }
+
+    return this.request<PagarmeBalance>(`/recipients/${encodeURIComponent(recipientId)}/balance`)
   }
 
   /**
@@ -541,4 +576,3 @@ export class PagarmeService {
 
 // InstÃ¢ncia singleton do serviÃ§o
 export const pagarmeService = new PagarmeService()
-

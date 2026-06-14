@@ -21,6 +21,7 @@ import com.aquiresolve.app.databinding.ActivityOrderDetailsBinding
 import com.aquiresolve.app.models.OrderData
 import com.aquiresolve.app.models.OrderStatus
 import com.aquiresolve.app.models.OsChecklistData
+import com.aquiresolve.app.utils.LocationPermissionHelper
 import com.aquiresolve.app.utils.ProtocolGenerator
 import com.aquiresolve.app.utils.VerificationCodeDialog
 import kotlinx.coroutines.delay
@@ -65,6 +66,8 @@ class OrderDetailsActivity : AppCompatActivity() {
     private var orderId: String? = null
     private var order: OrderData? = null
     private var isProviderView = false
+    private enum class LocationPermissionPurpose { MAP, START_OS }
+    private var pendingLocationPermissionPurpose: LocationPermissionPurpose? = null
     
     // Firebase
     private val db = FirebaseFirestore.getInstance()
@@ -1196,10 +1199,12 @@ class OrderDetailsActivity : AppCompatActivity() {
     private fun setupMapAndDistance(order: OrderData) {
         val coords = order.coordinates
         if (coords == null) {
+            binding.tvDistance.visibility = View.GONE
             binding.cardMap.visibility = View.GONE
             return
         }
         binding.cardMap.visibility = View.VISIBLE
+        binding.tvDistance.visibility = View.GONE
 
         val map = binding.mapOrder
         val clientPoint = GeoPoint(coords.latitude, coords.longitude)
@@ -1375,8 +1380,21 @@ class OrderDetailsActivity : AppCompatActivity() {
         if (!fine && !coarse) {
             binding.tvDistance.text = "Permissão de localização não concedida."
             binding.tvDistance.visibility = View.VISIBLE
+            pendingLocationPermissionPurpose = LocationPermissionPurpose.MAP
+            requestLocationPermissionLauncher.launch(android.Manifest.permission.ACCESS_FINE_LOCATION)
             return
         }
+
+        if (!LocationPermissionHelper.isLocationEnabled(this)) {
+            binding.tvDistance.text = "Ative a localização do dispositivo para calcular sua rota."
+            binding.tvDistance.visibility = View.VISIBLE
+            LocationPermissionHelper.showEnableLocationDialog(this)
+            return
+        }
+
+        binding.tvDistance.text = "Obtendo sua localização para calcular a rota..."
+        binding.tvDistance.visibility = View.VISIBLE
+        ProviderLocationForegroundService.start(this)
 
         locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 10_000L)
             .setMinUpdateIntervalMillis(5_000L)
@@ -1589,6 +1607,12 @@ class OrderDetailsActivity : AppCompatActivity() {
         stopProviderLocationUpdates()
         binding.mapOrder.onPause()
     }
+
+    override fun onDestroy() {
+        stopProviderLocationUpdates()
+        runCatching { binding.mapOrder.onDetach() }
+        super.onDestroy()
+    }
     
     /**
      * Controla o estado de carregamento
@@ -1614,6 +1638,7 @@ class OrderDetailsActivity : AppCompatActivity() {
                 .setTitle("Permissão de Localização")
                 .setMessage("Para iniciar o serviço, precisamos da sua localização GPS.")
                 .setPositiveButton("Permitir") { _, _ ->
+                    pendingLocationPermissionPurpose = LocationPermissionPurpose.START_OS
                     requestLocationPermissionLauncher.launch(android.Manifest.permission.ACCESS_FINE_LOCATION)
                 }
                 .setNegativeButton("Cancelar", null)
@@ -1671,10 +1696,22 @@ class OrderDetailsActivity : AppCompatActivity() {
         androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
-            order?.let { startOsFlow(it) }
+            when (pendingLocationPermissionPurpose) {
+                LocationPermissionPurpose.START_OS -> order?.let { startOsFlow(it) }
+                LocationPermissionPurpose.MAP -> currentClientPoint?.let {
+                    startProviderLocationUpdates(it, binding.mapOrder)
+                }
+                null -> Unit
+            }
         } else {
-            showErrorMessage("Permissão de localização necessária para iniciar o serviço")
+            if (pendingLocationPermissionPurpose == LocationPermissionPurpose.MAP) {
+                binding.tvDistance.text = "Permissão de localização necessária para calcular a rota."
+                binding.tvDistance.visibility = View.VISIBLE
+            } else {
+                showErrorMessage("Permissão de localização necessária para iniciar o serviço")
+            }
         }
+        pendingLocationPermissionPurpose = null
     }
 
     /**
