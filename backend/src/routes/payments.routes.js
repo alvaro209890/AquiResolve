@@ -5,6 +5,7 @@ const {
   processCardPayment,
   processPixPayment,
   getPaymentStatus,
+  settleCompletedOrder,
   handlePagarmeWebhook
 } = require('../controllers/payments.controller');
 const { calculatePricing } = require('../controllers/pricing.controller');
@@ -18,6 +19,7 @@ router.use(authenticateRequest);
 router.post('/pricing/calculate', calculatePricing);
 router.post('/card', processCardPayment);
 router.post('/pix', processPixPayment);
+router.post('/orders/:orderId/settle', settleCompletedOrder);
 router.get('/:orderId/status', getPaymentStatus);
 
 module.exports = router;

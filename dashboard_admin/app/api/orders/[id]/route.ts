@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore, adminApp } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+import { settleCompletedOrderAdmin } from '@/lib/services/order-settlement-admin'
 
 async function pushAndPersist(
   db: admin.firestore.Firestore,
@@ -41,11 +42,12 @@ const VALID_STATUSES = [
 // GET /api/orders/[id] — retorna um pedido pelo ID
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const db = getAdminFirestore()
-    const snap = await db.collection('orders').doc(params.id).get()
+    const snap = await db.collection('orders').doc(id).get()
     if (!snap.exists) {
       return NextResponse.json({ success: false, error: 'Pedido não encontrado' }, { status: 404 })
     }
@@ -59,11 +61,12 @@ export async function GET(
 // PATCH /api/orders/[id] — atualiza status ou outros campos de um pedido (Admin SDK)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const db = getAdminFirestore()
-    const orderId = params.id
+    const { id } = await params
+    const orderId = id
     const body = await request.json()
 
     const {
@@ -102,60 +105,7 @@ export async function PATCH(
 
       if (status === 'completed') {
         updateData.completedAt = admin.firestore.FieldValue.serverTimestamp()
-
-        const orderSnap2 = await orderRef.get()
-        const orderData = orderSnap2.data()
-        const providerId = orderData?.assignedProvider
-        const commission = orderData?.providerCommission ?? 0
-        const clientId = orderData?.clientId
-        const estimatedPrice = Number(orderData?.estimatedPrice ?? 0)
-
-        // Acumula saldo do prestador
-        if (providerId && commission > 0) {
-          const provRef = db.collection('providers').doc(providerId)
-          const userRef2 = db.collection('users').doc(providerId)
-          const [provSnap, userSnap2] = await Promise.all([provRef.get(), userRef2.get()])
-          if (provSnap.exists) {
-            await provRef.update({
-              providerBalance: admin.firestore.FieldValue.increment(commission),
-              providerTotalEarned: admin.firestore.FieldValue.increment(commission),
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            })
-          }
-          if (userSnap2.exists) {
-            await userRef2.update({
-              providerBalance: admin.firestore.FieldValue.increment(commission),
-              providerTotalEarned: admin.firestore.FieldValue.increment(commission),
-              updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-            })
-          }
-        }
-
-        // Credita cashback ao cliente
-        if (clientId && estimatedPrice > 0) {
-          const cashbackConfigSnap = await db.collection('app_config').doc('cashback').get()
-          const cashbackCfg = cashbackConfigSnap.data()
-          if (cashbackCfg?.enabled === true) {
-            const earnPct = Number(cashbackCfg.earnPercentage ?? 5)
-            const cashbackAmount = Math.round((estimatedPrice * earnPct) / 100 * 100) / 100
-            if (cashbackAmount > 0) {
-              const clientRef = db.collection('users').doc(clientId)
-              await clientRef.update({
-                cashbackBalance: admin.firestore.FieldValue.increment(cashbackAmount),
-                cashbackTotalEarned: admin.firestore.FieldValue.increment(cashbackAmount),
-                updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-              })
-              await clientRef.collection('cashback_transactions').add({
-                orderId,
-                amount: cashbackAmount,
-                earnPercentage: earnPct,
-                orderValue: estimatedPrice,
-                type: 'earned',
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
-              })
-            }
-          }
-        }
+        updateData.settlementStatus = 'pending'
       }
 
       if (status === 'distributing') {
@@ -174,6 +124,11 @@ export async function PATCH(
     }
 
     await orderRef.update(updateData)
+
+    let settlement: Record<string, unknown> | null = null
+    if (status === 'completed') {
+      settlement = await settleCompletedOrderAdmin(orderId)
+    }
 
     // Auto-notificações por mudança de status
     if (status) {
@@ -214,6 +169,7 @@ export async function PATCH(
       success: true,
       orderId,
       updated: updateData,
+      settlement,
       message: 'Pedido atualizado com sucesso',
     })
   } catch (error: unknown) {

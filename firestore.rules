@@ -116,7 +116,8 @@ service cloud.firestore {
             ])
           )
           || request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'clientCompletionConfirmed', 'status', 'completedAt', 'updatedAt'
+            'clientCompletionConfirmed', 'status', 'completedAt',
+            'settlementStatus', 'settlementRequestedAt', 'updatedAt'
           ])
           || request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'rating', 'review', 'detailedRatings', 'ratedAt', 'updatedAt'
@@ -152,7 +153,7 @@ service cloud.firestore {
           )
           || request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'providerCompletionConfirmed', 'clientCompletionConfirmed', 'status',
-            'completedAt', 'updatedAt'
+            'completedAt', 'settlementStatus', 'settlementRequestedAt', 'updatedAt'
           ])
           || (
             request.resource.data.status == 'cancelled'
@@ -263,6 +264,11 @@ service cloud.firestore {
       match /messages/{messageId} {
         allow read, write: if isSignedIn();
       }
+    }
+
+    match /order_settlements/{settlementId} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

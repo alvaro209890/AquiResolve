@@ -1,6 +1,7 @@
 ﻿package com.aquiresolve.app
 
 import android.util.Log
+import com.aquiresolve.app.api.PagarMeApiService
 import com.aquiresolve.app.models.OrderData
 import com.aquiresolve.app.utils.ProtocolGenerator
 import com.aquiresolve.app.utils.VerificationCodeGenerator
@@ -10,11 +11,29 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
+import okhttp3.OkHttpClient
+import retrofit2.Retrofit
+import retrofit2.converter.gson.GsonConverterFactory
 import java.util.*
+import java.util.concurrent.TimeUnit
 
 class FirebaseOrderManager {
     private val db = FirebaseFirestore.getInstance()
     private val auth = FirebaseAuth.getInstance()
+    private val settlementApi: PagarMeApiService by lazy {
+        val okHttpClient = OkHttpClient.Builder()
+            .connectTimeout(30, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .writeTimeout(30, TimeUnit.SECONDS)
+            .build()
+
+        Retrofit.Builder()
+            .baseUrl(BuildConfig.PAYMENTS_API_BASE_URL)
+            .client(okHttpClient)
+            .addConverterFactory(GsonConverterFactory.create())
+            .build()
+            .create(PagarMeApiService::class.java)
+    }
     
     companion object {
         private const val TAG = "FirebaseOrderManager"
@@ -322,45 +341,22 @@ class FirebaseOrderManager {
                 if (cleanedCode != storedClientCode) {
                     throw IllegalArgumentException("Código de verificação incorreto")
                 }
-                
-                // Obter comissão do prestador e ID do prestador
-                val providerCommission = snap.getDouble("providerCommission") ?: 0.0
-                val assignedProvider = snap.getString("assignedProvider")
-                
-                // Ler dados do prestador ANTES de fazer qualquer escrita
-                var currentEarnings = 0.0
-                if (assignedProvider != null && providerCommission > 0) {
-                    val providerRef = db.collection("providers").document(assignedProvider)
-                    val providerSnap = tx.get(providerRef)
-                    currentEarnings = providerSnap.getDouble("totalEarnings") ?: 0.0
-                }
-                
-                // AGORA TODAS AS ESCRITAS
+
                 // Código correto! Finalizar o pedido
                 val updates = mapOf(
                     "status" to OrderData.STATUS_COMPLETED,
                     "completedAt" to Timestamp.now(),
                     "providerCompletionConfirmed" to true,
                     "clientCompletionConfirmed" to true,
+                    "settlementStatus" to "pending",
+                    "settlementRequestedAt" to Timestamp.now(),
                     "updatedAt" to Timestamp.now()
                 )
                 
                 tx.update(docRef, updates)
-                
-                // Adicionar comissão ao lucro total do prestador
-                if (assignedProvider != null && providerCommission > 0) {
-                    val providerRef = db.collection("providers").document(assignedProvider)
-                    val newEarnings = currentEarnings + providerCommission
-                    
-                    tx.update(providerRef, mapOf(
-                        "totalEarnings" to newEarnings,
-                        "completedJobs" to com.google.firebase.firestore.FieldValue.increment(1),
-                        "updatedAt" to com.google.firebase.Timestamp.now()
-                    ))
-                    
-                    Log.d(TAG, "💰 Comissão de R$ $providerCommission adicionada ao prestador $assignedProvider. Novo total: R$ $newEarnings")
-                }
             }.await()
+
+            settleCompletedOrderOnBackend(orderId)
             
             Log.d(TAG, "✅ Pedido finalizado com sucesso: $orderId")
             Result.success(Unit)
@@ -392,18 +388,6 @@ class FirebaseOrderManager {
                 val newClient = if (actor == "client") true else clientConfirmed
                 val newProvider = if (actor == "provider") true else providerConfirmed
 
-                // Ler dados do prestador ANTES de fazer qualquer escrita
-                var currentEarnings = 0.0
-                val providerCommission = snap.getDouble("providerCommission") ?: 0.0
-                val assignedProvider = snap.getString("assignedProvider")
-                
-                if (newClient && newProvider && assignedProvider != null && providerCommission > 0) {
-                    val providerRef = db.collection("providers").document(assignedProvider)
-                    val providerSnap = tx.get(providerRef)
-                    currentEarnings = providerSnap.getDouble("totalEarnings") ?: 0.0
-                }
-
-                // AGORA TODAS AS ESCRITAS
                 val updates = mutableMapOf<String, Any>(
                     "updatedAt" to Timestamp.now()
                 )
@@ -417,29 +401,34 @@ class FirebaseOrderManager {
                 if (newClient && newProvider) {
                     updates["status"] = OrderData.STATUS_COMPLETED
                     updates["completedAt"] = Timestamp.now()
-                    
-                    // Adicionar comissão ao lucro total do prestador quando ambos confirmarem
-                    if (assignedProvider != null && providerCommission > 0) {
-                        val providerRef = db.collection("providers").document(assignedProvider)
-                        val newEarnings = currentEarnings + providerCommission
-                        
-                        tx.update(providerRef, mapOf(
-                            "totalEarnings" to newEarnings,
-                            "completedJobs" to com.google.firebase.firestore.FieldValue.increment(1),
-                            "updatedAt" to com.google.firebase.Timestamp.now()
-                        ))
-                        
-                        Log.d(TAG, "💰 Comissão de R$ $providerCommission adicionada ao prestador $assignedProvider. Novo total: R$ $newEarnings")
-                    }
+                    updates["settlementStatus"] = "pending"
+                    updates["settlementRequestedAt"] = Timestamp.now()
                 }
 
                 tx.update(docRef, updates)
             }.await()
 
+            val updatedOrder = db.collection(ORDERS_COLLECTION).document(orderId).get().await()
+            if (updatedOrder.getString("status") == OrderData.STATUS_COMPLETED) {
+                settleCompletedOrderOnBackend(orderId)
+            }
+
             Log.d(TAG, "Confirmação registrada ($actor): $orderId")
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "Erro na confirmação de conclusão: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    suspend fun settleCompletedOrder(orderId: String): Result<Unit> {
+        return try {
+            if (settleCompletedOrderOnBackend(orderId)) {
+                Result.success(Unit)
+            } else {
+                Result.failure(Exception("Liquidação financeira pendente"))
+            }
+        } catch (e: Exception) {
             Result.failure(e)
         }
     }
@@ -592,6 +581,35 @@ class FirebaseOrderManager {
                 SetOptions.merge()
             )
             .await()
+    }
+
+    private suspend fun settleCompletedOrderOnBackend(orderId: String): Boolean {
+        try {
+            val authHeader = getAuthorizationHeader()
+            val response = settlementApi.settleCompletedOrder(authHeader, orderId)
+            if (response.isSuccessful && response.body()?.success == true) {
+                Log.d(TAG, "Liquidação financeira confirmada para pedido $orderId")
+                return true
+            }
+            Log.w(TAG, "Liquidação pendente para pedido $orderId: HTTP ${response.code()}")
+        } catch (e: Exception) {
+            Log.w(TAG, "Liquidação pendente para pedido $orderId: ${e.message}")
+        }
+        return false
+    }
+
+    private suspend fun getAuthorizationHeader(): String {
+        val currentUser = auth.awaitCurrentUser()
+            ?: throw IllegalStateException("Usuário não autenticado")
+
+        val cachedToken = currentUser.getIdToken(false).await().token
+        if (!cachedToken.isNullOrBlank()) {
+            return "Bearer $cachedToken"
+        }
+
+        val freshToken = currentUser.getIdToken(true).await().token
+            ?: throw IllegalStateException("Não foi possível obter token de autenticação")
+        return "Bearer $freshToken"
     }
     
     /**

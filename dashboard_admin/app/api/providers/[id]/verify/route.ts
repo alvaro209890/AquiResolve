@@ -18,11 +18,12 @@ async function verifyAdminToken(request: NextRequest): Promise<string | null> {
 // PATCH /api/providers/[id]/verify — aprova ou rejeita um prestador
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const db = getAdminFirestore()
-    const providerId = params.id
+    const { id } = await params
+    const providerId = id
 
     const body = await request.json()
     const { status, rejectionReason } = body as {
@@ -113,11 +114,12 @@ export async function PATCH(
 // GET /api/providers/[id]/verify — retorna status de verificação do prestador
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const db = getAdminFirestore()
-    const providerId = params.id
+    const { id } = await params
+    const providerId = id
 
     const [providerSnap, historySnap] = await Promise.all([
       db.collection('providers').doc(providerId).get(),

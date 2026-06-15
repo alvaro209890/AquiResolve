@@ -36,11 +36,12 @@ async function notify(
 // Body opcional: { amount?: number (em reais, para reembolso parcial), reason?: string }
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const db = getAdminFirestore()
-    const orderId = params.id
+    const { id } = await params
+    const orderId = id
 
     let body: { amount?: number; reason?: string } = {}
     try {

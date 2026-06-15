@@ -42,7 +42,10 @@ export class FirestoreAnalyticsService {
   // Metricas de Pedidos (simplificadas)
   static async getOrdersMetrics() {
     try {
-      const orders = await getCollection('orders')
+      const [orders, settlements] = await Promise.all([
+        getCollection('orders'),
+        getCollection('order_settlements'),
+      ])
       const now = new Date()
       const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
       const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
@@ -59,6 +62,11 @@ export class FirestoreAnalyticsService {
 
       const completedList = orders.filter((order) => order.status === 'completed')
       const totalRevenue = completedList.reduce((sum, o) => sum + (Number(o.estimatedPrice) || 0), 0)
+      const totalCommissionFromSettlements = settlements.reduce((sum, s) => sum + (Number(s.providerCommission) || 0), 0)
+      const totalProviderCommission = totalCommissionFromSettlements > 0
+        ? totalCommissionFromSettlements
+        : completedList.reduce((sum, o) => sum + (Number(o.providerCommission) || 0), 0)
+      const totalCashbackDistributed = settlements.reduce((sum, s) => sum + (Number(s.cashbackAmount) || 0), 0)
       const revenueToday = completedList
         .filter((o) => toDateFromUnknown(o.completedAt ?? o.createdAt, new Date(0)) >= today)
         .reduce((sum, o) => sum + (Number(o.estimatedPrice) || 0), 0)
@@ -76,6 +84,8 @@ export class FirestoreAnalyticsService {
         completedOrders,
         emergencyOrders,
         totalRevenue,
+        totalProviderCommission,
+        totalCashbackDistributed,
         revenueToday,
         revenueLast30Days,
       }
@@ -91,6 +101,8 @@ export class FirestoreAnalyticsService {
         completedOrders: 0,
         emergencyOrders: 0,
         totalRevenue: 0,
+        totalProviderCommission: 0,
+        totalCashbackDistributed: 0,
         revenueToday: 0,
         revenueLast30Days: 0,
       }
@@ -237,6 +249,11 @@ export class FirestoreAnalyticsService {
           cancelledOrders: 0,
           completedOrders: 0,
           emergencyOrders: 0,
+          totalRevenue: 0,
+          totalProviderCommission: 0,
+          totalCashbackDistributed: 0,
+          revenueToday: 0,
+          revenueLast30Days: 0,
         },
         users: {
           totalUsers: 0,

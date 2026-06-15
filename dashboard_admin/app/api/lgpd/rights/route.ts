@@ -84,7 +84,7 @@ export async function GET(req: NextRequest) {
  * GET /api/lgpd/rights/access
  * Obter todos os dados pessoais do usuário (direito de acesso)
  */
-export async function GET_ACCESS(req: NextRequest) {
+async function GET_ACCESS(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams
     const userId = searchParams.get('userId')
@@ -158,4 +158,3 @@ export async function GET_ACCESS(req: NextRequest) {
     )
   }
 }
-

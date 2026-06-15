@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { useChatMessages, useChatActions } from "@/hooks/use-chat"
 import { ChatMessage } from "@/types/chat"
 import { LegacyChatConversation } from "@/lib/services/chat-service"
-import { User, UserCheck, Shield, FileText, MapPin, AlertTriangle, Trash2, MoreVertical, Phone, Mail, Image, MessageCircle } from "lucide-react"
+import { User, UserCheck, Shield, FileText, MapPin, AlertTriangle, Trash2, MoreVertical, Phone, Mail, Image, MessageCircle, Loader2, Paperclip } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
 import {
@@ -19,6 +19,8 @@ import {
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { storage } from "@/lib/firebase"
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage"
 import {
   ORDER_CHAT_THREAD_LABELS,
   detectOperationalSignalIds,
@@ -34,17 +36,20 @@ interface ChatMessagesProps {
 
 export function ChatMessages({ conversation }: ChatMessagesProps) {
   const messagesContainerRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const { user } = useAuth()
   const { toast } = useToast()
   const isOrdersChat = Boolean(conversation?.id.startsWith("orders_"))
   const [threadTab, setThreadTab] = useState<OrderChatThreadType | "all">("all")
   const [composerChannel, setComposerChannel] = useState<OrderChatThreadType>("admin_internal")
   const [draft, setDraft] = useState("")
+  const [uploadingAttachment, setUploadingAttachment] = useState(false)
 
   useEffect(() => {
     setThreadTab("all")
     setComposerChannel("admin_internal")
     setDraft("")
+    setUploadingAttachment(false)
   }, [conversation?.id])
 
   const threadScope = isOrdersChat ? threadTab : "all"
@@ -124,6 +129,14 @@ export function ChatMessages({ conversation }: ChatMessagesProps) {
       : undefined
   }
 
+  const getDocumentUrl = (message: ChatMessage): string | undefined => {
+    return message.metadata?.documentUrl ?? message.metadata?.attachmentUrl
+  }
+
+  const sanitizeFileName = (fileName: string) => {
+    return fileName.replace(/[^\w.\- ]+/g, "_").slice(0, 120) || "arquivo"
+  }
+
   const handleDeleteMessage = async (message: ChatMessage) => {
     if (!confirm("Tem certeza que deseja deletar esta mensagem?")) {
       return
@@ -153,6 +166,55 @@ export function ChatMessages({ conversation }: ChatMessagesProps) {
       toast({ title: "Mensagem enviada", description: `Canal: ${ORDER_CHAT_THREAD_LABELS[composerChannel]}` })
     } else {
       toast({ title: "Falha ao enviar", variant: "destructive" })
+    }
+  }
+
+  const handleAttachmentSelected = async (file: File | undefined) => {
+    if (!file || !conversation || !isOrdersChat || !user) {
+      return
+    }
+    if (!storage) {
+      toast({ title: "Storage não inicializado", variant: "destructive" })
+      return
+    }
+
+    const orderId = conversation.id.replace("orders_", "")
+    const safeName = sanitizeFileName(file.name)
+    const isImage = file.type.startsWith("image/")
+    const content = draft.trim() || (isImage ? "Imagem enviada" : `Arquivo enviado: ${safeName}`)
+
+    setUploadingAttachment(true)
+    try {
+      const storagePath = `chats/${orderId}/admin/${Date.now()}_${safeName}`
+      const snapshot = await uploadBytes(ref(storage, storagePath), file, {
+        contentType: file.type || "application/octet-stream",
+      })
+      const downloadUrl = await getDownloadURL(snapshot.ref)
+      const ok = await sendOrderThreadMessage({
+        orderId,
+        content,
+        threadType: composerChannel,
+        senderId: user.uid,
+        senderName: user.displayName || user.email || "Admin",
+        messageType: isImage ? "image" : "file",
+        imageUrl: isImage ? downloadUrl : undefined,
+        documentUrl: isImage ? undefined : downloadUrl,
+        fileName: safeName,
+        fileSize: file.size,
+        fileType: file.type || "application/octet-stream",
+      })
+      if (!ok) throw new Error("Falha ao gravar mensagem no Firestore")
+      setDraft("")
+      toast({ title: "Anexo enviado", description: `Canal: ${ORDER_CHAT_THREAD_LABELS[composerChannel]}` })
+    } catch (e: unknown) {
+      toast({
+        title: "Falha ao enviar anexo",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      })
+    } finally {
+      setUploadingAttachment(false)
+      if (fileInputRef.current) fileInputRef.current.value = ""
     }
   }
 
@@ -301,6 +363,7 @@ export function ChatMessages({ conversation }: ChatMessagesProps) {
           <div className="space-y-3">
             {messages.map((message) => {
               const imageUrl = getImageUrl(message)
+              const documentUrl = getDocumentUrl(message)
 
               return (
                 <div key={message.id} className={`flex items-start space-x-3 rounded-lg border p-3 ${getSenderColor(message.senderType)}`}>
@@ -336,11 +399,16 @@ export function ChatMessages({ conversation }: ChatMessagesProps) {
                         </div>
                       ) : null}
 
-                      {message.messageType === "file" ? (
-                        <div className="flex items-center space-x-2 rounded border border-border bg-card p-2">
+                      {message.messageType === "file" && documentUrl ? (
+                        <a
+                          href={documentUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center space-x-2 rounded border border-border bg-card p-2 transition-colors hover:bg-muted"
+                        >
                           <FileText className="h-4 w-4 text-blue-500" />
                           <span className="text-sm">{message.metadata?.fileName || "Arquivo"}</span>
-                        </div>
+                        </a>
                       ) : null}
 
                       {message.messageType === "location" && message.metadata?.location ? (
@@ -396,9 +464,14 @@ export function ChatMessages({ conversation }: ChatMessagesProps) {
         {isOrdersChat && user ? (
           <div className="border-t bg-muted/30 p-3 sm:p-4">
             <p className="mb-2 text-xs text-muted-foreground">
-              Envio administrativo em <strong>canais separados</strong> — mensagens internas usam visibilidade restrita no modelo; o app cliente/prestador deve filtrar por{" "}
-              <code className="rounded bg-background px-1">threadType</code> / <code className="rounded bg-background px-1">visibility</code> (regras Firestore pendentes no ambiente atual).
+              Envio administrativo em <strong>canais separados</strong>; cliente e prestador recebem apenas mensagens compatíveis com a visibilidade do canal.
             </p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={(event) => void handleAttachmentSelected(event.target.files?.[0])}
+            />
             <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch">
               <div className="w-full sm:w-56">
                 <Select value={composerChannel} onValueChange={(value) => setComposerChannel(value as OrderChatThreadType)}>
@@ -420,6 +493,16 @@ export function ChatMessages({ conversation }: ChatMessagesProps) {
                 placeholder="Mensagem da base (não interrompe o thread principal se enviar em canal interno)…"
                 className="min-h-20 flex-1 resize-none bg-background"
               />
+              <Button
+                type="button"
+                variant="outline"
+                className="h-10 shrink-0 sm:h-auto sm:self-end"
+                disabled={uploadingAttachment}
+                onClick={() => fileInputRef.current?.click()}
+                aria-label="Anexar arquivo"
+              >
+                {uploadingAttachment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
+              </Button>
               <Button type="button" className="h-10 shrink-0 sm:h-auto sm:self-end" onClick={() => void handleSendAdminMessage()}>
                 Enviar
               </Button>

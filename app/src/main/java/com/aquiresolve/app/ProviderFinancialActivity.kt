@@ -53,10 +53,19 @@ class ProviderFinancialActivity : AppCompatActivity() {
 
         lifecycleScope.launch {
             try {
-                // Lê saldo do providers/{uid} com fallback para users/{uid}
+                // Lê saldo do providers/{uid} com fallback para users/{uid} e campo legado totalEarnings.
                 val providerSnap = db.collection("providers").document(uid).get().await()
-                val balance = (providerSnap.getDouble("providerBalance") ?: 0.0)
-                val totalEarned = (providerSnap.getDouble("providerTotalEarned") ?: 0.0)
+                val userSnap = db.collection("users").document(uid).get().await()
+                val balance = providerSnap.getDouble("providerBalance")
+                    ?: userSnap.getDouble("providerBalance")
+                    ?: providerSnap.getDouble("totalEarnings")
+                    ?: userSnap.getDouble("totalEarnings")
+                    ?: 0.0
+                val totalEarned = providerSnap.getDouble("providerTotalEarned")
+                    ?: userSnap.getDouble("providerTotalEarned")
+                    ?: providerSnap.getDouble("totalEarnings")
+                    ?: userSnap.getDouble("totalEarnings")
+                    ?: 0.0
 
                 binding.tvBalance.text = brl.format(balance)
                 binding.tvTotalEarned.text = brl.format(totalEarned)

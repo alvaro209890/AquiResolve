@@ -121,7 +121,8 @@ service cloud.firestore {
             ])
           )
           || request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'clientCompletionConfirmed', 'status', 'completedAt', 'updatedAt'
+            'clientCompletionConfirmed', 'status', 'completedAt',
+            'settlementStatus', 'settlementRequestedAt', 'updatedAt'
           ])
           || request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'rating', 'review', 'detailedRatings', 'ratedAt', 'updatedAt'
@@ -157,7 +158,7 @@ service cloud.firestore {
           )
           || request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'providerCompletionConfirmed', 'clientCompletionConfirmed', 'status',
-            'completedAt', 'updatedAt'
+            'completedAt', 'settlementStatus', 'settlementRequestedAt', 'updatedAt'
           ])
           || (
             request.resource.data.status == 'cancelled'
@@ -321,6 +322,11 @@ service cloud.firestore {
         allow read: if isClient()
           && get(/databases/$(database)/documents/orders/$(orderId)).data.clienteId == request.auth.uid;
       }
+    }
+
+    match /order_settlements/{settlementId} {
+      allow read: if isAdmin();
+      allow write: if false;
     }
 
     // ===== TEMPLATES DE CHECKLIST =====

@@ -5,11 +5,12 @@ import * as admin from 'firebase-admin'
 // POST /api/orders/[id]/redirect — remove prestador atual e reatribui (ou volta a distribuindo)
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const db = getAdminFirestore()
-    const orderId = params.id
+    const { id } = await params
+    const orderId = id
     const body = await request.json()
     const { newProviderId, newProviderName, reason } = body as {
       newProviderId?: string

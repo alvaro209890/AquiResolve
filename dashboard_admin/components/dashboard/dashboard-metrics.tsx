@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils"
 import {
   AlertCircle, ClipboardList, Clock, DollarSign,
   TrendingUp, UserPlus, Users, CheckCircle,
+  Award, Wallet,
 } from "lucide-react"
 import { FirestoreAnalyticsService } from "@/lib/services/firestore-analytics-simple"
 import { Card, CardContent } from "@/components/ui/card"
@@ -75,6 +76,20 @@ export function DashboardMetrics() {
         icon: DollarSign,
         description: "Pedidos concluídos nos últimos 30 dias",
         variant: "teal",
+      },
+      {
+        title: "Cashback Distribuído",
+        value: (o.totalCashbackDistributed ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+        icon: Award,
+        description: "Créditos liquidados em order_settlements",
+        variant: "amber",
+      },
+      {
+        title: "Comissões Liquidadas",
+        value: (o.totalProviderCommission ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" }),
+        icon: Wallet,
+        description: "Repasse acumulado dos prestadores",
+        variant: "violet",
       },
     ]
   }, [data])

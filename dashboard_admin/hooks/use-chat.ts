@@ -496,24 +496,46 @@ export function useChatActions() {
       threadType: OrderChatThreadType
       senderId: string
       senderName: string
+      messageType?: ChatMessage["messageType"]
+      imageUrl?: string
+      documentUrl?: string
+      fileName?: string
+      fileSize?: number
+      fileType?: string
     }) => {
-      if (!db || !params.content.trim()) {
+      const content = params.content.trim()
+      const hasAttachment = Boolean(params.imageUrl || params.documentUrl)
+      if (!db || (!content && !hasAttachment)) {
         return false
       }
 
       setLoading(true)
       try {
         const visibility = defaultVisibilityForThread(params.threadType)
+        const messageType = params.messageType || (params.imageUrl ? "image" : params.documentUrl ? "file" : "text")
+        const metadata = {
+          imageUrl: params.imageUrl || null,
+          documentUrl: params.documentUrl || null,
+          fileName: params.fileName || null,
+          fileSize: params.fileSize || null,
+          fileType: params.fileType || null,
+        }
         await addDoc(collection(db, "orders", params.orderId, "messages"), {
-          message: params.content.trim(),
-          content: params.content.trim(),
+          message: content,
+          content,
           timestamp: Timestamp.now(),
           senderType: "admin",
           senderId: params.senderId,
           senderName: params.senderName,
           threadType: params.threadType,
           visibility,
-          messageType: "text",
+          messageType,
+          imageUrl: params.imageUrl || null,
+          documentUrl: params.documentUrl || null,
+          fileName: params.fileName || null,
+          fileSize: params.fileSize || null,
+          fileType: params.fileType || null,
+          metadata,
           isRead: true,
           readBy: [params.senderId],
         })
@@ -523,7 +545,7 @@ export function useChatActions() {
           adminId: params.senderId,
           adminName: params.senderName,
           action: "note_add",
-          details: `[canal:${params.threadType}] ${params.content.trim().slice(0, 240)}`,
+          details: `[canal:${params.threadType}/${messageType}] ${content.slice(0, 240) || params.fileName || "anexo"}`,
         })
 
         return true

@@ -1,5 +1,7 @@
 ﻿package com.aquiresolve.app.adapters
 
+import android.content.Intent
+import android.net.Uri
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -21,6 +23,13 @@ import java.util.*
 private fun formatTime(timestamp: Date): String {
     val dateFormat = SimpleDateFormat("HH:mm", Locale("pt", "BR"))
     return dateFormat.format(timestamp)
+}
+
+private fun openAttachment(view: View, url: String) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url)).apply {
+        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    }
+    view.context.startActivity(Intent.createChooser(intent, "Abrir arquivo"))
 }
 
 /**
@@ -80,6 +89,7 @@ class ChatAdapter(
 
         fun bind(message: ChatMessage) {
             val hasImage = !message.attachmentUrl.isNullOrEmpty() && message.attachmentType == AttachmentType.IMAGE
+            val hasDocument = !message.attachmentUrl.isNullOrEmpty() && message.attachmentType == AttachmentType.DOCUMENT
             if (hasImage) {
                 ivAttachment.visibility = View.VISIBLE
                 tvMessage.visibility = View.GONE
@@ -88,10 +98,24 @@ class ChatAdapter(
                     .diskCacheStrategy(DiskCacheStrategy.ALL)
                     .centerCrop()
                     .into(ivAttachment)
+                ivAttachment.setOnClickListener {
+                    message.attachmentUrl?.let { url -> openAttachment(itemView, url) }
+                }
+                tvMessage.setOnClickListener(null)
+            } else if (hasDocument) {
+                ivAttachment.visibility = View.GONE
+                tvMessage.visibility = View.VISIBLE
+                tvMessage.text = message.message.ifBlank { "Arquivo anexado" }
+                tvMessage.setOnClickListener {
+                    message.attachmentUrl?.let { url -> openAttachment(itemView, url) }
+                }
+                ivAttachment.setOnClickListener(null)
             } else {
                 ivAttachment.visibility = View.GONE
                 tvMessage.visibility = View.VISIBLE
                 tvMessage.text = message.message
+                tvMessage.setOnClickListener(null)
+                ivAttachment.setOnClickListener(null)
             }
             tvTime.text = formatTime(message.timestamp)
             tvStatus.text = if (message.isRead) "✓✓" else "✓"
@@ -115,6 +139,7 @@ class ChatAdapter(
         fun bind(message: ChatMessage) {
             tvSenderName.text = message.senderName
             val hasImage = !message.attachmentUrl.isNullOrEmpty() && message.attachmentType == AttachmentType.IMAGE
+            val hasDocument = !message.attachmentUrl.isNullOrEmpty() && message.attachmentType == AttachmentType.DOCUMENT
             if (hasImage) {
                 ivAttachment.visibility = View.VISIBLE
                 tvMessage.visibility = View.GONE
@@ -123,12 +148,26 @@ class ChatAdapter(
                     .diskCacheStrategy(DiskCacheStrategy.ALL)
                     .centerCrop()
                     .into(ivAttachment)
+                ivAttachment.setOnClickListener {
+                    message.attachmentUrl?.let { url -> openAttachment(itemView, url) }
+                }
+                tvMessage.setOnClickListener(null)
+            } else if (hasDocument) {
+                ivAttachment.visibility = View.GONE
+                tvMessage.visibility = View.VISIBLE
+                tvMessage.text = message.message.ifBlank { "Arquivo anexado" }
+                tvMessage.setOnClickListener {
+                    message.attachmentUrl?.let { url -> openAttachment(itemView, url) }
+                }
+                ivAttachment.setOnClickListener(null)
             } else {
                 ivAttachment.visibility = View.GONE
                 tvMessage.visibility = View.VISIBLE
                 tvMessage.text = message.message
+                tvMessage.setOnClickListener(null)
+                ivAttachment.setOnClickListener(null)
             }
             tvTime.text = formatTime(message.timestamp)
         }
     }
-} 
+}

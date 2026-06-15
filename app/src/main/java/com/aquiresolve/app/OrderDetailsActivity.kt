@@ -73,7 +73,6 @@ class OrderDetailsActivity : AppCompatActivity() {
     private val db = FirebaseFirestore.getInstance()
     private lateinit var orderManager: FirebaseOrderManager
     private lateinit var checklistManager: FirebaseChecklistManager
-    private val cashbackManager = CashbackManager()
     private lateinit var fusedLocationClient: FusedLocationProviderClient
 
     // OS Checklist
@@ -248,25 +247,18 @@ class OrderDetailsActivity : AppCompatActivity() {
      * Atualiza a interface com os dados do pedido
      */
     /**
-     * Credita o cashback do pedido concluído ao cliente. É idempotente
-     * (o CashbackManager usa um id determinístico por pedido), então pode ser
-     * chamado sempre que o cliente abrir um pedido concluído.
+     * Solicita a liquidação financeira no backend caso uma OS concluída ainda esteja pendente.
+     * Cashback e comissão são creditados exclusivamente pelo backend/admin para evitar duplicidade.
      */
     private fun creditCashbackIfEligible(order: OrderData) {
+        if (order.status != OrderData.STATUS_COMPLETED || order.settlementStatus == "settled") {
+            return
+        }
         lifecycleScope.launch {
             try {
-                val credited = cashbackManager.creditForCompletedOrder(order)
-                if (credited > 0.0) {
-                    showToast(
-                        String.format(
-                            java.util.Locale("pt", "BR"),
-                            "💸 Você ganhou R$ %.2f de cashback!",
-                            credited
-                        )
-                    )
-                }
+                orderManager.settleCompletedOrder(order.id)
             } catch (e: Exception) {
-                android.util.Log.w("OrderDetailsActivity", "Erro ao creditar cashback: ${e.message}")
+                android.util.Log.w("OrderDetailsActivity", "Liquidação financeira pendente: ${e.message}")
             }
         }
     }

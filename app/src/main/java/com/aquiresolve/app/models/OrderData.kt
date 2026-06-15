@@ -96,6 +96,18 @@ data class OrderData(
     @PropertyName("providerCommission")
     val providerCommission: Double = 0.0, // 50% do valor do pedido para o prestador
 
+    // Liquidação financeira
+    @PropertyName("settlementStatus")
+    val settlementStatus: String? = null,
+    @PropertyName("settlementRequestedAt")
+    val settlementRequestedAt: Timestamp? = null,
+    @PropertyName("settledAt")
+    val settledAt: Timestamp? = null,
+    @PropertyName("settledProviderCommission")
+    val settledProviderCommission: Double? = null,
+    @PropertyName("settledCashbackAmount")
+    val settledCashbackAmount: Double? = null,
+
     // Pagamento
     @PropertyName("paymentStatus")
     val paymentStatus: String? = null,

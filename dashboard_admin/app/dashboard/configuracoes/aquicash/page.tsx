@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
-import { DollarSign, Award, Percent, Save, RefreshCw, Info } from "lucide-react"
+import { DollarSign, Award, Percent, Save, RefreshCw, Info, Plus, Trash2 } from "lucide-react"
 
 interface CashbackConfig {
   enabled: boolean
@@ -32,6 +32,25 @@ interface CashbackConfig {
   comboVeiculos: number
 }
 
+interface CashbackCampaign {
+  id: string
+  name: string
+  enabled: boolean
+  bonusPercentage: number
+  maxCashbackPerOrder?: number
+  startsAt?: string | null
+  endsAt?: string | null
+}
+
+interface CampaignDraft {
+  name: string
+  bonusPercentage: number
+  maxCashbackPerOrder: number
+  startsAt: string
+  endsAt: string
+  enabled: boolean
+}
+
 const DEFAULTS: CashbackConfig = {
   enabled: true,
   activePhase: "growth",
@@ -53,6 +72,15 @@ const DEFAULTS: CashbackConfig = {
   comboEletricaHidraulica: 10,
   comboInstalacoesHidraulica: 10,
   comboVeiculos: 15,
+}
+
+const CAMPAIGN_DEFAULTS: CampaignDraft = {
+  name: "",
+  bonusPercentage: 5,
+  maxCashbackPerOrder: 0,
+  startsAt: "",
+  endsAt: "",
+  enabled: true,
 }
 
 function NumberField({
@@ -90,22 +118,44 @@ function NumberField({
 
 export default function AquiCashConfigPage() {
   const [config, setConfig] = useState<CashbackConfig>(DEFAULTS)
+  const [campaigns, setCampaigns] = useState<CashbackCampaign[]>([])
+  const [campaignDraft, setCampaignDraft] = useState<CampaignDraft>(CAMPAIGN_DEFAULTS)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [campaignSaving, setCampaignSaving] = useState(false)
+  const [campaignUpdating, setCampaignUpdating] = useState<string | null>(null)
   const { toast } = useToast()
 
   const set = <K extends keyof CashbackConfig>(key: K, value: CashbackConfig[K]) =>
     setConfig(prev => ({ ...prev, [key]: value }))
 
-  useEffect(() => {
-    fetch("/api/cashback-config")
-      .then(r => r.json())
-      .then(data => {
-        if (data.success && data.config) setConfig({ ...DEFAULTS, ...data.config })
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+  const setDraft = <K extends keyof CampaignDraft>(key: K, value: CampaignDraft[K]) =>
+    setCampaignDraft(prev => ({ ...prev, [key]: value }))
+
+  const loadCampaigns = useCallback(async () => {
+    const res = await fetch("/api/cashback-campaigns")
+    const data = await res.json()
+    if (data.success) {
+      setCampaigns(data.campaigns || [])
+    }
   }, [])
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const configResponse = await fetch("/api/cashback-config")
+        const configData = await configResponse.json()
+        if (configData.success && configData.config) setConfig({ ...DEFAULTS, ...configData.config })
+        await loadCampaigns()
+      } catch {
+        // página mantém defaults locais quando o backend não responde
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    void load()
+  }, [loadCampaigns])
 
   async function save() {
     setSaving(true)
@@ -127,6 +177,81 @@ export default function AquiCashConfigPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  async function createCampaign() {
+    setCampaignSaving(true)
+    try {
+      const res = await fetch("/api/cashback-campaigns", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...campaignDraft,
+          startsAt: campaignDraft.startsAt || null,
+          endsAt: campaignDraft.endsAt || null,
+        }),
+      })
+      const data = await res.json()
+      if (!data.success) throw new Error(data.error)
+      setCampaignDraft(CAMPAIGN_DEFAULTS)
+      await loadCampaigns()
+      toast({ title: "Campanha criada", description: "A campanha será considerada nos próximos serviços concluídos." })
+    } catch (e: unknown) {
+      toast({
+        title: "Erro ao criar campanha",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      })
+    } finally {
+      setCampaignSaving(false)
+    }
+  }
+
+  async function updateCampaign(id: string, payload: Partial<CashbackCampaign>) {
+    setCampaignUpdating(id)
+    try {
+      const res = await fetch(`/api/cashback-campaigns/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (!data.success) throw new Error(data.error)
+      await loadCampaigns()
+    } catch (e: unknown) {
+      toast({
+        title: "Erro ao atualizar campanha",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      })
+    } finally {
+      setCampaignUpdating(null)
+    }
+  }
+
+  async function deleteCampaign(id: string) {
+    if (!confirm("Remover esta campanha de cashback?")) return
+    setCampaignUpdating(id)
+    try {
+      const res = await fetch(`/api/cashback-campaigns/${id}`, { method: "DELETE" })
+      const data = await res.json()
+      if (!data.success) throw new Error(data.error)
+      await loadCampaigns()
+      toast({ title: "Campanha removida" })
+    } catch (e: unknown) {
+      toast({
+        title: "Erro ao remover campanha",
+        description: e instanceof Error ? e.message : String(e),
+        variant: "destructive",
+      })
+    } finally {
+      setCampaignUpdating(null)
+    }
+  }
+
+  function formatCampaignDate(value?: string | null) {
+    if (!value) return "Sem limite"
+    return new Date(value).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })
   }
 
   if (loading) {
@@ -296,6 +421,109 @@ export default function AquiCashConfigPage() {
           <NumberField label="Elétrica + Hidráulica" value={config.comboEletricaHidraulica} onChange={v => set("comboEletricaHidraulica", v)} />
           <NumberField label="Instalações + Hidráulica" value={config.comboInstalacoesHidraulica} onChange={v => set("comboInstalacoesHidraulica", v)} />
           <NumberField label="Veículos (2+ serviços automotivos)" value={config.comboVeiculos} onChange={v => set("comboVeiculos", v)} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Percent className="h-4 w-4" />
+            Campanhas promocionais de cashback
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="space-y-2">
+              <span className="text-sm font-medium">Nome da campanha</span>
+              <Input
+                value={campaignDraft.name}
+                onChange={e => setDraft("name", e.target.value)}
+                placeholder="Ex.: Semana do cliente"
+              />
+            </div>
+            <NumberField
+              label="Bônus de cashback"
+              value={campaignDraft.bonusPercentage}
+              onChange={v => setDraft("bonusPercentage", v)}
+            />
+            <NumberField
+              label="Limite por OS"
+              value={campaignDraft.maxCashbackPerOrder}
+              onChange={v => setDraft("maxCashbackPerOrder", v)}
+              suffix="R$"
+              max={99999}
+            />
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-sm text-muted-foreground">Campanha ativa</span>
+              <Switch checked={campaignDraft.enabled} onCheckedChange={v => setDraft("enabled", v)} />
+            </div>
+            <div className="space-y-2">
+              <span className="text-sm font-medium">Início</span>
+              <Input
+                type="datetime-local"
+                value={campaignDraft.startsAt}
+                onChange={e => setDraft("startsAt", e.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <span className="text-sm font-medium">Fim</span>
+              <Input
+                type="datetime-local"
+                value={campaignDraft.endsAt}
+                onChange={e => setDraft("endsAt", e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <Button onClick={createCampaign} disabled={campaignSaving || !campaignDraft.name.trim()} className="gap-2">
+              <Plus className="h-4 w-4" />
+              {campaignSaving ? "Criando…" : "Criar campanha"}
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            {campaigns.length === 0 ? (
+              <p className="rounded border border-dashed p-4 text-sm text-muted-foreground">
+                Nenhuma campanha promocional cadastrada.
+              </p>
+            ) : (
+              campaigns.map(campaign => (
+                <div key={campaign.id} className="flex flex-col gap-3 rounded border p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{campaign.name}</p>
+                      <Badge variant={campaign.enabled ? "default" : "secondary"}>
+                        {campaign.enabled ? "Ativa" : "Pausada"}
+                      </Badge>
+                      <Badge variant="outline">+{campaign.bonusPercentage}%</Badge>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {formatCampaignDate(campaign.startsAt)} até {formatCampaignDate(campaign.endsAt)}
+                      {campaign.maxCashbackPerOrder ? ` · limite R$ ${campaign.maxCashbackPerOrder}` : ""}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={campaign.enabled}
+                      disabled={campaignUpdating === campaign.id}
+                      onCheckedChange={v => void updateCampaign(campaign.id, { enabled: v })}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      disabled={campaignUpdating === campaign.id}
+                      onClick={() => void deleteCampaign(campaign.id)}
+                      aria-label="Remover campanha"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </CardContent>
       </Card>
 

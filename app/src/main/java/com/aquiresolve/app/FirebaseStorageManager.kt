@@ -2,10 +2,11 @@
 
 import android.content.Context
 import android.net.Uri
+import android.provider.OpenableColumns
+import android.webkit.MimeTypeMap
 import com.google.firebase.storage.FirebaseStorage
-import com.google.firebase.storage.StorageReference
+import com.google.firebase.storage.StorageMetadata
 import kotlinx.coroutines.tasks.await
-import java.io.File
 import java.util.UUID
 
 class FirebaseStorageManager {
@@ -28,16 +29,49 @@ class FirebaseStorageManager {
     
     suspend fun uploadDocument(context: Context, documentUri: Uri, folder: String = "documents"): Result<String> {
         return try {
-            val fileName = "${UUID.randomUUID()}.pdf"
+            val mimeType = context.contentResolver.getType(documentUri)
+            val extension = resolveExtension(context, documentUri, mimeType)
+            val fileName = "${UUID.randomUUID()}.$extension"
             val storageRef = storage.reference.child("$folder/$fileName")
-            
-            val uploadTask = storageRef.putFile(documentUri).await()
+            val metadata = StorageMetadata.Builder()
+                .setContentType(mimeType ?: "application/octet-stream")
+                .build()
+
+            val uploadTask = storageRef.putFile(documentUri, metadata).await()
             val downloadUrl = uploadTask.storage.downloadUrl.await()
             
             Result.success(downloadUrl.toString())
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    private fun resolveExtension(context: Context, uri: Uri, mimeType: String?): String {
+        val fromMime = mimeType
+            ?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) }
+            ?.lowercase()
+        if (!fromMime.isNullOrBlank()) {
+            return sanitizeExtension(fromMime)
+        }
+
+        val displayName = queryDisplayName(context, uri)
+        val fromName = displayName
+            ?.substringAfterLast('.', missingDelimiterValue = "")
+            ?.lowercase()
+        return sanitizeExtension(fromName.takeUnless { it.isNullOrBlank() } ?: "bin")
+    }
+
+    private fun queryDisplayName(context: Context, uri: Uri): String? {
+        return context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { cursor ->
+                if (!cursor.moveToFirst()) return@use null
+                val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (index >= 0) cursor.getString(index) else null
+            }
+    }
+
+    private fun sanitizeExtension(value: String): String {
+        return value.replace(Regex("[^a-z0-9]"), "").take(12).ifBlank { "bin" }
     }
     
     suspend fun uploadMultipleImages(context: Context, imageUris: List<Uri>, folder: String = "images"): Result<List<String>> {
@@ -154,4 +188,4 @@ class FirebaseStorageManager {
             Result.failure(e)
         }
     }
-} 
+}

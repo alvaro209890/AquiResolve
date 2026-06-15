@@ -11,6 +11,9 @@ const {
   syncPaymentStatusToFirestore
 } = require('../services/payment-status-sync.service');
 const {
+  settleCompletedOrder: settleCompletedOrderService
+} = require('../services/order-settlement.service');
+const {
   normalizeOrderResponse,
   mapPagarmeError
 } = require('../services/payment-mapper.service');
@@ -193,6 +196,43 @@ async function getPaymentStatus(req, res, next) {
   }
 }
 
+async function settleCompletedOrder(req, res, next) {
+  try {
+    const { orderId } = req.params;
+
+    if (!orderId || typeof orderId !== 'string' || !orderId.trim()) {
+      throw new HttpError(400, 'orderId inválido', {
+        code: 'INVALID_ORDER_ID'
+      });
+    }
+
+    logger.info('Solicitada liquidacao financeira de pedido', {
+      requestId: req.requestId,
+      uid: req.user && req.user.uid,
+      orderId: orderId.trim()
+    });
+
+    const settlement = await settleCompletedOrderService({
+      orderId: orderId.trim(),
+      actorUid: req.user && req.user.uid,
+      actorType: 'mobile'
+    });
+
+    res.status(200).json({
+      success: true,
+      settlement
+    });
+  } catch (error) {
+    logger.warn('Falha ao liquidar pedido concluido', {
+      requestId: req.requestId,
+      uid: req.user && req.user.uid,
+      orderId: req.params?.orderId || null,
+      error: error.message
+    });
+    next(error);
+  }
+}
+
 function verifyWebhookSecret(req) {
   const expectedSecret = process.env.PAGARME_WEBHOOK_SECRET || process.env.PAYMENT_WEBHOOK_SECRET || '';
   if (!expectedSecret) {
@@ -277,5 +317,6 @@ module.exports = {
   processCardPayment,
   processPixPayment,
   getPaymentStatus,
+  settleCompletedOrder,
   handlePagarmeWebhook
 };

@@ -21,3 +21,12 @@ data class PricingResponse(
     @SerializedName("source")
     val source: String? = null
 )
+
+data class OrderSettlementResponse(
+    @SerializedName("success")
+    val success: Boolean,
+    @SerializedName("settlement")
+    val settlement: Map<String, Any>? = null,
+    @SerializedName("error")
+    val error: String? = null
+)

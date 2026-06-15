@@ -4,6 +4,7 @@ import com.aquiresolve.app.models.payment.PaymentRequest
 import com.aquiresolve.app.models.payment.PaymentResponse
 import com.aquiresolve.app.models.payment.PixPaymentRequest
 import com.aquiresolve.app.models.payment.PixPaymentResponse
+import com.aquiresolve.app.models.payment.OrderSettlementResponse
 import com.aquiresolve.app.models.payment.PricingRequest
 import com.aquiresolve.app.models.payment.PricingResponse
 import retrofit2.Response
@@ -53,6 +54,14 @@ interface PagarMeApiService {
         @Header("Authorization") authorization: String,
         @Path("orderId") orderId: String
     ): Response<PixPaymentResponse>
-}
 
+    /**
+     * Liquida cashback e comissão de uma OS concluída de forma idempotente no backend.
+     */
+    @POST("orders/{orderId}/settle")
+    suspend fun settleCompletedOrder(
+        @Header("Authorization") authorization: String,
+        @Path("orderId") orderId: String
+    ): Response<OrderSettlementResponse>
+}
 

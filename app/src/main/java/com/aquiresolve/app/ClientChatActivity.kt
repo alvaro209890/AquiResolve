@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
+import android.provider.OpenableColumns
 import android.provider.MediaStore
 import android.text.Editable
 import android.text.TextWatcher
@@ -74,6 +75,13 @@ class ClientChatActivity : AppCompatActivity() {
             } else {
                 showErrorMessage("Erro ao obter a imagem enviada")
             }
+        }
+    }
+    private val chatDocumentPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri ->
+        if (uri != null) {
+            uploadAndSendDocument(uri)
         }
     }
     private val auth by lazy { com.google.firebase.auth.FirebaseAuth.getInstance() }
@@ -395,7 +403,7 @@ class ClientChatActivity : AppCompatActivity() {
      * Mostra opções de anexo
      */
     private fun showAttachmentOptions() {
-        val options = arrayOf("📷 Tirar Foto", "🖼️ Galeria")
+        val options = arrayOf("📷 Tirar Foto", "🖼️ Galeria", "Arquivo")
 
         AlertDialog.Builder(this)
             .setTitle("Anexar Arquivo")
@@ -403,6 +411,7 @@ class ClientChatActivity : AppCompatActivity() {
                 when (which) {
                     0 -> takePhotoForChat()
                     1 -> openChatImagePicker()
+                    2 -> openDocumentPicker()
                 }
             }
             .setNegativeButton("Cancelar", null)
@@ -479,6 +488,50 @@ class ClientChatActivity : AppCompatActivity() {
         }
     }
 
+    private fun openDocumentPicker() {
+        chatDocumentPickerLauncher.launch("*/*")
+    }
+
+    private fun uploadAndSendDocument(uri: Uri) {
+        val oId = orderId
+        if (oId.isNullOrBlank()) {
+            showErrorMessage("Pedido inválido para envio de arquivo")
+            return
+        }
+
+        lifecycleScope.launch {
+            try {
+                val currentUserId = getCurrentUserId()
+                if (currentUserId.isNullOrBlank()) {
+                    showErrorMessage("Faça login novamente para enviar arquivos")
+                    return@launch
+                }
+
+                val storageManager = FirebaseStorageManager()
+                val result = storageManager.uploadDocument(
+                    this@ClientChatActivity,
+                    uri,
+                    "chats/$oId/files"
+                )
+                result.fold(
+                    onSuccess = { url ->
+                        sendChatDocumentMessage(
+                            documentUrl = url,
+                            fileName = queryDisplayName(uri) ?: "arquivo",
+                            fileSize = queryFileSize(uri),
+                            fileType = contentResolver.getType(uri)
+                        )
+                    },
+                    onFailure = { error ->
+                        showErrorMessage("Erro ao enviar arquivo: ${error.message}")
+                    }
+                )
+            } catch (e: Exception) {
+                showErrorMessage("Erro ao enviar arquivo: ${e.message}")
+            }
+        }
+    }
+
     /**
      * Rola para o final da lista
      */
@@ -509,7 +562,7 @@ class ClientChatActivity : AppCompatActivity() {
     private fun loadMessagesFromFirestore() {
         val oId = orderId ?: return
         lifecycleScope.launch {
-            chatManager.getMessagesFlow(oId).collectLatest { remoteMessages ->
+            chatManager.getMessagesFlow(oId, "client").collectLatest { remoteMessages ->
                 val currentUserId = getCurrentUserId()
                 if (currentUserId.isNullOrBlank()) {
                     showErrorMessage("Sessão expirada. Entre novamente para acessar o chat.")
@@ -526,10 +579,14 @@ class ClientChatActivity : AppCompatActivity() {
                         senderName = rm.senderName,
                         message = rm.message,
                         timestamp = rm.timestamp.toDate(),
-                        type = if (rm.senderType == "client") MessageType.SENT else MessageType.RECEIVED,
+                        type = if (rm.senderId == currentUserId) MessageType.SENT else MessageType.RECEIVED,
                         isRead = rm.isRead,
-                        attachmentUrl = rm.imageUrl,
-                        attachmentType = if (!rm.imageUrl.isNullOrEmpty()) AttachmentType.IMAGE else null
+                        attachmentUrl = rm.imageUrl ?: rm.documentUrl,
+                        attachmentType = when {
+                            !rm.imageUrl.isNullOrEmpty() -> AttachmentType.IMAGE
+                            !rm.documentUrl.isNullOrEmpty() -> AttachmentType.DOCUMENT
+                            else -> null
+                        }
                     )
                 })
                 chatAdapter.notifyDataSetChanged()
@@ -591,7 +648,8 @@ class ClientChatActivity : AppCompatActivity() {
                     senderName = message.senderName,
                     senderType = "client",
                     message = message.message,
-                    imageUrl = message.attachmentUrl
+                    imageUrl = message.attachmentUrl,
+                    messageType = "image"
                 )
             )
             if (result.isFailure) {
@@ -599,5 +657,61 @@ class ClientChatActivity : AppCompatActivity() {
             }
             // Não adicionar localmente - o listener do Firestore já atualiza a lista automaticamente
         }
+    }
+
+    private fun sendChatDocumentMessage(
+        documentUrl: String,
+        fileName: String,
+        fileSize: Long?,
+        fileType: String?
+    ) {
+        val oId = orderId
+        if (oId.isNullOrBlank()) {
+            showErrorMessage("Pedido inválido para envio de arquivo")
+            return
+        }
+        val currentUserId = getCurrentUserId()
+        if (currentUserId.isNullOrBlank()) {
+            showErrorMessage("Faça login novamente para enviar arquivos")
+            return
+        }
+
+        lifecycleScope.launch {
+            val result = chatManager.sendMessage(
+                FirebaseChatManager.ChatMessage(
+                    orderId = oId,
+                    senderId = currentUserId,
+                    senderName = getCurrentUserName(),
+                    senderType = "client",
+                    message = "Arquivo enviado: $fileName",
+                    documentUrl = documentUrl,
+                    messageType = "file",
+                    fileName = fileName,
+                    fileSize = fileSize,
+                    fileType = fileType
+                )
+            )
+            if (result.isFailure) {
+                showErrorMessage("Erro ao enviar arquivo: ${result.exceptionOrNull()?.message}")
+            }
+        }
+    }
+
+    private fun queryDisplayName(uri: Uri): String? {
+        return contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { cursor ->
+                if (!cursor.moveToFirst()) return@use null
+                val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (index >= 0) cursor.getString(index) else null
+            }
+    }
+
+    private fun queryFileSize(uri: Uri): Long? {
+        return contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)
+            ?.use { cursor ->
+                if (!cursor.moveToFirst()) return@use null
+                val index = cursor.getColumnIndex(OpenableColumns.SIZE)
+                if (index >= 0) cursor.getLong(index) else null
+            }
     }
 }

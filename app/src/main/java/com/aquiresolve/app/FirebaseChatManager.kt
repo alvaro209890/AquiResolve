@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.tasks.await
+import java.util.Locale
 
 class FirebaseChatManager {
     
@@ -18,12 +19,18 @@ class FirebaseChatManager {
         val orderId: String = "",
         val senderId: String = "",
         val senderName: String = "",
-        val senderType: String = "", // "client" or "provider"
+        val senderType: String = "", // "client", "provider" or "admin"
         val message: String = "",
         val timestamp: com.google.firebase.Timestamp = com.google.firebase.Timestamp.now(),
         val isRead: Boolean = false,
         val imageUrl: String? = null,
-        val documentUrl: String? = null
+        val documentUrl: String? = null,
+        val threadType: String = THREAD_CLIENT_PROVIDER,
+        val visibility: String = VISIBILITY_PUBLIC,
+        val messageType: String? = null,
+        val fileName: String? = null,
+        val fileSize: Long? = null,
+        val fileType: String? = null
     )
     
     data class ChatRoom(
@@ -37,19 +44,52 @@ class FirebaseChatManager {
         val lastMessageTime: com.google.firebase.Timestamp = com.google.firebase.Timestamp.now(),
         val unreadCount: Int = 0
     )
+
+    companion object {
+        const val THREAD_CLIENT_PROVIDER = "client_provider"
+        const val THREAD_CLIENT_BASE = "client_base"
+        const val THREAD_PROVIDER_BASE = "provider_base"
+        const val THREAD_ADMIN_INTERNAL = "admin_internal"
+        const val VISIBILITY_PUBLIC = "public"
+        const val VISIBILITY_ADMIN_CLIENT = "admin_client"
+        const val VISIBILITY_ADMIN_PROVIDER = "admin_provider"
+        const val VISIBILITY_ADMIN_ONLY = "admin_only"
+    }
     
     suspend fun sendMessage(message: ChatMessage): Result<String> {
         return try {
+            val threadType = normalizeThreadType(message.threadType)
+            val visibility = normalizeVisibility(message.visibility, threadType)
+            val resolvedMessageType = message.messageType ?: when {
+                !message.imageUrl.isNullOrEmpty() -> "image"
+                !message.documentUrl.isNullOrEmpty() -> "file"
+                else -> "text"
+            }
+            val metadata = mutableMapOf<String, Any>()
+            message.imageUrl?.takeIf { it.isNotBlank() }?.let { metadata["imageUrl"] = it }
+            message.documentUrl?.takeIf { it.isNotBlank() }?.let { metadata["documentUrl"] = it }
+            message.fileName?.takeIf { it.isNotBlank() }?.let { metadata["fileName"] = it }
+            message.fileSize?.let { metadata["fileSize"] = it }
+            message.fileType?.takeIf { it.isNotBlank() }?.let { metadata["fileType"] = it }
+
             val messageMap = hashMapOf(
                 "orderId" to message.orderId,
                 "senderId" to message.senderId,
                 "senderName" to message.senderName,
                 "senderType" to message.senderType,
                 "message" to message.message,
+                "content" to message.message,
                 "timestamp" to message.timestamp,
                 "isRead" to message.isRead,
                 "imageUrl" to message.imageUrl,
-                "documentUrl" to message.documentUrl
+                "documentUrl" to message.documentUrl,
+                "threadType" to threadType,
+                "visibility" to visibility,
+                "messageType" to resolvedMessageType,
+                "fileName" to message.fileName,
+                "fileSize" to message.fileSize,
+                "fileType" to message.fileType,
+                "metadata" to metadata
             )
 
             // Usar subcoleção por pedido para evitar necessidade de índice composto
@@ -83,27 +123,7 @@ class FirebaseChatManager {
                 .await()
             
             val messages = query.documents.mapNotNull { doc ->
-                val orderIdDoc = doc.getString("orderId") ?: orderId
-                val senderId = doc.getString("senderId") ?: ""
-                val senderName = doc.getString("senderName") ?: ""
-                val senderType = doc.getString("senderType") ?: ""
-                val message = doc.getString("message") ?: ""
-                val timestamp = doc.getTimestamp("timestamp") ?: com.google.firebase.Timestamp.now()
-                val isRead = doc.getBoolean("isRead") ?: false
-                val imageUrl = doc.getString("imageUrl")
-                val documentUrl = doc.getString("documentUrl")
-                ChatMessage(
-                    id = doc.id,
-                    orderId = orderIdDoc,
-                    senderId = senderId,
-                    senderName = senderName,
-                    senderType = senderType,
-                    message = message,
-                    timestamp = timestamp,
-                    isRead = isRead,
-                    imageUrl = imageUrl,
-                    documentUrl = documentUrl
-                )
+                documentToChatMessage(doc, orderId)
             }
             Result.success(messages)
         } catch (e: Exception) {
@@ -111,7 +131,7 @@ class FirebaseChatManager {
         }
     }
     
-    suspend fun getMessagesFlow(orderId: String): Flow<List<ChatMessage>> = callbackFlow {
+    suspend fun getMessagesFlow(orderId: String, viewerRole: String? = null): Flow<List<ChatMessage>> = callbackFlow {
         val registration = firestore
             .collection("orders")
             .document(orderId)
@@ -122,29 +142,10 @@ class FirebaseChatManager {
                     close(error)
                     return@addSnapshotListener
                 }
-                val messages = snapshot?.documents?.mapNotNull { doc ->
-                    val orderIdDoc = doc.getString("orderId") ?: orderId
-                    val senderId = doc.getString("senderId") ?: ""
-                    val senderName = doc.getString("senderName") ?: ""
-                    val senderType = doc.getString("senderType") ?: ""
-                    val message = doc.getString("message") ?: ""
-                    val timestamp = doc.getTimestamp("timestamp") ?: com.google.firebase.Timestamp.now()
-                    val isRead = doc.getBoolean("isRead") ?: false
-                    val imageUrl = doc.getString("imageUrl")
-                    val documentUrl = doc.getString("documentUrl")
-                    ChatMessage(
-                        id = doc.id,
-                        orderId = orderIdDoc,
-                        senderId = senderId,
-                        senderName = senderName,
-                        senderType = senderType,
-                        message = message,
-                        timestamp = timestamp,
-                        isRead = isRead,
-                        imageUrl = imageUrl,
-                        documentUrl = documentUrl
-                    )
-                } ?: emptyList()
+                val messages = snapshot?.documents
+                    ?.mapNotNull { doc -> documentToChatMessage(doc, orderId) }
+                    ?.filter { message -> viewerRole == null || isVisibleToRole(message, viewerRole) }
+                    ?: emptyList()
                 trySend(messages).isSuccess
             }
         awaitClose { registration.remove() }
@@ -260,7 +261,7 @@ class FirebaseChatManager {
      */
     private suspend fun upsertChatConversation(orderId: String, message: ChatMessage) {
         try {
-            val messageType = when {
+            val messageType = message.messageType ?: when {
                 !message.imageUrl.isNullOrEmpty() -> "image"
                 !message.documentUrl.isNullOrEmpty() -> "file"
                 else -> "text"
@@ -270,7 +271,9 @@ class FirebaseChatManager {
                 "senderName" to message.senderName,
                 "senderId" to message.senderId,
                 "timestamp" to message.timestamp,
-                "messageType" to messageType
+                "messageType" to messageType,
+                "threadType" to normalizeThreadType(message.threadType),
+                "visibility" to normalizeVisibility(message.visibility, message.threadType)
             )
 
             val convRef = firestore.collection("chatConversations").document(orderId)
@@ -325,6 +328,92 @@ class FirebaseChatManager {
         }
     }
 
+    private fun documentToChatMessage(
+        doc: com.google.firebase.firestore.DocumentSnapshot,
+        fallbackOrderId: String
+    ): ChatMessage? {
+        if (doc.getBoolean("isDeleted") == true) {
+            return null
+        }
+
+        val rawThreadType = doc.getString("threadType") ?: doc.getString("channel")
+        val threadType = normalizeThreadType(rawThreadType)
+        val visibility = normalizeVisibility(doc.getString("visibility"), threadType)
+        val metadata = doc.get("metadata") as? Map<*, *>
+        val imageUrl = doc.getString("imageUrl")
+            ?: doc.getString("image_url")
+            ?: doc.getString("mediaUrl")
+            ?: doc.getString("attachmentUrl")
+            ?: metadata?.get("imageUrl") as? String
+        val documentUrl = doc.getString("documentUrl")
+            ?: doc.getString("fileUrl")
+            ?: metadata?.get("documentUrl") as? String
+        val senderType = normalizeSenderType(doc.getString("senderType"))
+
+        return ChatMessage(
+            id = doc.id,
+            orderId = doc.getString("orderId") ?: fallbackOrderId,
+            senderId = doc.getString("senderId") ?: "",
+            senderName = doc.getString("senderName") ?: when (senderType) {
+                "admin" -> "Base AquiResolve"
+                "provider" -> "Prestador"
+                else -> "Cliente"
+            },
+            senderType = senderType,
+            message = doc.getString("message") ?: doc.getString("content") ?: "",
+            timestamp = doc.getTimestamp("timestamp") ?: com.google.firebase.Timestamp.now(),
+            isRead = doc.getBoolean("isRead") ?: false,
+            imageUrl = imageUrl,
+            documentUrl = documentUrl,
+            threadType = threadType,
+            visibility = visibility,
+            messageType = doc.getString("messageType") ?: if (!documentUrl.isNullOrBlank()) "file" else null,
+            fileName = doc.getString("fileName") ?: metadata?.get("fileName") as? String,
+            fileSize = doc.getLong("fileSize") ?: (metadata?.get("fileSize") as? Number)?.toLong(),
+            fileType = doc.getString("fileType") ?: metadata?.get("fileType") as? String
+        )
+    }
+
+    private fun normalizeSenderType(value: String?): String {
+        return when (value?.lowercase(Locale.ROOT)) {
+            "provider", "prestador" -> "provider"
+            "admin", "support", "system" -> "admin"
+            else -> "client"
+        }
+    }
+
+    private fun normalizeThreadType(value: String?): String {
+        return when (value?.lowercase(Locale.ROOT)) {
+            THREAD_CLIENT_BASE -> THREAD_CLIENT_BASE
+            THREAD_PROVIDER_BASE -> THREAD_PROVIDER_BASE
+            THREAD_ADMIN_INTERNAL -> THREAD_ADMIN_INTERNAL
+            else -> THREAD_CLIENT_PROVIDER
+        }
+    }
+
+    private fun normalizeVisibility(value: String?, threadType: String): String {
+        return when (value?.lowercase(Locale.ROOT)) {
+            VISIBILITY_ADMIN_CLIENT -> VISIBILITY_ADMIN_CLIENT
+            VISIBILITY_ADMIN_PROVIDER -> VISIBILITY_ADMIN_PROVIDER
+            VISIBILITY_ADMIN_ONLY -> VISIBILITY_ADMIN_ONLY
+            VISIBILITY_PUBLIC -> VISIBILITY_PUBLIC
+            else -> when (normalizeThreadType(threadType)) {
+                THREAD_CLIENT_BASE -> VISIBILITY_ADMIN_CLIENT
+                THREAD_PROVIDER_BASE -> VISIBILITY_ADMIN_PROVIDER
+                THREAD_ADMIN_INTERNAL -> VISIBILITY_ADMIN_ONLY
+                else -> VISIBILITY_PUBLIC
+            }
+        }
+    }
+
+    private fun isVisibleToRole(message: ChatMessage, viewerRole: String): Boolean {
+        return when (viewerRole.lowercase(Locale.ROOT)) {
+            "client", "cliente" -> message.visibility == VISIBILITY_PUBLIC || message.visibility == VISIBILITY_ADMIN_CLIENT
+            "provider", "prestador" -> message.visibility == VISIBILITY_PUBLIC || message.visibility == VISIBILITY_ADMIN_PROVIDER
+            else -> true
+        }
+    }
+
     suspend fun deleteMessage(orderId: String, messageId: String): Result<Unit> {
         return try {
             firestore
@@ -348,4 +437,4 @@ class FirebaseChatManager {
             Result.failure(e)
         }
     }
-} 
+}

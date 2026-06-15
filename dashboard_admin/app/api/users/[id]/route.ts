@@ -5,11 +5,12 @@ import * as admin from 'firebase-admin'
 // GET /api/users/[id] — retorna dados de um usuário
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const db = getAdminFirestore()
-    const snap = await db.collection('users').doc(params.id).get()
+    const snap = await db.collection('users').doc(id).get()
     if (!snap.exists) {
       return NextResponse.json({ success: false, error: 'Usuário não encontrado' }, { status: 404 })
     }
@@ -23,12 +24,13 @@ export async function GET(
 // PATCH /api/users/[id] — atualiza campos de um usuário (Admin SDK — bypassa regras)
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const db = getAdminFirestore()
     const authAdmin = getAdminAuth()
-    const userId = params.id
+    const { id } = await params
+    const userId = id
     const body = await request.json()
 
     const {
@@ -128,12 +130,13 @@ export async function PATCH(
 // DELETE /api/users/[id] — bloqueia permanentemente (não apaga por segurança)
 export async function DELETE(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const db = getAdminFirestore()
     const authAdmin = getAdminAuth()
-    const userId = params.id
+    const { id } = await params
+    const userId = id
 
     await authAdmin.updateUser(userId, { disabled: true })
     await db.collection('users').doc(userId).update({

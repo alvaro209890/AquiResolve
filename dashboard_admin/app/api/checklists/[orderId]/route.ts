@@ -4,11 +4,11 @@ import { getAdminFirestore } from '@/lib/firebase-admin'
 // GET /api/checklists/[orderId] — lê checklist + fotos de uma OS
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { orderId: string } }
+  { params }: { params: Promise<{ orderId: string }> }
 ) {
   try {
     const db = getAdminFirestore()
-    const orderId = params.orderId
+    const { orderId } = await params
 
     const [checklistSnap, orderSnap] = await Promise.all([
       db.collection('checklists').doc(orderId).get(),
