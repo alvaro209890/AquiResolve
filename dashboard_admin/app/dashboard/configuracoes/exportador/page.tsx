@@ -1,402 +1,291 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+"use client"
+
+import { useCallback, useEffect, useMemo, useState } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { 
-  Download, 
-  Search, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Filter,
-  RefreshCw,
-  Upload,
-  ArrowLeft,
-  Eye,
-  Globe,
-  Clock
-} from "lucide-react"
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select"
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { PageWithBack } from "@/components/layout/page-with-back"
+import { Download, RefreshCw, FileText, FileSpreadsheet, FileDown, Database } from "lucide-react"
+import { getCollection } from "@/lib/firestore"
 
-const exportadores = [
+type Row = Record<string, any>
+
+interface Column {
+  key: string
+  label: string
+  /** Extrai o valor textual da linha (já formatado para exibição/exportação). */
+  get: (row: Row) => string
+}
+
+function tsToDate(value: any): Date | null {
+  const d = value?.toDate?.() ?? (value ? new Date(value) : null)
+  return d && Number.isFinite(d.getTime?.() ?? NaN) ? d : null
+}
+
+function fmtDate(value: any): string {
+  const d = tsToDate(value)
+  return d ? d.toLocaleDateString("pt-BR") : ""
+}
+
+function fmtMoney(value: any): string {
+  const n = Number(value)
+  if (!Number.isFinite(n) || n === 0) return ""
+  return n.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
+const STATUS_LABEL: Record<string, string> = {
+  completed: "Concluído", in_progress: "Em atendimento", assigned: "Atribuído",
+  distributing: "Em distribuição", cancelled: "Cancelado", pending: "Pendente",
+  awaiting_payment: "Aguardando pagamento",
+}
+
+interface Dataset {
+  key: string
+  label: string
+  collection: string
+  columns: Column[]
+  /** Filtro opcional aplicado após buscar a coleção. */
+  filter?: (row: Row) => boolean
+}
+
+const DATASETS: Dataset[] = [
   {
-    id: "1",
-    nome: "BRASIL ASSISTÊNCIA",
-    cliente: "ALLIANZ SEGUROS SA",
-    fusoHorario: "America/Sao_Paulo",
-    status: "ativo",
-    ultimaSincronizacao: "2025-01-15 14:30:00",
+    key: "orders",
+    label: "Pedidos",
+    collection: "orders",
+    columns: [
+      { key: "protocol", label: "Protocolo", get: (r) => String(r.protocol ?? r.id ?? "") },
+      { key: "client", label: "Cliente", get: (r) => String(r.clientName ?? "") },
+      { key: "service", label: "Serviço", get: (r) => String(r.serviceName ?? r.serviceType ?? "") },
+      { key: "provider", label: "Prestador", get: (r) => String(r.assignedProviderName ?? r.providerName ?? "") },
+      { key: "status", label: "Status", get: (r) => STATUS_LABEL[String(r.status)] ?? String(r.status ?? "") },
+      { key: "value", label: "Valor (R$)", get: (r) => fmtMoney(r.finalPrice ?? r.estimatedPrice) },
+      { key: "commission", label: "Comissão (R$)", get: (r) => fmtMoney(r.providerCommission) },
+      { key: "createdAt", label: "Criado em", get: (r) => fmtDate(r.createdAt) },
+    ],
   },
   {
-    id: "2",
-    nome: "CDF",
-    cliente: "CDF - CENTRAL DE FUNC. TECNOLOGIA E PARTICIPACOES S.A",
-    fusoHorario: "America/Sao_Paulo",
-    status: "ativo",
-    ultimaSincronizacao: "2025-01-15 13:45:00",
+    key: "clients",
+    label: "Clientes",
+    collection: "users",
+    filter: (r) => {
+      const t = String(r.userType ?? r.role ?? "").toLowerCase()
+      return t === "client" || t === "cliente" || t === ""
+    },
+    columns: [
+      { key: "name", label: "Nome", get: (r) => String(r.name ?? r.nome ?? r.displayName ?? "") },
+      { key: "email", label: "E-mail", get: (r) => String(r.email ?? "") },
+      { key: "phone", label: "Telefone", get: (r) => String(r.phone ?? r.telefone ?? r.phoneNumber ?? "") },
+      { key: "blocked", label: "Bloqueado", get: (r) => (r.blocked === true ? "Sim" : "Não") },
+      { key: "createdAt", label: "Cadastro", get: (r) => fmtDate(r.createdAt) },
+    ],
   },
   {
-    id: "3",
-    nome: "EUROP",
-    cliente: "EUROP ASSISTANCE BRASIL LTDA",
-    fusoHorario: "America/Sao_Paulo",
-    status: "ativo",
-    ultimaSincronizacao: "2025-01-15 12:15:00",
-  },
-  {
-    id: "4",
-    nome: "FACIL ASSIST",
-    cliente: "",
-    fusoHorario: "America/Sao_Paulo",
-    status: "inativo",
-    ultimaSincronizacao: "2025-01-10 09:20:00",
-  },
-  {
-    id: "5",
-    nome: "MAPFRE ASSISTÊNCIA",
-    cliente: "MAPFRE ASSISTENCIA S/A.",
-    fusoHorario: "America/Sao_Paulo",
-    status: "ativo",
-    ultimaSincronizacao: "2025-01-15 11:30:00",
-  },
-  {
-    id: "6",
-    nome: "MCK",
-    cliente: "",
-    fusoHorario: "America/Sao_Paulo",
-    status: "inativo",
-    ultimaSincronizacao: "2025-01-08 16:45:00",
-  },
-  {
-    id: "7",
-    nome: "MONDIAL ASSISTANCE",
-    cliente: "MONDIAL SERVICOS LTDA",
-    fusoHorario: "America/Sao_Paulo",
-    status: "ativo",
-    ultimaSincronizacao: "2025-01-15 10:15:00",
-  },
-  {
-    id: "8",
-    nome: "PORTO SEGURO",
-    cliente: "PORTO SEGURO ASSISTENCIA E SERVICOS S/A",
-    fusoHorario: "America/Sao_Paulo",
-    status: "ativo",
-    ultimaSincronizacao: "2025-01-15 15:20:00",
-  },
-  {
-    id: "9",
-    nome: "TOKIO MARINE",
-    cliente: "TOKIO MARINE SEGURADORA",
-    fusoHorario: "America/Sao_Paulo",
-    status: "ativo",
-    ultimaSincronizacao: "2025-01-15 14:00:00",
+    key: "providers",
+    label: "Prestadores",
+    collection: "providers",
+    columns: [
+      { key: "name", label: "Nome", get: (r) => String(r.nome ?? r.name ?? r.fullName ?? "") },
+      { key: "email", label: "E-mail", get: (r) => String(r.email ?? "") },
+      { key: "phone", label: "Telefone", get: (r) => String(r.telefone ?? r.phone ?? "") },
+      { key: "status", label: "Status", get: (r) => String(r.status ?? "") },
+      { key: "verification", label: "Verificação", get: (r) => String(r.verificationStatus ?? "") },
+      { key: "orders", label: "Serviços", get: (r) => String(r.totalServicos ?? r.totalOrders ?? 0) },
+      { key: "rating", label: "Avaliação", get: (r) => String(r.avaliacao ?? r.rating ?? 0) },
+      { key: "blocked", label: "Bloqueado", get: (r) => (r.blocked === true ? "Sim" : "Não") },
+    ],
   },
 ]
 
-const getStatusColor = (status: string) => {
-  switch (status) {
-    case "ativo":
-      return "bg-green-100 text-green-800"
-    case "inativo":
-      return "bg-muted text-muted-foreground"
-    default:
-      return "bg-muted text-muted-foreground"
-  }
-}
-
-const getFusoHorarioColor = (fuso: string) => {
-  return "bg-blue-100 text-blue-800"
-}
-
 export default function ExportadorPage() {
+  const [datasetKey, setDatasetKey] = useState<string>("orders")
+  const [rows, setRows] = useState<Row[]>([])
+  const [loading, setLoading] = useState(false)
+
+  const dataset = useMemo(() => DATASETS.find((d) => d.key === datasetKey)!, [datasetKey])
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const raw = await getCollection(dataset.collection)
+      setRows(dataset.filter ? raw.filter(dataset.filter) : raw)
+    } finally {
+      setLoading(false)
+    }
+  }, [dataset])
+
+  useEffect(() => { load() }, [load])
+
+  const fileName = (ext: string) =>
+    `${dataset.key}-aquiresolve-${new Date().toISOString().slice(0, 10)}.${ext}`
+
+  const triggerDownload = (blob: Blob, name: string) => {
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement("a")
+    link.href = url
+    link.setAttribute("download", name)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  }
+
+  const matrix = useMemo(
+    () => rows.map((row) => dataset.columns.map((col) => col.get(row))),
+    [rows, dataset]
+  )
+
+  const exportCsv = () => {
+    const header = dataset.columns.map((c) => c.label).join(",")
+    const body = matrix
+      .map((cells) => cells.map((c) => `"${c.replace(/"/g, '""')}"`).join(","))
+      .join("\n")
+    triggerDownload(new Blob(["﻿" + header + "\n" + body], { type: "text/csv;charset=utf-8;" }), fileName("csv"))
+  }
+
+  const exportExcel = () => {
+    const head = dataset.columns.map((c) => `<th>${c.label}</th>`).join("")
+    const bodyRows = matrix
+      .map((cells) => `<tr>${cells.map((c) => `<td>${c}</td>`).join("")}</tr>`)
+      .join("")
+    const html = `<html xmlns:x="urn:schemas-microsoft-com:office:excel"><head><meta charset="utf-8"/></head><body><table border="1"><thead><tr>${head}</tr></thead><tbody>${bodyRows}</tbody></table></body></html>`
+    triggerDownload(new Blob(["﻿" + html], { type: "application/vnd.ms-excel;charset=utf-8;" }), fileName("xls"))
+  }
+
+  const exportPdf = async () => {
+    const { jsPDF } = await import("jspdf")
+    const doc = new jsPDF({ orientation: "landscape" })
+    const pageWidth = doc.internal.pageSize.getWidth()
+    doc.setFontSize(15)
+    doc.setTextColor(27, 94, 32)
+    doc.text(`AquiResolve — ${dataset.label}`, 14, 16)
+    doc.setFontSize(9)
+    doc.setTextColor(120)
+    doc.text(`Gerado em ${new Date().toLocaleString("pt-BR")} · ${rows.length} registro(s)`, 14, 22)
+
+    const cols = dataset.columns
+    const colWidth = (pageWidth - 28) / cols.length
+    let y = 32
+    doc.setFontSize(8)
+    doc.setTextColor(13, 71, 161)
+    cols.forEach((c, i) => doc.text(c.label, 14 + i * colWidth, y))
+    doc.setDrawColor(220)
+    doc.line(14, y + 2, pageWidth - 14, y + 2)
+    y += 7
+    doc.setTextColor(0)
+    matrix.forEach((cells) => {
+      if (y > 195) { doc.addPage(); y = 20 }
+      cells.forEach((cell, i) => {
+        const text = cell.length > 22 ? cell.slice(0, 21) + "…" : cell
+        doc.text(text, 14 + i * colWidth, y)
+      })
+      y += 6
+    })
+    doc.save(fileName("pdf"))
+  }
+
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4" />
+    <PageWithBack backButtonLabel="Voltar">
+      <div className="space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Database className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-foreground">Central de Exportação</h1>
+              <p className="text-sm text-muted-foreground">Exporte dados reais do Firestore em PDF, Excel ou CSV</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Select value={datasetKey} onValueChange={setDatasetKey}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {DATASETS.map((d) => (
+                  <SelectItem key={d.key} value={d.key}>{d.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+              <RefreshCw className={`mr-1.5 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+              Atualizar
             </Button>
-            <h1 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--foreground)' }}>
-              Exportador
-            </h1>
-          </div>
-          <p className="text-muted-foreground">
-            autem.com.br › configurações › exportador
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <Upload className="h-4 w-4 mr-2" />
-            Importar
-          </Button>
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Exportador
-          </Button>
-        </div>
-      </div>
-
-      {/* Estatísticas */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
-              Total de Exportadores
-            </CardTitle>
-            <Download className="h-4 w-4" style={{ color: 'var(--primary)' }} />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" style={{ color: 'var(--primary)' }}>{exportadores.length}</div>
-            <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-              Configurados
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
-              Ativos
-            </CardTitle>
-            <Download className="h-4 w-4" style={{ color: 'var(--success)' }} />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" style={{ color: 'var(--success)' }}>
-              {exportadores.filter(e => e.status === 'ativo').length}
-            </div>
-            <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-              Em operação
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
-              Inativos
-            </CardTitle>
-            <Download className="h-4 w-4" style={{ color: 'var(--warning)' }} />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" style={{ color: 'var(--warning)' }}>
-              {exportadores.filter(e => e.status === 'inativo').length}
-            </div>
-            <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-              Suspensos
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium" style={{ color: 'var(--foreground)' }}>
-              Última Sincronização
-            </CardTitle>
-            <Clock className="h-4 w-4" style={{ color: 'var(--info)' }} />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold" style={{ color: 'var(--info)' }}>
-              Hoje
-            </div>
-            <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
-              15:20:00
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Barra de Ações */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="sm">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          <Button variant="outline" size="sm">
-            <Upload className="h-4 w-4" />
-          </Button>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4" style={{ color: 'var(--muted-foreground)' }} />
-            <Input 
-              placeholder="PROCURAR" 
-              className="pl-20 w-64" 
-              aria-label="Buscar exportadores"
-            />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button disabled={loading || rows.length === 0}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Exportar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={exportPdf}>
+                  <FileText className="mr-2 h-4 w-4 text-red-600" /> PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportExcel}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" /> Excel (.xls)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={exportCsv}>
+                  <FileDown className="mr-2 h-4 w-4 text-blue-600" /> CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Novo Exportador
-          </Button>
-        </div>
-      </div>
-
-      {/* Tabela de Exportadores */}
-      <Card>
-        <CardHeader>
-          <CardTitle style={{ color: 'var(--foreground)' }}>Exportadores Configurados</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead style={{ color: 'var(--foreground)' }}>
-                  <input type="checkbox" className="rounded" />
-                </TableHead>
-                <TableHead style={{ color: 'var(--foreground)' }}>Exportador</TableHead>
-                <TableHead style={{ color: 'var(--foreground)' }}>Cliente/Fornecedor</TableHead>
-                <TableHead style={{ color: 'var(--foreground)' }}>Fuso Horário</TableHead>
-                <TableHead style={{ color: 'var(--foreground)' }}>Status</TableHead>
-                <TableHead style={{ color: 'var(--foreground)' }}>Última Sincronização</TableHead>
-                <TableHead className="text-right" style={{ color: 'var(--foreground)' }}>Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {exportadores.map((exportador) => (
-                <TableRow key={exportador.id}>
-                  <TableCell>
-                    <input type="checkbox" className="rounded" />
-                  </TableCell>
-                  <TableCell className="font-medium" style={{ color: 'var(--foreground)' }}>
-                    {exportador.nome}
-                  </TableCell>
-                  <TableCell style={{ color: 'var(--foreground)' }}>
-                    {exportador.cliente || "Não configurado"}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getFusoHorarioColor(exportador.fusoHorario)}>
-                      {exportador.fusoHorario}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={getStatusColor(exportador.status)}>
-                      {exportador.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell style={{ color: 'var(--foreground)' }}>
-                    {exportador.ultimaSincronizacao}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button size="sm" variant="outline">
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button size="sm" variant="outline">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button size="sm" variant="outline" className="text-red-600 bg-transparent">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Paginação */}
-      <div className="flex items-center justify-between">
-        <p className="text-sm" style={{ color: 'var(--muted-foreground)' }}>
-          Mostrando de 1 até {exportadores.length} de {exportadores.length} resultado(s)
-        </p>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" disabled>
-            ←
-          </Button>
-          <Button variant="outline" size="sm">
-            1
-          </Button>
-          <Button variant="outline" size="sm" disabled>
-            →
-          </Button>
-        </div>
-      </div>
-
-      {/* Informações Adicionais */}
-      <div className="grid gap-6 md:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle style={{ color: 'var(--foreground)' }}>Status dos Exportadores</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                  <span style={{ color: 'var(--foreground)' }}>Ativos</span>
-                </div>
-                <Badge variant="secondary">
-                  {exportadores.filter(e => e.status === 'ativo').length}
-                </Badge>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-3 h-3 bg-muted-foreground rounded-full"></div>
-                  <span style={{ color: 'var(--foreground)' }}>Inativos</span>
-                </div>
-                <Badge variant="secondary">
-                  {exportadores.filter(e => e.status === 'inativo').length}
-                </Badge>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle style={{ color: 'var(--foreground)' }}>Configurações de Fuso Horário</CardTitle>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>{dataset.label}</CardTitle>
+                <CardDescription>{rows.length} registro(s) na coleção <code className="text-xs bg-muted px-1 py-0.5 rounded">{dataset.collection}</code></CardDescription>
+              </div>
+              <Badge variant="outline">{dataset.columns.length} colunas</Badge>
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              {Array.from(new Set(exportadores.map(e => e.fusoHorario))).map((fuso) => (
-                <div key={fuso} className="flex items-center justify-between p-2 bg-muted/50 rounded">
-                  <div className="flex items-center gap-2">
-                    <Globe className="h-4 w-4" style={{ color: 'var(--muted-foreground)' }} />
-                    <span style={{ color: 'var(--foreground)' }}>{fuso}</span>
-                  </div>
-                  <Badge variant="secondary">
-                    {exportadores.filter(e => e.fusoHorario === fuso).length}
-                  </Badge>
-                </div>
-              ))}
-            </div>
+            {loading ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">Carregando dados...</div>
+            ) : rows.length === 0 ? (
+              <div className="py-12 text-center text-sm text-muted-foreground">Nenhum registro encontrado nesta coleção.</div>
+            ) : (
+              <div className="rounded-md border overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      {dataset.columns.map((c) => (
+                        <TableHead key={c.key}>{c.label}</TableHead>
+                      ))}
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {matrix.slice(0, 100).map((cells, i) => (
+                      <TableRow key={i}>
+                        {cells.map((cell, j) => (
+                          <TableCell key={j} className="whitespace-nowrap text-sm">{cell || "—"}</TableCell>
+                        ))}
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {rows.length > 100 ? (
+                  <p className="p-3 text-xs text-muted-foreground border-t">
+                    Exibindo 100 de {rows.length} registros — a exportação inclui todos.
+                  </p>
+                ) : null}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
-
-      {/* Ações Rápidas */}
-      <Card>
-        <CardHeader>
-          <CardTitle style={{ color: 'var(--foreground)' }}>Ações Rápidas</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Button variant="outline" className="h-auto p-4 flex flex-col items-center gap-2">
-              <Plus className="h-6 w-6" />
-              <span>Novo Exportador</span>
-            </Button>
-            <Button variant="outline" className="h-auto p-4 flex flex-col items-center gap-2">
-              <Upload className="h-6 w-6" />
-              <span>Importar Configurações</span>
-            </Button>
-            <Button variant="outline" className="h-auto p-4 flex flex-col items-center gap-2">
-              <RefreshCw className="h-6 w-6" />
-              <span>Sincronizar Todos</span>
-            </Button>
-            <Button variant="outline" className="h-auto p-4 flex flex-col items-center gap-2">
-              <Download className="h-6 w-6" />
-              <span>Exportar Configurações</span>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+    </PageWithBack>
   )
 }
