@@ -7,7 +7,12 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, Eye, Ban, CheckCircle, Shield, Star, Loader2, RefreshCw } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog"
+import { Search, Eye, CheckCircle, Shield, Star, Loader2, RefreshCw, UserX } from "lucide-react"
 import { ProviderModal } from "./provider-modal"
 import { FirebaseProvidersService, type FirebaseProvider } from "@/lib/services/firebase-providers"
 import { mapProviderStatusToLegacy } from "@/lib/providers/status"
@@ -28,14 +33,19 @@ interface Provider {
   totalOrders: number
   totalEarnings: number
   status: "active" | "inactive" | "pending" | "blocked"
+  blocked: boolean
+  blockType: string | null
+  blockedReason: string | null
   createdAt: string
 }
 
 function convertFirebaseToProvider(provider: FirebaseProvider): Provider {
   const vs = mapRawVerificationStatus((provider as any).verificationStatus)
   const isVerified = vs === "approved"
-  const status =
-    vs === "rejected"
+  const isBlocked = (provider as any).blocked === true
+  const status = isBlocked
+    ? "blocked"
+    : vs === "rejected"
       ? "blocked"
       : vs === "pending"
         ? "pending"
@@ -55,9 +65,20 @@ function convertFirebaseToProvider(provider: FirebaseProvider): Provider {
     totalOrders: provider.totalServicos || 0,
     totalEarnings: Number((provider as any).totalEarnings || (provider as any).totalGanhos || 0),
     status,
+    blocked: isBlocked,
+    blockType: (provider as any).blockType ?? null,
+    blockedReason: (provider as any).blockedReason ?? null,
     createdAt: provider.createdAt ? toIsoStringFromUnknown(provider.createdAt) : "",
   }
 }
+
+const BLOCK_REASONS = [
+  "Baixa avaliação",
+  "Falta recorrente",
+  "Descumprimento de regras",
+  "Fraude",
+  "Outro",
+]
 
 export function ProvidersTable() {
   const [providers, setProviders] = useState<Provider[]>([])
@@ -69,6 +90,14 @@ export function ProvidersTable() {
   const [categoryFilter, setCategoryFilter] = useState<string>("all")
   const [selectedProvider, setSelectedProvider] = useState<Provider | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+
+  // Bloqueio de prestador
+  const [blockTarget, setBlockTarget] = useState<Provider | null>(null)
+  const [blockType, setBlockType] = useState<"suspension" | "permanent">("suspension")
+  const [blockReason, setBlockReason] = useState<string>(BLOCK_REASONS[0])
+  const [blockReasonDetail, setBlockReasonDetail] = useState("")
+  const [blockedUntil, setBlockedUntil] = useState("")
+  const [blocking, setBlocking] = useState(false)
 
   const fetchProviders = useCallback(async () => {
     try {
@@ -127,24 +156,62 @@ export function ProvidersTable() {
     }
   }
 
-  const handleStatusChange = async (provider: Provider, newStatus: "active" | "blocked") => {
-    try {
-      setUpdatingProviderId(provider.id)
-      setError(null)
-      const firebaseStatus = newStatus === "active" ? "disponivel" : "offline"
-      await FirebaseProvidersService.updateProviderStatus(provider.id, firebaseStatus)
-      await fetchProviders()
-    } catch (err) {
-      console.error("Erro ao atualizar status do prestador:", err)
-      setError("Erro ao atualizar status do prestador")
-    } finally {
-      setUpdatingProviderId(null)
-    }
-  }
-
   const handleViewProvider = (provider: Provider) => {
     setSelectedProvider(provider)
     setIsModalOpen(true)
+  }
+
+  const openBlockDialog = (provider: Provider) => {
+    setBlockTarget(provider)
+    setBlockType("suspension")
+    setBlockReason(BLOCK_REASONS[0])
+    setBlockReasonDetail("")
+    setBlockedUntil("")
+  }
+
+  const submitBlock = async () => {
+    if (!blockTarget) return
+    const reason = blockReason === "Outro" ? blockReasonDetail.trim() : blockReason
+    if (!reason) {
+      setError("Informe o motivo do bloqueio")
+      return
+    }
+    try {
+      setBlocking(true)
+      setError(null)
+      const res = await fetch(`/api/providers/${blockTarget.id}/block`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          blockType,
+          reason,
+          blockedUntil: blockType === "suspension" && blockedUntil ? new Date(blockedUntil).toISOString() : undefined,
+        }),
+      })
+      if (!res.ok) throw new Error((await res.json()).error || "Falha ao bloquear")
+      setBlockTarget(null)
+      await fetchProviders()
+    } catch (err) {
+      console.error("Erro ao bloquear prestador:", err)
+      setError(err instanceof Error ? err.message : "Erro ao bloquear prestador")
+    } finally {
+      setBlocking(false)
+    }
+  }
+
+  const handleUnblock = async (provider: Provider) => {
+    try {
+      setUpdatingProviderId(provider.id)
+      setError(null)
+      const res = await fetch(`/api/providers/${provider.id}/block`, { method: "DELETE" })
+      if (!res.ok) throw new Error((await res.json()).error || "Falha ao desbloquear")
+      await fetchProviders()
+    } catch (err) {
+      console.error("Erro ao desbloquear prestador:", err)
+      setError(err instanceof Error ? err.message : "Erro ao desbloquear prestador")
+    } finally {
+      setUpdatingProviderId(null)
+    }
   }
 
   const handleProviderCategoriesUpdated = (categories: string[]) => {
@@ -311,23 +378,27 @@ export function ProvidersTable() {
                           <Button variant="ghost" size="sm" onClick={() => handleViewProvider(provider)}>
                             <Eye className="h-4 w-4" />
                           </Button>
-                          {provider.status === "active" ? (
+                          {provider.blocked ? (
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleStatusChange(provider, "blocked")}
+                              title="Desbloquear prestador"
+                              onClick={() => handleUnblock(provider)}
                               disabled={updatingProviderId === provider.id}
                             >
-                              <Ban className="h-4 w-4 text-red-600" />
+                              {updatingProviderId === provider.id
+                                ? <Loader2 className="h-4 w-4 animate-spin" />
+                                : <CheckCircle className="h-4 w-4 text-green-600" />}
                             </Button>
                           ) : (
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleStatusChange(provider, "active")}
+                              title="Suspender / bloquear prestador"
+                              onClick={() => openBlockDialog(provider)}
                               disabled={updatingProviderId === provider.id}
                             >
-                              <CheckCircle className="h-4 w-4 text-green-600" />
+                              <UserX className="h-4 w-4 text-red-600" />
                             </Button>
                           )}
                         </div>
@@ -351,6 +422,82 @@ export function ProvidersTable() {
           setSelectedProvider(null)
         }}
       />
+
+      <Dialog open={!!blockTarget} onOpenChange={(open) => { if (!open) setBlockTarget(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserX className="h-5 w-5 text-red-600" />
+              Bloquear prestador
+            </DialogTitle>
+            <DialogDescription>
+              {blockTarget?.name} — o prestador não poderá fazer login nem receber novos serviços.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Tipo de bloqueio</Label>
+              <Select value={blockType} onValueChange={(v) => setBlockType(v as "suspension" | "permanent")}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="suspension">Suspensão (temporária)</SelectItem>
+                  <SelectItem value="permanent">Bloqueio definitivo</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {blockType === "suspension" ? (
+              <div className="space-y-2">
+                <Label>Suspenso até (opcional)</Label>
+                <Input type="date" value={blockedUntil} onChange={(e) => setBlockedUntil(e.target.value)} />
+              </div>
+            ) : null}
+
+            <div className="space-y-2">
+              <Label>Motivo</Label>
+              <Select value={blockReason} onValueChange={setBlockReason}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {BLOCK_REASONS.map((reason) => (
+                    <SelectItem key={reason} value={reason}>{reason}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {blockReason === "Outro" ? (
+              <div className="space-y-2">
+                <Label>Descreva o motivo</Label>
+                <Textarea
+                  value={blockReasonDetail}
+                  onChange={(e) => setBlockReasonDetail(e.target.value)}
+                  placeholder="Descreva o motivo do bloqueio"
+                  rows={3}
+                />
+              </div>
+            ) : null}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBlockTarget(null)} disabled={blocking}>
+              Cancelar
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={submitBlock}
+              disabled={blocking}
+            >
+              {blocking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              {blockType === "suspension" ? "Suspender" : "Bloquear"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

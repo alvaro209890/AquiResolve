@@ -43,6 +43,13 @@ import { usePagarmeCharges, usePagarmeOrders, usePagarmeAnalytics } from "@/hook
 import { PagarmeService } from "@/lib/services/pagarme-service"
 import { cn } from "@/lib/utils"
 import { AppShell } from "@/components/layout/app-shell"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { FileSpreadsheet, FileDown } from "lucide-react"
 
 const TAB_KEYS = new Set(["overview", "analytics", "performance"])
 
@@ -318,22 +325,105 @@ export default function ReportsPage() {
     refetchAnalytics()
   }
 
-  const handleExport = () => {
-    if (!dailyData.length) return
+  const reportFileName = (ext: string) => `relatorio-aquiresolve-${format(new Date(), "yyyy-MM-dd")}.${ext}`
 
-    const csvHeader = "Data,Pedidos,Receita"
-    const csvRows = dailyData.map((row) => `${row.label},${row.pedidos},${row.receita.toFixed(2)}`)
-    const csvContent = [csvHeader, ...csvRows].join("\n")
-
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+  const triggerDownload = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob)
     const link = document.createElement("a")
     link.href = url
-    link.setAttribute("download", `relatorio-${format(new Date(), "yyyy-MM-dd")}.csv`)
+    link.setAttribute("download", filename)
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
+  }
+
+  const handleExportCsv = () => {
+    if (!dailyData.length) return
+    const csvHeader = "Data,Pedidos,Receita"
+    const csvRows = dailyData.map((row) => `${row.label},${row.pedidos},${row.receita.toFixed(2)}`)
+    const csvContent = [csvHeader, ...csvRows].join("\n")
+    triggerDownload(new Blob(["﻿" + csvContent], { type: "text/csv;charset=utf-8;" }), reportFileName("csv"))
+  }
+
+  const handleExportExcel = () => {
+    if (!dailyData.length) return
+    const rowsHtml = dailyData
+      .map((row) => `<tr><td>${row.label}</td><td>${row.pedidos}</td><td>${row.receita.toFixed(2)}</td></tr>`)
+      .join("")
+    const summaryHtml = `
+      <tr><td colspan="3"></td></tr>
+      <tr><td><b>Receita total</b></td><td colspan="2">${stats.receitaTotal.toFixed(2)}</td></tr>
+      <tr><td><b>Pedidos pagos</b></td><td colspan="2">${stats.pedidosPagos}</td></tr>
+      <tr><td><b>Ticket médio</b></td><td colspan="2">${stats.ticketMedio.toFixed(2)}</td></tr>
+      <tr><td><b>Taxa de aprovação</b></td><td colspan="2">${stats.taxaAprovacao.toFixed(1)}%</td></tr>`
+    const html = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel">
+      <head><meta charset="utf-8" /></head>
+      <body>
+        <table border="1">
+          <thead><tr><th>Data</th><th>Pedidos</th><th>Receita (R$)</th></tr></thead>
+          <tbody>${rowsHtml}${summaryHtml}</tbody>
+        </table>
+      </body></html>`
+    triggerDownload(new Blob(["﻿" + html], { type: "application/vnd.ms-excel;charset=utf-8;" }), reportFileName("xls"))
+  }
+
+  const handleExportPdf = async () => {
+    if (!dailyData.length) return
+    const { jsPDF } = await import("jspdf")
+    const doc = new jsPDF()
+    const pageWidth = doc.internal.pageSize.getWidth()
+
+    doc.setFontSize(16)
+    doc.setTextColor(27, 94, 32)
+    doc.text("AquiResolve — Relatório", 14, 18)
+    doc.setFontSize(10)
+    doc.setTextColor(120)
+    doc.text(`Gerado em ${format(new Date(), "dd/MM/yyyy HH:mm", { locale: ptBR })}`, 14, 25)
+
+    // Resumo
+    doc.setTextColor(0)
+    doc.setFontSize(11)
+    let y = 36
+    const resumo: [string, string][] = [
+      ["Receita total", formatCurrency(stats.receitaTotal)],
+      ["Pedidos pagos", String(stats.pedidosPagos)],
+      ["Ticket médio", formatCurrency(stats.ticketMedio)],
+      ["Taxa de aprovação", `${stats.taxaAprovacao.toFixed(1)}%`],
+      ["Clientes únicos", String(stats.clientesUnicos)],
+    ]
+    resumo.forEach(([label, value]) => {
+      doc.setTextColor(90)
+      doc.text(`${label}:`, 14, y)
+      doc.setTextColor(0)
+      doc.text(value, 70, y)
+      y += 7
+    })
+
+    // Tabela diária
+    y += 6
+    doc.setFontSize(12)
+    doc.setTextColor(13, 71, 161)
+    doc.text("Evolução diária", 14, y)
+    y += 8
+    doc.setFontSize(10)
+    doc.setTextColor(0)
+    doc.setDrawColor(220)
+    doc.text("Data", 14, y)
+    doc.text("Pedidos", 90, y)
+    doc.text("Receita", 140, y)
+    doc.line(14, y + 2, pageWidth - 14, y + 2)
+    y += 9
+    dailyData.forEach((row) => {
+      if (y > 280) { doc.addPage(); y = 20 }
+      doc.text(String(row.label), 14, y)
+      doc.text(String(row.pedidos), 90, y)
+      doc.text(formatCurrency(row.receita), 140, y)
+      y += 7
+    })
+
+    doc.save(reportFileName("pdf"))
   }
 
   return (
@@ -387,10 +477,28 @@ export default function ReportsPage() {
               {isLoading ? "Atualizando..." : "Atualizar"}
             </Button>
 
-            <Button onClick={handleExport} disabled={!dailyData.length || isLoading}>
-              <Download className="mr-2 h-4 w-4" />
-              Exportar CSV
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button disabled={!dailyData.length || isLoading}>
+                  <Download className="mr-2 h-4 w-4" />
+                  Exportar
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={handleExportPdf}>
+                  <FileText className="mr-2 h-4 w-4 text-red-600" />
+                  PDF
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportExcel}>
+                  <FileSpreadsheet className="mr-2 h-4 w-4 text-emerald-600" />
+                  Excel (.xls)
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleExportCsv}>
+                  <FileDown className="mr-2 h-4 w-4 text-blue-600" />
+                  CSV
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 

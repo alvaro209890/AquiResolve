@@ -6,6 +6,7 @@ import android.view.View
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import com.aquiresolve.app.adapters.ImageAdapter
@@ -13,6 +14,7 @@ import com.aquiresolve.app.databinding.ActivityOsHistoryBinding
 import com.aquiresolve.app.models.OsChecklistData
 import com.aquiresolve.app.models.OrderData
 import kotlinx.coroutines.launch
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -23,6 +25,8 @@ class OsHistoryActivity : AppCompatActivity() {
     private lateinit var orderManager: FirebaseOrderManager
 
     private var orderId: String? = null
+    private var loadedOrder: OrderData? = null
+    private var loadedChecklist: OsChecklistData? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,6 +62,8 @@ class OsHistoryActivity : AppCompatActivity() {
 
                 val order = orderResult.getOrNull()
                 val checklist = checklistResult.getOrNull()
+                loadedOrder = order
+                loadedChecklist = checklist
 
                 if (order != null) {
                     updateOrderInfo(order)
@@ -184,6 +190,40 @@ class OsHistoryActivity : AppCompatActivity() {
     }
 
     private fun exportToPdf() {
-        Toast.makeText(this, "Exportação PDF em desenvolvimento", Toast.LENGTH_SHORT).show()
+        val order = loadedOrder
+        val checklist = loadedChecklist
+        if (order == null || checklist == null) {
+            Toast.makeText(this, "Aguarde o carregamento da OS", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        binding.btnExportPdf.isEnabled = false
+        Toast.makeText(this, "Gerando PDF da OS...", Toast.LENGTH_SHORT).show()
+
+        lifecycleScope.launch {
+            try {
+                val file = OsPdfGenerator.generate(this@OsHistoryActivity, order, checklist)
+                sharePdf(file, order.protocol.ifBlank { order.id })
+            } catch (e: Exception) {
+                Toast.makeText(this@OsHistoryActivity, "Erro ao gerar PDF: ${e.message}", Toast.LENGTH_LONG).show()
+            } finally {
+                binding.btnExportPdf.isEnabled = true
+            }
+        }
+    }
+
+    private fun sharePdf(file: File, protocol: String) {
+        val uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
+        val shareIntent = Intent(Intent.ACTION_SEND).apply {
+            type = "application/pdf"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, "Ordem de Serviço $protocol — AquiResolve")
+            putExtra(
+                Intent.EXTRA_TEXT,
+                "Segue a Ordem de Serviço $protocol referente ao atendimento AquiResolve."
+            )
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(Intent.createChooser(shareIntent, "Compartilhar OS via..."))
     }
 }
