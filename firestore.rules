@@ -276,6 +276,14 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Campanhas promocionais de cashback — gerenciadas só pelo Admin SDK
+    // (rotas /api/cashback-campaigns). Leitura liberada a usuários autenticados
+    // para o app exibir campanhas ativas; escrita bloqueada no client SDK.
+    match /cashback_campaigns/{campaignId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // Checklists (top-level — app mobile)
     // ═══════════════════════════════════════════════════════════════════════════
