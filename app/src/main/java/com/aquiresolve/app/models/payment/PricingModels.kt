@@ -6,7 +6,11 @@ data class PricingRequest(
     @SerializedName("category")
     val category: String,
     @SerializedName("serviceType")
-    val serviceType: String
+    val serviceType: String,
+    // Guincho: distância (km) da origem ao destino. O backend usa isto para
+    // calcular saída + R$/km. Ignorado pelos demais serviços (preço fixo).
+    @SerializedName("distanceKm")
+    val distanceKm: Double? = null
 )
 
 data class PricingResponse(

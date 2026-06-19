@@ -72,12 +72,16 @@ class PagarMeManager(private val context: Context) {
         }
     }
 
-    suspend fun calculateServicePricing(category: String, serviceType: String): PricingResult {
+    suspend fun calculateServicePricing(
+        category: String,
+        serviceType: String,
+        distanceKm: Double? = null
+    ): PricingResult {
         return try {
             val authToken = getAuthorizationHeader()
             val response = apiService.calculatePricing(
                 authToken,
-                PricingRequest(category = category, serviceType = serviceType)
+                PricingRequest(category = category, serviceType = serviceType, distanceKm = distanceKm)
             )
 
             if (response.isSuccessful) {

@@ -153,6 +153,15 @@ class CreateOrderActivity : AppCompatActivity() {
             else -> null
         }
 
+        // Guincho tem fluxo próprio (origem→destino, preço por km) — desvia para a tela dedicada.
+        if (TowingOrderActivity.isTowingCategory(effectiveCategory)) {
+            startActivity(Intent(this, TowingOrderActivity::class.java).apply {
+                putExtra("service_category_name", effectiveCategory)
+            })
+            finish()
+            return
+        }
+
         // Configurar a interface
         setupUI()
         setupClickListeners()

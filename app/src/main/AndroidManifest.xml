@@ -94,6 +94,10 @@
             android:exported="false"
             android:theme="@style/Theme.LoginApp" />
         <activity
+            android:name=".TowingOrderActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LoginApp" />
+        <activity
             android:name=".AddressManagementActivity"
             android:exported="false"
             android:theme="@style/Theme.LoginApp" />

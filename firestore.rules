@@ -102,7 +102,9 @@ service cloud.firestore {
           'complement', 'city', 'state', 'coordinates', 'scheduledDate',
           'preferredTimeSlot', 'images', 'cartCheckoutCode', 'cartItemId',
           'status', 'paymentStatus', 'estimatedPrice', 'finalPrice',
-          'cartDiscountPercent', 'providerCommission', 'createdAt', 'updatedAt'
+          'cartDiscountPercent', 'providerCommission', 'createdAt', 'updatedAt',
+          'serviceCategory', 'originAddress', 'destinationAddress',
+          'originLocation', 'destinationLocation', 'distanceKm'
         ]);
     }
 

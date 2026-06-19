@@ -1,6 +1,7 @@
 const HttpError = require('../utils/http-error');
 const { initializeFirebase } = require('../config/firebase');
 const logger = require('../utils/logger');
+const { isTowingCategory, calculateTowingPricing } = require('./towing-pricing.service');
 
 // Cache em memória do lookup no Firestore (catalog_services) para não bater no banco
 // a cada cálculo. TTL curto: mudanças no painel refletem em segundos.
@@ -538,7 +539,7 @@ async function lookupFirestorePricing(category, serviceType) {
   return value;
 }
 
-async function calculateServicePricing({ category, serviceType }) {
+async function calculateServicePricing({ category, serviceType, distanceKm }) {
   const cleanCategory = normalizeText(category);
   const cleanServiceType = normalizeText(serviceType);
   if (!cleanCategory) {
@@ -546,6 +547,16 @@ async function calculateServicePricing({ category, serviceType }) {
   }
   if (!cleanServiceType) {
     throw new HttpError(422, 'Tipo de serviço é obrigatório', { code: 'INVALID_SERVICE_TYPE' });
+  }
+
+  // 0) Guincho: preço por distância (saída + R$/km da origem ao destino).
+  //    O app envia distanceKm calculado pela rota; ignora o catálogo fixo.
+  if (isTowingCategory(cleanCategory)) {
+    return calculateTowingPricing({
+      category: cleanCategory,
+      serviceType: cleanServiceType,
+      distanceKm
+    });
   }
 
   // 1) Catálogo dinâmico do painel (fonte de verdade quando disponível).

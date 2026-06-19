@@ -5,7 +5,8 @@ async function calculatePricing(req, res, next) {
   try {
     const result = await calculateServicePricing({
       category: req.body && req.body.category,
-      serviceType: req.body && req.body.serviceType
+      serviceType: req.body && req.body.serviceType,
+      distanceKm: req.body && req.body.distanceKm
     });
 
     logger.info('Precificacao de servico calculada', {

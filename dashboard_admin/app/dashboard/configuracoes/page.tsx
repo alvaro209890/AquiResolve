@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Settings, UserCheck, Database, Shield, CheckCircle, AlertTriangle, Award } from "lucide-react"
+import { Settings, UserCheck, Database, Shield, CheckCircle, AlertTriangle, Award, Truck } from "lucide-react"
 import { SyncPanel } from "@/components/financial/sync-panel"
 
 export default function ConfiguracoesPage() {
@@ -82,6 +82,25 @@ export default function ConfiguracoesPage() {
             <div className="mt-4">
               <Button variant="ghost" size="sm" asChild>
                 <a href="/dashboard/configuracoes/aquicash">Configurar AquiCash →</a>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="shadow-card hover:shadow-card-hover transition-shadow cursor-pointer border-amber-200">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-foreground">
+              <Truck className="h-5 w-5 text-amber-600" />
+              Guincho
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground">
+              Taxa de saída, valor por km e repasse ao motorista (preço por trajeto origem → destino)
+            </p>
+            <div className="mt-4">
+              <Button variant="ghost" size="sm" asChild>
+                <a href="/dashboard/configuracoes/guincho">Configurar Guincho →</a>
               </Button>
             </div>
           </CardContent>
