@@ -1,6 +1,13 @@
 # 04 — Parceiros AquiResolve
 
-**Prioridade:** 🟡 Média · **Fase:** 2 · **Complexidade:** Média
+**Prioridade:** 🟡 Média · **Fase:** 2 · **Complexidade:** Média · **Status:** ✅ Concluído (2026-06-22)
+
+> Implementado e **validado ao vivo no emulador** (Waydroid): a seção "🤝 Parceiros AquiResolve"
+> aparece na Home com os cards (logo, nome, pill de benefício). Tocar abre o detalhe
+> ([PartnerDetailActivity]) com banner, descrição, benefício, cupom copiável e "Visitar site".
+> Provado: Telhanorte (cupom AQUI15) → "Copiar" colocou `AQUI15` no clipboard (comprovado colando
+> no campo de busca) e "Visitar site" abriu `https://www.telhanorte.com.br/` no navegador. Os 3 tipos
+> (desconto/cupom/cashback) renderizaram. Painel + API + regras + seed prontos.
 
 ---
 
@@ -130,28 +137,29 @@ Seção "Parceiros AquiResolve" (título + `RecyclerView` horizontal de logos), 
 ## ✔️ Checklist
 
 ### Firestore / Regras
-- [ ] Bloco `partners` em `firestore.rules` + publicar.
+- [x] Bloco `partners` em `firestore.rules` + publicar.
+- [x] Bloco `partner_images` em `storage.rules` (upload ≤10MB pelo painel) + publicado.
 
 ### Painel admin
-- [ ] API `app/api/partners/route.ts` (GET/POST/DELETE, Admin SDK).
-- [ ] Página `dashboard/configuracoes/parceiros/page.tsx`.
-- [ ] Item na sidebar + deploy.
-- [ ] Cadastrar 2–3 parceiros de teste.
+- [x] API `app/api/partners/route.ts` (GET/POST/DELETE, Admin SDK; cupom só p/ benefitType=coupon).
+- [x] Página `dashboard/configuracoes/parceiros/page.tsx` (form: nome, logo+banner upload, descrição, tipo de benefício, rótulo, cupom condicional, URL, ordem, ativo; lista com toggle/editar/remover).
+- [x] Item "Parceiros AquiResolve" na sidebar (Configurações) + deploy.
+- [x] Cadastrar parceiros de teste (script `scripts/seed-partners.mjs` — 3 parceiros, 1 por tipo).
 
 ### App
-- [ ] Model `Partner.kt`.
-- [ ] `PartnerRepository.kt`.
-- [ ] `PartnerAdapter.kt` + `item_partner.xml`.
-- [ ] Seção na Home (título + RecyclerView).
-- [ ] Detalhe do parceiro (copiar cupom / abrir link).
-- [ ] `setupPartners()` em `ClientHomeActivity`.
-- [ ] Eventos Analytics `parceiro_click` / `parceiro_cupom_copiado`.
+- [x] Model `Partner.kt` (com helpers `hasCoupon()`/`hasUrl()`).
+- [x] `PartnerRepository.kt` (load/cache/fallback vazio, defensivo; pré-aquecido no `AppApplication`).
+- [x] `PartnerAdapter.kt` + `item_partner.xml` (card ~160dp: logo fitCenter + nome + pill de benefício).
+- [x] Seção `sectionPartners` na Home (título + RecyclerView horizontal, abaixo de Combos; GONE se vazio).
+- [x] `PartnerDetailActivity` + `activity_partner_detail.xml` (banner/logo, descrição, benefício, cupom copiável, "Visitar site").
+- [x] `setupPartners()` em `ClientHomeActivity`.
+- [x] Eventos Analytics `parceiro_click` / `parceiro_cupom_copiado` / `parceiro_link_aberto`.
 
-### QA
-- [ ] Parceiros aparecem; vazio → seção some.
-- [ ] Copiar cupom funciona (cola no clipboard + toast).
-- [ ] Link abre no navegador.
-- [ ] Logos carregam (Glide) e não distorcem.
+### QA (validado no emulador Waydroid)
+- [x] Parceiros aparecem; vazio → seção some (mesmo padrão dos combos).
+- [x] Copiar cupom funciona (clipboard recebeu `AQUI15`, comprovado colando no campo de busca).
+- [x] Link abre no navegador (`https://www.telhanorte.com.br/` via ACTION_VIEW).
+- [x] Logos carregam (Glide, fitCenter) e não distorcem.
 
 ---
 

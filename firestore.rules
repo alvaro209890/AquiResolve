@@ -205,6 +205,13 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Parceiros patrocinadores exibidos na Home — leitura por usuário autenticado;
+    // escrita exclusiva via Admin SDK (painel /dashboard/configuracoes/parceiros).
+    match /partners/{partnerId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // Usuários
     // ═══════════════════════════════════════════════════════════════════════════

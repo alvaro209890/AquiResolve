@@ -104,6 +104,7 @@ Activity → Manager → Firebase/Retrofit
 | `client_chat_broadcasts/{id}` | Histórico de cada disparo em massa do admin (auditoria). Só Admin SDK |
 | `home_banners/{id}` | Banners do carrossel da Home do cliente. App lê (`BannerRepository`); escrita só Admin SDK (painel) |
 | `home_combos/{id}` | Combos promocionais (vitrine) da Home. App lê (`ComboRepository`); escrita só Admin SDK (painel). Preço é exibição — desconto real vem do `PromotionManager` no carrinho |
+| `partners/{id}` | Parceiros patrocinadores (vitrine) da Home. App lê (`PartnerRepository`); escrita só Admin SDK (painel). Benefício: discount/cashback/coupon/link |
 
 ### Catálogo de NICHOS dinâmico (app ↔ painel)
 - O app **lê** os nichos de `service_categories` via `CatalogRepository.kt` (pré-carregado no `AppApplication`, com **fallback estático** em `ServiceNicheCatalog` se o Firestore estiver vazio/offline — zero regressão).
@@ -155,6 +156,20 @@ Seção "🔥 Combos Promocionais" na `ClientHomeActivity` (abaixo de Categorias
 - **Painel:** `app/api/combos/route.ts` (GET/POST/DELETE, Admin SDK; recalcula promo/savings no servidor) + `app/dashboard/servicos/combos/page.tsx` (multi-select de itens de `catalog_services` + cálculo automático + aviso de coerência) + item na sidebar (Serviços). Seed de teste: `scripts/seed-combos.mjs`.
 - **Firestore/Storage:** `home_combos` = `read: isSignedIn()` / `write: false`; `storage.rules` libera `combo_images/{fileName}` (upload autenticado ≤10MB). Sem índice composto.
 - **Analytics:** `home_combo_click` (id/nome), `combo_add_cart` (id/nome/itensAdicionados).
+
+### Parceiros AquiResolve (vitrine na Home) — `partners`
+Seção "🤝 Parceiros AquiResolve" na `ClientHomeActivity` (abaixo de Combos): patrocinadores (logo + benefício) gerenciados pelo painel → **sem novo APK** para criar/editar/desativar. Conteúdo é dado, não código.
+- **App:** `models/Partner.kt` (helpers `hasCoupon()`/`hasUrl()`; `benefitType` = discount/cashback/coupon/link) + `PartnerRepository.kt` (espelha `ComboRepository`: lê `partners`, filtra `active`, ordena `displayOrder`, cacheia, **nunca lança**; pré-aquecido no `AppApplication`). UI: `adapters/PartnerAdapter.kt` + `item_partner.xml` (RecyclerView horizontal em `sectionPartners`, nasce `GONE`; logo `fitCenter` em fundo branco + pill de benefício). Detalhe: `PartnerDetailActivity` + `activity_partner_detail.xml` (banner/logo, descrição, benefício; **cupom copiável** via `ClipboardManager` quando `coupon`; **"Visitar site"** via `Intent.ACTION_VIEW` quando há `url`). Parceiro lido por id do cache (`PartnerRepository.cachedPartnerById`) via extra `partner_id`.
+- **Painel:** `app/api/partners/route.ts` (GET/POST/DELETE, Admin SDK; `couponCode` só persistido p/ `benefitType=coupon`) + `app/dashboard/configuracoes/parceiros/page.tsx` (form: nome, logo+banner upload p/ `partner_images/`, descrição, tipo de benefício, rótulo, cupom condicional, URL, ordem, ativo) + item na sidebar (Configurações). Seed de teste: `scripts/seed-partners.mjs`.
+- **Firestore/Storage:** `partners` = `read: isSignedIn()` / `write: false`; `storage.rules` libera `partner_images/{fileName}` (upload autenticado ≤10MB). Sem índice composto.
+- **Analytics:** `parceiro_click`, `parceiro_cupom_copiado`, `parceiro_link_aberto` (id/nome).
+- **Validado ao vivo** (Waydroid): 3 parceiros (desconto/cupom/cashback) renderizaram; Telhanorte → "Copiar" pôs `AQUI15` no clipboard (comprovado colando no campo de busca); "Visitar site" abriu `https://www.telhanorte.com.br/`.
+
+### Manual do Painel — `/dashboard/manual`
+Aba "Manual do Painel" na sidebar (`app/dashboard/manual/page.tsx`, ícone `BookOpen`): documentação navegável (índice + âncoras) de **cada área do painel** (Painel, Serviços, Controle, Usuários, Pedidos, Financeiro, Relatórios, Configurações, Área Master), além de **conceitos** ("conteúdo é dado, não código", segurança das coleções, preço do catálogo) e **infraestrutura** (Firebase/Render/Vercel). Conteúdo estático em arrays no próprio componente — atualizar ao adicionar área nova.
+
+### infra-config/ (referência local — NÃO versionada)
+Pasta na raiz (`infra-config/`, no `.gitignore`) com **referência completa e exposta** de toda a configuração: `firebase/` (regras copiadas da raiz + `firebase-web-config.json` + `service-account.json` decodificada + `firebase-config.md`), `render/` (`render-credentials.txt` + `render.env`/`render-env-vars.json` puxados ao vivo da API + `render-service.md`), `vercel/` (`vercel.env` = cópia do `.env.local` + `vercel-config.md`). Contém segredos → **local apenas**, nunca commitar. Atualizar quando uma variável mudar na origem.
 
 ### Recuperação de senha (esqueci minha senha)
 - **Tela:** `ForgotPasswordActivity` (`activity_forgot_password.xml`). Acessível de **3 lugares**:
@@ -355,6 +370,8 @@ Todas as rotas estão em `dashboard_admin/app/api/`:
 | `/api/banners` | GET | Lista banners da Home de `home_banners` ordenados por `displayOrder` (Admin SDK) |
 | `/api/banners` | POST | Cria/atualiza banner (normaliza `actionType`; `id` opcional) (Admin SDK) |
 | `/api/banners` | DELETE | Remove banner de `home_banners` (`?id=`) (Admin SDK) |
+| `/api/combos` | GET/POST/DELETE | CRUD de combos em `home_combos`; recalcula promo/savings no servidor (Admin SDK) |
+| `/api/partners` | GET/POST/DELETE | CRUD de parceiros em `partners`; `couponCode` só p/ `benefitType=coupon` (Admin SDK) |
 | `/api/orders/[id]/refund` | POST | Reembolsa o pagamento do pedido via Pagar.me (Admin SDK). Body `{ amount?, reason? }` |
 | `/api/client-chats` | GET | Lista chats Base↔Cliente (`?status=active\|archived&unreadOnly=true`) |
 | `/api/client-chats/[clientId]` | PATCH | Pin/archive do chat (`{ pinned?, archived? }`) |
@@ -386,6 +403,9 @@ Todas as rotas estão em `dashboard_admin/app/api/`:
 | Chat com Clientes | `/dashboard/controle/chat-clientes` | Chat Base↔Cliente — lista de clientes (busca/filtros/unread badge), painel da conversa (polling 5s), modal de broadcast (audience all/active) |
 | Cashback (AquiCash) | `/dashboard/configuracoes/aquicash` | Configura fases, tiers, combos e salva em `app_config/cashback` via Admin SDK |
 | Banners da Home | `/dashboard/configuracoes/banners` | CRUD do carrossel da Home: upload da imagem (Storage `banner_images/`) ou URL, título/subtítulo, ação (niche/service/cashback/url/combos/partners/none), cor de fundo, ordem, ativo. Escreve em `home_banners` via `/api/banners` (Admin SDK) |
+| Combos Promocionais | `/dashboard/servicos/combos` | CRUD de combos: multi-select de `catalog_services` + cálculo automático de preços + aviso de coerência de desconto. Escreve em `home_combos` via `/api/combos` (Admin SDK) |
+| Parceiros AquiResolve | `/dashboard/configuracoes/parceiros` | CRUD de parceiros: logo+banner (Storage `partner_images/`), descrição, tipo de benefício, cupom condicional, URL, ordem, ativo. Escreve em `partners` via `/api/partners` (Admin SDK) |
+| Manual do Painel | `/dashboard/manual` | Documentação navegável de cada área do painel + conceitos + infraestrutura (página estática) |
 | Logs de Auditoria | `/dashboard/controle/logs` | Histórico de todas as ações críticas do admin (verificações, bloqueios, cancelamentos) |
 
 ### Hooks atualizados

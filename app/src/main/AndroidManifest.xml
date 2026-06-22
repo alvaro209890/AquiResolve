@@ -207,6 +207,11 @@
             android:theme="@style/Theme.LoginApp"
             android:screenOrientation="portrait" />
         <activity
+            android:name=".PartnerDetailActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LoginApp"
+            android:screenOrientation="portrait" />
+        <activity
             android:name=".ProviderHomeActivity"
             android:exported="false"
             android:theme="@style/Theme.LoginApp"

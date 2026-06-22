@@ -17,9 +17,9 @@ Foco: o cliente bate o olho e em segundos sabe o que fazer.
 
 > Ao final da Fase 1 a Home já parece "premium" e a conversão tende a subir, **sem IA**.
 
-### Fase 2 — Monetização e parcerias (conteúdo gerenciável)
+### Fase 2 — Monetização e parcerias (conteúdo gerenciável) — ✅ CONCLUÍDA (2026-06-22)
 4. ✅ **Combos promocionais** (`03`) — reaproveita a lógica de desconto já existente. **CONCLUÍDO (2026-06-22)**.
-5. **Parceiros AquiResolve** (`04`) — espaço para patrocinadores (descontos/cashback/cupons).
+5. ✅ **Parceiros AquiResolve** (`04`) — espaço para patrocinadores (descontos/cashback/cupons). **CONCLUÍDO (2026-06-22)**.
 
 ### Fase 3 — Inteligência (conveniência)
 6. **Assistente IA Groq** (`06`) — descreve o problema → IA identifica o nicho e direciona.
@@ -87,7 +87,7 @@ Assistente IA ───────────┘        (IA depende de proxy n
 | 1 | Banner rotativo | [x] | [x] | [x] | [x] | ✅ Concluído (2026-06-22) |
 | 2 | Categorias horizontais | n/a | reusa `service_categories` | [x] | [x] | ✅ Concluído (2026-06-22) |
 | 3 | Combos promocionais | [x] | [x] | [x] | [x] | ✅ Concluído (2026-06-22) |
-| 4 | Parceiros | [ ] | [ ] | [ ] | [ ] | ⬜ Não iniciado |
+| 4 | Parceiros | [x] | [x] | [x] | [x] | ✅ Concluído (2026-06-22) |
 | 5 | Busca inteligente | n/a | reusa `catalog_services` | [x] | [x] | ✅ Concluído (2026-06-22) |
 | 6 | Assistente IA | [ ] (proxy) | [ ] | [ ] | [ ] | ⬜ Não iniciado |
 | 7 | Home Premium (montagem) | n/a | n/a | [ ] | [ ] | ⬜ Não iniciado |

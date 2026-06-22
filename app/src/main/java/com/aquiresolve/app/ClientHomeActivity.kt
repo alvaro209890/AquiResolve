@@ -26,10 +26,12 @@ import com.bumptech.glide.request.RequestOptions
 import com.aquiresolve.app.adapters.BannerAdapter
 import com.aquiresolve.app.adapters.HomeCategoryAdapter
 import com.aquiresolve.app.adapters.HomeComboAdapter
+import com.aquiresolve.app.adapters.PartnerAdapter
 import com.aquiresolve.app.adapters.SearchSuggestionAdapter
 import com.aquiresolve.app.databinding.ActivityClientHomeBinding
 import com.aquiresolve.app.models.HomeBanner
 import com.aquiresolve.app.models.HomeCombo
+import com.aquiresolve.app.models.Partner
 import com.aquiresolve.app.models.OrderData
 import com.aquiresolve.app.models.SearchSuggestion
 import com.aquiresolve.app.utils.ServiceSearchHelper
@@ -60,6 +62,9 @@ class ClientHomeActivity : AppCompatActivity() {
     // Vitrine de Combos Promocionais
     private var comboAdapter: HomeComboAdapter? = null
 
+    // Vitrine de Parceiros AquiResolve
+    private var partnerAdapter: PartnerAdapter? = null
+
     // Busca Inteligente
     private var suggestionAdapter: SearchSuggestionAdapter? = null
     private val searchHandler = Handler(Looper.getMainLooper())
@@ -88,6 +93,7 @@ class ClientHomeActivity : AppCompatActivity() {
         setupCategories()
         setupBannerCarousel()
         setupCombos()
+        setupPartners()
         setupSearchSuggestions()
         loadProfileImage()
         loadRecentOrders()
@@ -503,6 +509,61 @@ class ClientHomeActivity : AppCompatActivity() {
                 android.os.Bundle().apply {
                     putString("comboId", combo.id)
                     putString("comboName", combo.name)
+                }
+            )
+        } catch (_: Exception) {
+        }
+    }
+
+    // ───────────────────────────── Parceiros AquiResolve ─────────────────────────────
+
+    /**
+     * Monta a seção horizontal de Parceiros AquiResolve (plano 04). Fonte: [PartnerRepository]
+     * (coleção `partners`, gerida pelo painel). Sem parceiros ativos, a seção fica `GONE`.
+     * Tocar num parceiro abre [PartnerDetailActivity] (descrição + cupom/copiar + visitar site).
+     */
+    private fun setupPartners() {
+        partnerAdapter = PartnerAdapter(emptyList()) { partner -> onPartnerClicked(partner) }
+        binding.rvPartners.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        binding.rvPartners.adapter = partnerAdapter
+
+        // Primeiro o cache (instantâneo), depois recarrega do Firestore.
+        applyPartners(PartnerRepository.cachedPartners())
+        lifecycleScope.launch {
+            val partners = try {
+                PartnerRepository.load()
+            } catch (_: Exception) {
+                PartnerRepository.cachedPartners()
+            }
+            applyPartners(partners)
+        }
+    }
+
+    private fun applyPartners(partners: List<Partner>) {
+        if (partners.isEmpty()) {
+            binding.sectionPartners.visibility = View.GONE
+            return
+        }
+        binding.sectionPartners.visibility = View.VISIBLE
+        partnerAdapter?.updateItems(partners)
+    }
+
+    private fun onPartnerClicked(partner: Partner) {
+        logPartnerClick(partner)
+        startActivity(
+            Intent(this, PartnerDetailActivity::class.java)
+                .putExtra(PartnerDetailActivity.EXTRA_PARTNER_ID, partner.id)
+        )
+    }
+
+    private fun logPartnerClick(partner: Partner) {
+        try {
+            FirebaseConfig.getAnalytics()?.logEvent(
+                "parceiro_click",
+                android.os.Bundle().apply {
+                    putString("partnerId", partner.id)
+                    putString("partnerName", partner.name)
                 }
             )
         } catch (_: Exception) {

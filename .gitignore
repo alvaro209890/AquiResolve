@@ -65,3 +65,7 @@ app/.gradle/
 
 # Credenciais de teste do emulador (Waydroid) — nunca versionar
 .emulator-test-credentials
+
+# Pasta local de infraestrutura (regras + TODAS as variaveis Firebase/Render/Vercel
+# expostas para referencia) — contem segredos, NUNCA versionar
+infra-config/

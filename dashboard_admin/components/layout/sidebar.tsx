@@ -32,6 +32,8 @@ import {
   Megaphone,
   ImageIcon,
   Flame,
+  Handshake,
+  BookOpen,
 } from "lucide-react"
 
 const navigation = [
@@ -106,8 +108,15 @@ const navigation = [
     children: [
       { name: "Geral", href: "/dashboard/configuracoes", icon: Settings },
       { name: "Banners da Home", href: "/dashboard/configuracoes/banners", icon: ImageIcon },
+      { name: "Parceiros AquiResolve", href: "/dashboard/configuracoes/parceiros", icon: Handshake },
       { name: "Equipes", href: "/dashboard/configuracoes/equipes", icon: UserCheck },
     ],
+  },
+  {
+    name: "Manual do Painel",
+    href: "/dashboard/manual",
+    icon: BookOpen,
+    permission: "dashboard",
   },
   {
     name: "Área Master",

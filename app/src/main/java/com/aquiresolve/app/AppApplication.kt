@@ -47,6 +47,14 @@ class AppApplication : Application() {
                     Log.w("AppApplication", "Falha ao pré-carregar combos: ${e.message}")
                 }
             }
+            // Pré-aquece a seção de parceiros patrocinadores da Home (fallback silencioso se vazio/offline).
+            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+                try {
+                    PartnerRepository.load()
+                } catch (e: Exception) {
+                    Log.w("AppApplication", "Falha ao pré-carregar parceiros: ${e.message}")
+                }
+            }
             Log.d("AppApplication", "Firebase initialized in Application.onCreate")
         } catch (e: Exception) {
             Log.e("AppApplication", "Error initializing Firebase: ${e.message}", e)
