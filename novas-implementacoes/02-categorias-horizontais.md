@@ -115,14 +115,14 @@ Inserir seção no `activity_client_home.xml` (abaixo do banner, antes de "Pedid
 - [ ] Definir emojis para os nichos principais.
 
 ### App
-- [ ] `item_home_category.xml`.
-- [ ] `HomeCategoryAdapter.kt`.
-- [ ] Inserir título + `RecyclerView` horizontal no `activity_client_home.xml`.
-- [ ] `setupCategories()` em `ClientHomeActivity` (load via `CatalogRepository`).
-- [ ] Roteamento nicho → criação de pedido com nicho pré-selecionado.
-- [ ] Item "Ver todos" → `ServicesActivity`.
-- [ ] Renderizar emoji do campo `icon` (fallback ⚙️/wrench se vazio).
-- [ ] Evento Analytics `home_categoria_click`.
+- [x] `item_home_category.xml` (card circular + ícone/emoji + rótulo).
+- [x] `HomeCategoryAdapter.kt` (suporta emoji literal **e** slug drawable via `resolveIcon`).
+- [x] Inserir título + `RecyclerView` horizontal no `activity_client_home.xml` (seção `sectionCategories`, antes do card de cashback).
+- [x] `setupCategories()` em `ClientHomeActivity` (load via `CatalogRepository`, com fallback imediato em cache).
+- [x] Roteamento nicho → `CreateOrderActivity` com extra `service_category_name` (mesma chave de `ServicesActivity`).
+- [x] Item "Ver todos" → `ServicesActivity`.
+- [x] Renderizar emoji do campo `icon` (fallback para drawable `resolveIcon`/`ic_services` quando não for emoji).
+- [x] Evento Analytics `home_categoria_click` (param `niche`).
 
 ### QA
 - [ ] Lista carrega do Firestore; offline cai no fallback estático sem quebrar.

@@ -61,6 +61,8 @@
     
     <!-- Surface Colors -->
     <color name="surface_color">#FFFFFF</color>
+    <!-- Fundo de cards (usado nos layouts do Chat Central); restaurado por estar ausente -->
+    <color name="card_background">#FFFFFF</color>
     
     <!-- Divider and Border -->
     <color name="divider_color">#E2E8F0</color>

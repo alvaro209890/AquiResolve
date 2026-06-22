@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Item da lista horizontal de Categorias da Home (HomeCategoryAdapter).
+  Largura fixa (~80dp) com círculo de ícone no topo e rótulo do nicho abaixo.
+  O ícone suporta DOIS modos (resolvidos no adapter a partir do campo `icon` do catálogo):
+    - emoji literal  -> mostrado em tvCategoryEmoji
+    - slug drawable  -> mostrado em ivCategoryIcon (mapeado por ServiceCategoriesAdapter.resolveIcon)
+  Assim, editar o emoji/ordem no painel reflete no app sem novo APK.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="80dp"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:gravity="center_horizontal"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        app:cardCornerRadius="32dp"
+        app:cardElevation="3dp"
+        app:cardBackgroundColor="@color/white"
+        app:strokeWidth="1dp"
+        app:strokeColor="@color/gray_100">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
+
+            <!-- Modo slug/drawable -->
+            <ImageView
+                android:id="@+id/ivCategoryIcon"
+                android:layout_width="32dp"
+                android:layout_height="32dp"
+                android:layout_gravity="center"
+                android:src="@drawable/ic_services"
+                app:tint="@color/primary_color"
+                android:contentDescription="@null" />
+
+            <!-- Modo emoji literal -->
+            <TextView
+                android:id="@+id/tvCategoryEmoji"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center"
+                android:textSize="28sp"
+                android:includeFontPadding="false"
+                android:visibility="gone"
+                tools:text="⚡" />
+
+        </FrameLayout>
+
+    </com.google.android.material.card.MaterialCardView>
+
+    <TextView
+        android:id="@+id/tvCategoryName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:gravity="center"
+        android:maxLines="2"
+        android:ellipsize="end"
+        android:textSize="12sp"
+        android:textColor="@color/text_primary"
+        tools:text="Elétrica" />
+
+</LinearLayout>

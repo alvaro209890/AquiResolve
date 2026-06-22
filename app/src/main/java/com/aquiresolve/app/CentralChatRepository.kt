@@ -14,7 +14,7 @@ import kotlinx.coroutines.tasks.await
  * Acesso ao chat Base ↔ Cliente (Central AquiResolve).
  *
  * As regras Firestore permitem:
- *  - read em `client_chats/{uid}` e `messages/*` apenas se `isOwner(uid)`
+ *  - read em `client_chats/{uid}` e na subcoleção `messages` apenas se `isOwner(uid)`
  *  - create de mensagem apenas com `senderType='client'` e `senderId == auth.uid`
  *
  * A atualização da metadata (last*, contadores) é responsabilidade do painel

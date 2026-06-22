@@ -13,13 +13,16 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.request.RequestOptions
+import com.aquiresolve.app.adapters.HomeCategoryAdapter
 import com.aquiresolve.app.databinding.ActivityClientHomeBinding
 import com.aquiresolve.app.models.OrderData
 import com.aquiresolve.app.utils.NotificationBadgeHelper
 import com.aquiresolve.app.utils.PriceFormatter
+import com.aquiresolve.app.utils.ServiceNicheCatalog
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -49,6 +52,7 @@ class ClientHomeActivity : AppCompatActivity() {
         setupWindowInsets()
         setupUI()
         setupClickListeners()
+        setupCategories()
         loadProfileImage()
         loadRecentOrders()
     }
@@ -184,6 +188,62 @@ class ClientHomeActivity : AppCompatActivity() {
                 }
                 else -> false
             }
+        }
+    }
+
+    /**
+     * Monta a seção de Categorias (nichos) em scroll horizontal na Home.
+     *
+     * Fonte: catálogo dinâmico ([CatalogRepository] → [ServiceNicheCatalog]), com fallback estático
+     * automático quando o Firestore está vazio/offline (a seção nunca aparece vazia). Tocar num nicho
+     * abre [CreateOrderActivity] já com o nicho pré-selecionado (mesmo extra `service_category_name`
+     * usado por [ServicesActivity]); o item final "Ver todos" abre a lista completa em [ServicesActivity].
+     */
+    private fun setupCategories() {
+        val adapter = HomeCategoryAdapter(
+            niches = emptyList(),
+            onNicheClick = { item ->
+                logCategoryClick(item.name)
+                startActivity(
+                    Intent(this, CreateOrderActivity::class.java)
+                        .putExtra("service_category_name", item.name)
+                )
+            },
+            onSeeAll = {
+                startActivity(Intent(this, ServicesActivity::class.java))
+            }
+        )
+
+        binding.rvCategories.layoutManager =
+            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
+        binding.rvCategories.adapter = adapter
+        // Fallback imediato (cache em memória) para não piscar vazio enquanto o Firestore carrega.
+        adapter.updateItems(buildCategoryItems())
+
+        lifecycleScope.launch {
+            try {
+                CatalogRepository.load()
+            } catch (_: Exception) {
+            }
+            adapter.updateItems(buildCategoryItems())
+        }
+    }
+
+    /** Converte o catálogo (com ícone) em itens do adapter e acrescenta o atalho "Ver todos". */
+    private fun buildCategoryItems(): List<HomeCategoryAdapter.Item> {
+        val items = ServiceNicheCatalog.selectableNichesWithIcons().map {
+            HomeCategoryAdapter.Item(name = it.name, icon = it.icon)
+        }
+        return items + HomeCategoryAdapter.Item(name = "Ver todos", icon = "", seeAll = true)
+    }
+
+    private fun logCategoryClick(niche: String) {
+        try {
+            FirebaseConfig.getAnalytics()?.logEvent(
+                "home_categoria_click",
+                android.os.Bundle().apply { putString("niche", niche) }
+            )
+        } catch (_: Exception) {
         }
     }
 

@@ -240,6 +240,36 @@
 
             </LinearLayout>
 
+            <!-- Seção de Categorias (nichos em scroll horizontal) -->
+            <LinearLayout
+                android:id="@+id/sectionCategories"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginBottom="24dp">
+
+                <TextView
+                    android:id="@+id/tvCategoriesTitle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Categorias"
+                    android:textSize="20sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary"
+                    android:layout_marginBottom="12dp" />
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rvCategories"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:clipToPadding="false"
+                    android:nestedScrollingEnabled="false"
+                    android:overScrollMode="never"
+                    tools:listitem="@layout/item_home_category"
+                    tools:orientation="horizontal" />
+
+            </LinearLayout>
+
             <!-- Card de cashback -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardCashback"

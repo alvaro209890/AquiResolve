@@ -85,7 +85,7 @@ Assistente IA ───────────┘        (IA depende de proxy n
 | # | Feature | Painel | Firestore/Regras | App | QA | Status |
 |---|---------|--------|------------------|-----|----|--------|
 | 1 | Banner rotativo | [ ] | [ ] | [ ] | [ ] | ⬜ Não iniciado |
-| 2 | Categorias horizontais | [ ] | [ ] | [ ] | [ ] | ⬜ Não iniciado |
+| 2 | Categorias horizontais | n/a | reusa `service_categories` | [x] | [x] | ✅ Concluído (2026-06-22) |
 | 3 | Combos promocionais | [ ] | [ ] | [ ] | [ ] | ⬜ Não iniciado |
 | 4 | Parceiros | [ ] | [ ] | [ ] | [ ] | ⬜ Não iniciado |
 | 5 | Busca inteligente | n/a | [ ] | [ ] | [ ] | ⬜ Não iniciado |
