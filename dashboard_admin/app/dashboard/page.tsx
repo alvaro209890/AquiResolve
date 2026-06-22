@@ -10,6 +10,7 @@ import { GoogleMapsLoader } from "@/components/map/google-maps-loader"
 import { DashboardMetrics } from "@/components/dashboard/dashboard-metrics"
 import { RecentActivity } from "@/components/dashboard/recent-activity"
 import { ServicesAnalytics } from "@/components/dashboard/services-analytics"
+import { RatingsBreakdown } from "@/components/dashboard/ratings-breakdown"
 import { useAnalytics } from "@/hooks/use-analytics"
 import { useEffect, useState, useCallback } from "react"
 import Link from "next/link"
@@ -135,6 +136,14 @@ export default function DashboardPage() {
               </Card>
             </div>
           </div>
+
+          {/* Avaliações */}
+          <section>
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+              Avaliações
+            </h2>
+            <RatingsBreakdown />
+          </section>
 
           {/* Map */}
           <section>

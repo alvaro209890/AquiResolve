@@ -184,6 +184,26 @@ awaiting_payment → pending → distributing → assigned → in_progress → c
 - `revenueLast30Days` — idem, filtrado pelos últimos 30 dias
 - Exibidos como dois novos KPI cards no Dashboard principal
 
+### KPI de Avaliações no Dashboard
+- Fonte: campo `orders/{id}.rating` (1..5, gravado por `FirebaseOrderManager.rateOrder`).
+- Agregado em `dashboard_admin/lib/services/firestore-analytics-simple.ts`:
+  - `averageRating` — média de notas dos pedidos avaliados
+  - `totalRated` — quantidade de pedidos avaliados (`rating > 0`)
+  - `ratingDistribution` — histograma 1..5★
+- KPI cards: **Avaliação Média** (ex.: `4.7 ★`) e **Avaliações Recebidas** em `components/dashboard/dashboard-metrics.tsx`.
+- Widget de distribuição (média + barra horizontal por estrela): `components/dashboard/ratings-breakdown.tsx`, plugado em `/dashboard` na seção "Avaliações" (acima do mapa de rastreamento).
+
+### Cashback — Fase Launch (desconto direto por nº de serviços + combos)
+Onde é aplicado: **no carrinho**, NÃO no `PaymentActivity` (este só recebe o total já com desconto). O caminho completo é:
+1. Painel admin em `/dashboard/configuracoes/aquicash` grava `activePhase`, `directDiscount2/3/4Plus`, `combosEnabled` e `combo*` em `app_config/cashback` (Admin SDK).
+2. App lê via `CashbackManager.getConfig()` e calcula o desconto com `PromotionManager.computeDiscount(niches, subtotal, config)` — escolhe o **maior** entre desconto por quantidade (apenas na fase `launch`) e o melhor combo aplicável (vale nas 2 fases).
+3. `ClientCartActivity.updateSummary()` exibe linha "Subtotal / Desconto / Total" e um **hint** `tvLaunchDiscountHint` quando o cliente está perto da próxima faixa (ex.: "🎁 Adicione mais 1 serviço e ganhe 10%").
+4. `FirebaseCartManager.prepareCheckout(..., discountPercent)` aplica `finalPrice = effectivePrice * (1 − pct/100)` em **cada** pedido criado e grava `cartDiscountPercent` no doc. O `chargedTotal` (somatório dos `finalPrice`) vai para `PaymentActivity.EXTRA_ORDER_AMOUNT`.
+5. **Comissão do prestador (`providerCommission`) NÃO muda** — o desconto é custeado pela plataforma.
+6. `CashbackManager.creditForCompletedOrder` **só credita** na fase `growth` (early-return se `isLaunchPhase`). Isso garante que as duas fases sejam mutuamente exclusivas, como na arte oficial do programa.
+
+**Pedidos single-service** (via `CreateOrderActivity.navigateToPayment`) não passam pelo carrinho e portanto não recebem desconto — o que está correto: tanto desconto direto (≥2 serviços) quanto combos (≥2 categorias) exigem mais de 1 item.
+
 ### Backend de Pagamentos (Pagar.me)
 - URL: `https://aquiresolve.onrender.com/api/payments/`
 - Configurada em `app/build.gradle` como `PAYMENTS_API_BASE_URL`

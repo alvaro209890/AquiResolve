@@ -156,6 +156,21 @@
 
                 </LinearLayout>
 
+                <!-- Hint da fase Launch: "Adicione mais 1 serviço e ganhe X%" -->
+                <TextView
+                    android:id="@+id/tvLaunchDiscountHint"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:padding="8dp"
+                    android:background="@color/primary_light"
+                    android:textColor="@color/primary_dark"
+                    android:textSize="12sp"
+                    android:textStyle="italic"
+                    android:gravity="center"
+                    android:visibility="gone"
+                    tools:text="🎁 Adicione mais 1 serviço e ganhe 10% de desconto" />
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"

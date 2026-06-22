@@ -82,6 +82,18 @@ export class FirestoreAnalyticsService {
       const completedOrders = orders.filter((order) => order.status === 'completed').length
       const emergencyOrders = orders.filter((order) => Boolean(order.isEmergency)).length
 
+      // Avaliações (rating dado pelo cliente em orders/{id}.rating; 1..5)
+      // Considera só pedidos efetivamente avaliados (rating > 0).
+      const ratedOrders = orders.filter((o) => Number(o.rating) > 0)
+      const totalRated = ratedOrders.length
+      const sumRatings = ratedOrders.reduce((sum, o) => sum + Number(o.rating || 0), 0)
+      const averageRating = totalRated > 0 ? sumRatings / totalRated : 0
+      const ratingDistribution: Record<1 | 2 | 3 | 4 | 5, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+      ratedOrders.forEach((o) => {
+        const r = Math.max(1, Math.min(5, Math.round(Number(o.rating)))) as 1 | 2 | 3 | 4 | 5
+        ratingDistribution[r] += 1
+      })
+
       const completedList = orders.filter((order) => order.status === 'completed')
       const totalRevenue = completedList.reduce((sum, o) => sum + (Number(o.estimatedPrice) || 0), 0)
       const totalCommissionFromSettlements = settlementSummary.totalProviderCommission
@@ -110,6 +122,9 @@ export class FirestoreAnalyticsService {
         totalCashbackDistributed,
         revenueToday,
         revenueLast30Days,
+        averageRating,
+        totalRated,
+        ratingDistribution,
       }
     } catch (error) {
       console.error('Erro ao buscar metricas de pedidos:', error)
@@ -127,6 +142,9 @@ export class FirestoreAnalyticsService {
         totalCashbackDistributed: 0,
         revenueToday: 0,
         revenueLast30Days: 0,
+        averageRating: 0,
+        totalRated: 0,
+        ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
       }
     }
   }
@@ -276,6 +294,9 @@ export class FirestoreAnalyticsService {
           totalCashbackDistributed: 0,
           revenueToday: 0,
           revenueLast30Days: 0,
+          averageRating: 0,
+          totalRated: 0,
+          ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
         },
         users: {
           totalUsers: 0,

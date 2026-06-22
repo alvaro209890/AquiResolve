@@ -168,6 +168,40 @@ class ClientCartActivity : AppCompatActivity() {
             binding.layoutDiscount.visibility = View.GONE
         }
 
+        updateLaunchHint()
+    }
+
+    /**
+     * Mostra um aviso quando o cliente está perto da próxima faixa de desconto
+     * direto (1ª Fase – Lançamento). Ex.: tem 1 serviço → "adicione mais 1 e ganhe 5%".
+     */
+    private fun updateLaunchHint() {
+        val hintView = binding.tvLaunchDiscountHint
+        if (!promoConfig.enabled || !promoConfig.isLaunchPhase || !promoConfig.directDiscountEnabled) {
+            hintView.visibility = View.GONE
+            return
+        }
+        val count = cartItems.size
+        val nextTier: Pair<Int, Double>? = when {
+            count == 0 -> 2 to promoConfig.directDiscount2
+            count == 1 -> 2 to promoConfig.directDiscount2
+            count == 2 -> 3 to promoConfig.directDiscount3
+            count == 3 -> 4 to promoConfig.directDiscount4Plus
+            else -> null
+        }
+        if (nextTier == null || nextTier.second <= 0.0) {
+            hintView.visibility = View.GONE
+            return
+        }
+        val missing = (nextTier.first - count).coerceAtLeast(1)
+        val percent = CashbackManager.formatRate(nextTier.second)
+        hintView.text = if (count == 0) {
+            "🎁 Adicione 2 serviços ao carrinho e ganhe $percent de desconto"
+        } else {
+            "🎁 Adicione mais $missing serviço${if (missing > 1) "s" else ""} e ganhe $percent de desconto"
+        }
+        hintView.visibility = View.VISIBLE
+
         val empty = cartItems.isEmpty()
         binding.tvEmptyCart.visibility = if (empty) View.VISIBLE else View.GONE
         binding.rvCartItems.visibility = if (empty) View.GONE else View.VISIBLE

@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils"
 import {
   AlertCircle, ClipboardList, Clock, DollarSign,
   TrendingUp, UserPlus, Users, CheckCircle,
-  Award, Wallet,
+  Award, Wallet, Star,
 } from "lucide-react"
 import { FirestoreAnalyticsService } from "@/lib/services/firestore-analytics-simple"
 import { Card, CardContent } from "@/components/ui/card"
@@ -90,6 +90,22 @@ export function DashboardMetrics() {
         icon: Wallet,
         description: "Repasse acumulado dos prestadores",
         variant: "violet",
+      },
+      {
+        title: "Avaliação Média",
+        value: (o.averageRating ?? 0) > 0
+          ? `${(o.averageRating as number).toFixed(1)} ★`
+          : "—",
+        icon: Star,
+        description: `Média de ${(o.totalRated ?? 0).toLocaleString("pt-BR")} avaliações`,
+        variant: "amber",
+      },
+      {
+        title: "Avaliações Recebidas",
+        value: (o.totalRated ?? 0).toLocaleString("pt-BR"),
+        icon: Star,
+        description: "Pedidos avaliados pelos clientes",
+        variant: "teal",
       },
     ]
   }, [data])
