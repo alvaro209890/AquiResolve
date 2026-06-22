@@ -189,6 +189,13 @@ service cloud.firestore {
       allow write: if false; // Dashboard usa Admin SDK
     }
 
+    // Banners do carrossel da Home — leitura por usuário autenticado;
+    // escrita exclusiva via Admin SDK (painel /dashboard/configuracoes/banners).
+    match /home_banners/{bannerId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // Usuários
     // ═══════════════════════════════════════════════════════════════════════════

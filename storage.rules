@@ -94,6 +94,12 @@ service firebase.storage {
       allow write: if signedInCanModifyImage(10 * 1024 * 1024);
     }
 
+    // ===== BANNERS DA HOME (carrossel; upload pelo painel admin) =====
+    match /banner_images/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if signedInCanModifyImage(10 * 1024 * 1024);
+    }
+
     // ===== IMAGENS DE CHAT =====
     match /chat_images/{orderId}/{fileName} {
       allow read: if isSignedIn();

@@ -1,9 +1,13 @@
 ﻿package com.aquiresolve.app
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
+import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
@@ -14,11 +18,14 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.viewpager2.widget.ViewPager2
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.request.RequestOptions
+import com.aquiresolve.app.adapters.BannerAdapter
 import com.aquiresolve.app.adapters.HomeCategoryAdapter
 import com.aquiresolve.app.databinding.ActivityClientHomeBinding
+import com.aquiresolve.app.models.HomeBanner
 import com.aquiresolve.app.models.OrderData
 import com.aquiresolve.app.utils.NotificationBadgeHelper
 import com.aquiresolve.app.utils.PriceFormatter
@@ -38,6 +45,16 @@ class ClientHomeActivity : AppCompatActivity() {
     private val centralChatRepo = CentralChatRepository()
     private var centralUnreadListener: ListenerRegistration? = null
 
+    // Carrossel de banners
+    private var bannerAdapter: BannerAdapter? = null
+    private val bannerHandler = Handler(Looper.getMainLooper())
+    private var bannerAutoScroll: Runnable? = null
+    private var bannerCount = 0
+
+    companion object {
+        private const val BANNER_INTERVAL_MS = 4000L
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -53,6 +70,7 @@ class ClientHomeActivity : AppCompatActivity() {
         setupUI()
         setupClickListeners()
         setupCategories()
+        setupBannerCarousel()
         loadProfileImage()
         loadRecentOrders()
     }
@@ -71,6 +89,7 @@ class ClientHomeActivity : AppCompatActivity() {
         )
 
         startCentralBadgeListener()
+        startBannerAutoScroll()
     }
 
     override fun onPause() {
@@ -79,6 +98,13 @@ class ClientHomeActivity : AppCompatActivity() {
         NotificationBadgeHelper.stopListening()
         centralUnreadListener?.remove()
         centralUnreadListener = null
+        stopBannerAutoScroll()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        // Garante que o loop do carrossel não vaze (mesmo cuidado dos listeners)
+        stopBannerAutoScroll()
     }
 
     private fun startCentralBadgeListener() {
@@ -242,6 +268,168 @@ class ClientHomeActivity : AppCompatActivity() {
             FirebaseConfig.getAnalytics()?.logEvent(
                 "home_categoria_click",
                 android.os.Bundle().apply { putString("niche", niche) }
+            )
+        } catch (_: Exception) {
+        }
+    }
+
+    // ───────────────────────────── Carrossel de banners ─────────────────────────────
+
+    /**
+     * Monta o carrossel rotativo de banners no topo da Home.
+     *
+     * Fonte: [BannerRepository] (coleção `home_banners`, gerida pelo painel). Quando não há banners
+     * ativos (vazio/offline/erro), a seção inteira fica `GONE` — a Home nunca exibe espaço vazio.
+     * Cada banner roteia conforme `actionType` ([onBannerClicked]); auto-scroll a cada ~4s, pausando
+     * em `onPause`/`onDestroy` e reiniciando o timer a cada troca de página (inclusive swipe manual).
+     */
+    private fun setupBannerCarousel() {
+        bannerAdapter = BannerAdapter(emptyList()) { banner -> onBannerClicked(banner) }
+        binding.bannerPager.adapter = bannerAdapter
+
+        binding.bannerPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                updateBannerDots(position)
+                // Reinicia o timer ao trocar de página — vale tanto para o auto-scroll
+                // quanto para o swipe manual do usuário (que assim "ganha" tempo na página).
+                restartBannerAutoScroll()
+            }
+        })
+
+        // Cache imediato (o AppApplication pré-carrega) para não piscar enquanto o Firestore responde.
+        applyBanners(BannerRepository.cachedBanners())
+
+        lifecycleScope.launch {
+            val banners = try {
+                BannerRepository.load()
+            } catch (_: Exception) {
+                emptyList()
+            }
+            applyBanners(banners)
+        }
+    }
+
+    private fun applyBanners(banners: List<HomeBanner>) {
+        bannerCount = banners.size
+        if (banners.isEmpty()) {
+            binding.sectionBanners.visibility = View.GONE
+            stopBannerAutoScroll()
+            return
+        }
+        binding.sectionBanners.visibility = View.VISIBLE
+        bannerAdapter?.updateItems(banners)
+        buildBannerDots(banners.size)
+        updateBannerDots(binding.bannerPager.currentItem)
+        startBannerAutoScroll()
+    }
+
+    private fun buildBannerDots(count: Int) {
+        binding.bannerDots.removeAllViews()
+        val size = dpToPx(8)
+        val margin = dpToPx(3)
+        repeat(count) {
+            val dot = View(this)
+            val lp = LinearLayout.LayoutParams(size, size)
+            lp.marginStart = margin
+            lp.marginEnd = margin
+            dot.layoutParams = lp
+            dot.setBackgroundResource(R.drawable.banner_dot_inactive)
+            binding.bannerDots.addView(dot)
+        }
+        // Com 1 banner, dots não fazem sentido.
+        binding.bannerDots.visibility = if (count > 1) View.VISIBLE else View.GONE
+    }
+
+    private fun updateBannerDots(active: Int) {
+        for (i in 0 until binding.bannerDots.childCount) {
+            binding.bannerDots.getChildAt(i).setBackgroundResource(
+                if (i == active) R.drawable.banner_dot_active else R.drawable.banner_dot_inactive
+            )
+        }
+    }
+
+    private fun startBannerAutoScroll() {
+        if (bannerCount <= 1) return
+        stopBannerAutoScroll()
+        val runnable = Runnable {
+            if (bannerCount <= 1) return@Runnable
+            val next = (binding.bannerPager.currentItem + 1) % bannerCount
+            // A troca dispara onPageSelected → reagenda o próximo passo (loop contínuo).
+            binding.bannerPager.setCurrentItem(next, true)
+        }
+        bannerAutoScroll = runnable
+        bannerHandler.postDelayed(runnable, BANNER_INTERVAL_MS)
+    }
+
+    private fun restartBannerAutoScroll() {
+        stopBannerAutoScroll()
+        startBannerAutoScroll()
+    }
+
+    private fun stopBannerAutoScroll() {
+        bannerAutoScroll?.let { bannerHandler.removeCallbacks(it) }
+    }
+
+    /** Roteia o toque no banner conforme `actionType`, tratando valor inválido como "sem ação". */
+    private fun onBannerClicked(banner: HomeBanner) {
+        logBannerClick(banner)
+        when (banner.actionType) {
+            HomeBanner.ACTION_CASHBACK ->
+                startActivity(Intent(this, CashbackActivity::class.java))
+
+            HomeBanner.ACTION_NICHE -> {
+                val niche = banner.actionValue.trim()
+                val known = CatalogRepository.cachedNicheNames().any { it.equals(niche, ignoreCase = true) }
+                if (niche.isNotEmpty() && known) {
+                    startActivity(
+                        Intent(this, CreateOrderActivity::class.java)
+                            .putExtra("service_category_name", niche)
+                    )
+                } else {
+                    // Nicho inválido/removido → fallback seguro (não crashar): lista de serviços.
+                    startActivity(Intent(this, ServicesActivity::class.java))
+                }
+            }
+
+            HomeBanner.ACTION_SERVICE -> {
+                val intent = Intent(this, ServicesActivity::class.java)
+                if (banner.actionValue.isNotBlank()) {
+                    intent.putExtra("search_query", banner.actionValue.trim())
+                }
+                startActivity(intent)
+            }
+
+            HomeBanner.ACTION_URL -> openExternalUrl(banner.actionValue)
+
+            // Seções futuras (combos = plano 03, parceiros = plano 04): fallback p/ navegação de serviços.
+            HomeBanner.ACTION_COMBOS, HomeBanner.ACTION_PARTNERS ->
+                startActivity(Intent(this, ServicesActivity::class.java))
+
+            else -> {
+                // none / tipo desconhecido → banner apenas informativo, sem ação.
+            }
+        }
+    }
+
+    private fun openExternalUrl(url: String) {
+        val u = url.trim()
+        if (!u.startsWith("http://") && !u.startsWith("https://")) return
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(u)))
+        } catch (_: Exception) {
+            showToast("Não foi possível abrir o link")
+        }
+    }
+
+    private fun logBannerClick(banner: HomeBanner) {
+        try {
+            FirebaseConfig.getAnalytics()?.logEvent(
+                "home_banner_click",
+                android.os.Bundle().apply {
+                    putString("actionType", banner.actionType)
+                    putString("actionValue", banner.actionValue)
+                    putString("bannerId", banner.id)
+                }
             )
         } catch (_: Exception) {
         }

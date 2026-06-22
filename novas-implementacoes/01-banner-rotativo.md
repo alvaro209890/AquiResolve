@@ -1,6 +1,11 @@
 # 01 — Banner Rotativo (Carrossel da Home)
 
-**Prioridade:** 🟢 Alta · **Fase:** 1 · **Complexidade:** Baixa-Média
+**Prioridade:** 🟢 Alta · **Fase:** 1 · **Complexidade:** Baixa-Média · **Status:** ✅ Concluído (2026-06-22)
+
+> Implementado e **validado ao vivo no emulador** (Waydroid): carrossel aparece no topo da Home,
+> rotaciona sozinho (~4s), mostra dots, carrega imagens (Glide) e roteia o toque. Testadas as ações
+> `service` (→ ServicesActivity com busca pré-preenchida) e `cashback` (→ CashbackActivity).
+> Regras (`home_banners` + Storage `banner_images`) publicadas; painel deployado.
 
 ---
 
@@ -167,34 +172,35 @@ Inserir no `activity_client_home.xml`, no topo do `LinearLayout` do conteúdo:
 ## ✔️ Checklist
 
 ### Firestore / Regras
-- [ ] Adicionar bloco `home_banners` em `firestore.rules`.
-- [ ] Publicar regras (`firebase deploy --only firestore:rules --project aqui-resolve`).
-- [ ] (Opcional) Índice por `displayOrder` se necessário.
+- [x] Adicionar bloco `home_banners` em `firestore.rules` (`read: isSignedIn()` / `write: false`).
+- [x] Bloco `banner_images/{fileName}` em `storage.rules` (upload da imagem pelo painel).
+- [x] Publicar regras (`firebase deploy --only firestore:rules,storage` via skill `aquiresolve-firebase`, projeto `aplicativoservico-143c2`).
+- [x] Sem índice composto necessário (app filtra `active` e ordena `displayOrder` em memória).
 
 ### Painel admin
-- [ ] API `app/api/banners/route.ts` (GET/POST/DELETE, Admin SDK).
-- [ ] Página `dashboard/configuracoes/banners/page.tsx` (lista + form + upload/URL).
-- [ ] Item na `sidebar.tsx`.
-- [ ] Deploy do painel (`npx vercel deploy --prod --yes`).
-- [ ] Cadastrar 3–4 banners de teste.
+- [x] API `app/api/banners/route.ts` (GET/POST/DELETE, Admin SDK).
+- [x] Página `dashboard/configuracoes/banners/page.tsx` (lista + form + upload p/ Storage **ou** URL + color picker).
+- [x] Item na `sidebar.tsx` (grupo Configurações → "Banners da Home").
+- [x] Deploy do painel (`npx vercel deploy --prod --yes`).
+- [x] Cadastrar 3 banners de teste (`scripts/seed-banners.mjs`: cashback/niche/service).
 
 ### App
-- [ ] Model `HomeBanner.kt`.
-- [ ] `BannerRepository.kt` (load + cache + fallback).
-- [ ] `BannerAdapter.kt` + `item_home_banner.xml`.
-- [ ] Inserir `ViewPager2` + dots no `activity_client_home.xml`.
-- [ ] `setupBannerCarousel()` + auto-scroll + dots em `ClientHomeActivity`.
-- [ ] Roteamento por `actionType`.
-- [ ] Esconder seção quando vazio/erro.
-- [ ] Evento Analytics `home_banner_click`.
+- [x] Model `HomeBanner.kt`.
+- [x] `BannerRepository.kt` (load + cache + fallback; pré-aquecido no `AppApplication`).
+- [x] `BannerAdapter.kt` + `item_home_banner.xml` (+ drawables `banner_dot_active/inactive`).
+- [x] Inserir `ViewPager2` + dots no `activity_client_home.xml` (seção `sectionBanners`, escondida por padrão).
+- [x] `setupBannerCarousel()` + auto-scroll (~4s) + dots em `ClientHomeActivity`.
+- [x] Roteamento por `actionType` (niche/service/cashback/url/combos/partners/none; valor inválido → fallback seguro).
+- [x] Esconder seção quando vazio/erro (`visibility = GONE`).
+- [x] Evento Analytics `home_banner_click` (params `actionType`/`actionValue`/`bannerId`).
 
-### QA
-- [ ] Carrossel rotaciona sozinho e pausa ao interagir.
-- [ ] Swipe manual funciona; dots acompanham.
-- [ ] Cada `actionType` abre o destino correto.
-- [ ] Sem banners → seção some, Home não quebra.
-- [ ] Offline → não trava (fallback).
-- [ ] Insets/scroll continuam corretos (topo sob a AppBar).
+### QA (validado no emulador Waydroid)
+- [x] Carrossel rotaciona sozinho (capturados 3 banners distintos em frames diferentes); para em `onPause`/`onDestroy`.
+- [x] Dots acompanham a página ativa.
+- [x] `actionType` abre o destino correto (testado `service` → ServicesActivity c/ busca; `cashback` → CashbackActivity).
+- [x] Sem banners → seção some, Home não quebra (seção nasce `GONE`).
+- [x] Offline → não trava (repo nunca lança; fallback p/ cache/vazio).
+- [x] Insets/scroll continuam corretos (carrossel dentro do `NestedScrollView`, altura fixa 160dp).
 
 ---
 

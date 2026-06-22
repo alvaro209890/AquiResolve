@@ -23,6 +23,14 @@ class AppApplication : Application() {
                     Log.w("AppApplication", "Falha ao pré-carregar catálogo: ${e.message}")
                 }
             }
+            // Pré-aquece o carrossel de banners da Home (fallback silencioso se vazio/offline).
+            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+                try {
+                    BannerRepository.load()
+                } catch (e: Exception) {
+                    Log.w("AppApplication", "Falha ao pré-carregar banners: ${e.message}")
+                }
+            }
             Log.d("AppApplication", "Firebase initialized in Application.onCreate")
         } catch (e: Exception) {
             Log.e("AppApplication", "Error initializing Firebase: ${e.message}", e)

@@ -30,6 +30,7 @@ import {
   Layers,
   Radio,
   Megaphone,
+  ImageIcon,
 } from "lucide-react"
 
 const navigation = [
@@ -102,6 +103,7 @@ const navigation = [
     permission: "configuracoes",
     children: [
       { name: "Geral", href: "/dashboard/configuracoes", icon: Settings },
+      { name: "Banners da Home", href: "/dashboard/configuracoes/banners", icon: ImageIcon },
       { name: "Equipes", href: "/dashboard/configuracoes/equipes", icon: UserCheck },
     ],
   },

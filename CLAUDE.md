@@ -102,6 +102,7 @@ Activity → Manager → Firebase/Retrofit
 | `client_chats/{clientId}` | Chat Base ↔ Cliente — metadata (lastMessage, unreadByClient, unreadByAdmin). Cliente lê; escrita só Admin SDK |
 | `client_chats/{clientId}/messages/{id}` | Mensagens do chat. Cliente cria as próprias (senderType='client'); admin envia via Admin SDK |
 | `client_chat_broadcasts/{id}` | Histórico de cada disparo em massa do admin (auditoria). Só Admin SDK |
+| `home_banners/{id}` | Banners do carrossel da Home do cliente. App lê (`BannerRepository`); escrita só Admin SDK (painel) |
 
 ### Catálogo de NICHOS dinâmico (app ↔ painel)
 - O app **lê** os nichos de `service_categories` via `CatalogRepository.kt` (pré-carregado no `AppApplication`, com **fallback estático** em `ServiceNicheCatalog` se o Firestore estiver vazio/offline — zero regressão).
@@ -132,6 +133,13 @@ Fluxo completo de aprovação opcional (escopo do item 5 — Edição de Perfil)
 - O botão "Salvar Serviços" fica desabilitado enquanto houver solicitação `pending`. Reabilita somente após reload da tela (quando a solicitação foi aprovada/rejeitada pelo admin).
 - `loadPendingSpecialtyRequest()` é chamado em `onViewCreated` além de `saveServices()`.
 - Aprovação do admin NÃO requer novo APK — apenas atualiza `services` no Firestore; o app lê o campo a cada abertura do perfil.
+
+### Banner Rotativo (carrossel da Home) — `home_banners`
+Carrossel no topo da `ClientHomeActivity`, com banners gerenciados pelo painel (conteúdo é dado, não código → **sem novo APK** para criar/editar/desativar).
+- **App:** `models/HomeBanner.kt` + `BannerRepository.kt` (espelha `CatalogRepository`: lê `home_banners`, filtra `active`, ordena `displayOrder`, cacheia, **nunca lança**; pré-aquecido no `AppApplication`). UI: `adapters/BannerAdapter.kt` + `item_home_banner.xml` no `ViewPager2`; `setupBannerCarousel()` faz auto-scroll ~4s (pausa em `onPause`/`onDestroy`, reinicia o timer a cada troca de página/swipe) e monta os dots (`banner_dot_active/inactive`). Seção `sectionBanners` nasce `GONE` → some quando não há banners. Roteamento por `actionType`: `niche`→`CreateOrderActivity` (extra `service_category_name`, valida nicho no catálogo), `service`→`ServicesActivity` (extra `search_query`), `cashback`→`CashbackActivity`, `url`→navegador, `combos`/`partners`→`ServicesActivity` (seções futuras), `none`/inválido→sem ação. Analytics `home_banner_click`.
+- **Painel:** `/dashboard/configuracoes/banners` (upload p/ Storage `banner_images/` ou URL, título/subtítulo, ação, cor, ordem, ativo) → `POST/GET/DELETE /api/banners` (Admin SDK). Item na sidebar (grupo Configurações).
+- **Firestore/Storage:** `home_banners` = `read: isSignedIn()` / `write: false`; `storage.rules` libera `banner_images/{fileName}` para upload autenticado (imagem ≤10MB). Sem índice composto (filtro/sort em memória).
+- **Semear teste:** `node dashboard_admin/scripts/seed-banners.mjs` (3 banners: cashback/niche/service). Recomenda-se imagens ~1200×500.
 
 ### Recuperação de senha (esqueci minha senha)
 - **Tela:** `ForgotPasswordActivity` (`activity_forgot_password.xml`). Acessível de **3 lugares**:
@@ -329,6 +337,9 @@ Todas as rotas estão em `dashboard_admin/app/api/`:
 | `/api/catalog/services` | GET | Lista SERVIÇOS de `catalog_services` (opcional `?niche=`) (Admin SDK) |
 | `/api/catalog/services` | POST | Cria/atualiza serviço (nicho/valor/% do prestador); calcula `providerCommission` (Admin SDK) |
 | `/api/catalog/services` | DELETE | Remove serviço de `catalog_services` (`?id=`) (Admin SDK) |
+| `/api/banners` | GET | Lista banners da Home de `home_banners` ordenados por `displayOrder` (Admin SDK) |
+| `/api/banners` | POST | Cria/atualiza banner (normaliza `actionType`; `id` opcional) (Admin SDK) |
+| `/api/banners` | DELETE | Remove banner de `home_banners` (`?id=`) (Admin SDK) |
 | `/api/orders/[id]/refund` | POST | Reembolsa o pagamento do pedido via Pagar.me (Admin SDK). Body `{ amount?, reason? }` |
 | `/api/client-chats` | GET | Lista chats Base↔Cliente (`?status=active\|archived&unreadOnly=true`) |
 | `/api/client-chats/[clientId]` | PATCH | Pin/archive do chat (`{ pinned?, archived? }`) |
@@ -359,6 +370,7 @@ Todas as rotas estão em `dashboard_admin/app/api/`:
 | Aprovação de Especialidades | `/dashboard/controle/especialidades` | Fila de solicitações de alteração de especialidades dos prestadores — aprovar/rejeitar com motivo opcional; aprovação atualiza `providers/{id}.services` via Admin SDK e notifica o prestador |
 | Chat com Clientes | `/dashboard/controle/chat-clientes` | Chat Base↔Cliente — lista de clientes (busca/filtros/unread badge), painel da conversa (polling 5s), modal de broadcast (audience all/active) |
 | Cashback (AquiCash) | `/dashboard/configuracoes/aquicash` | Configura fases, tiers, combos e salva em `app_config/cashback` via Admin SDK |
+| Banners da Home | `/dashboard/configuracoes/banners` | CRUD do carrossel da Home: upload da imagem (Storage `banner_images/`) ou URL, título/subtítulo, ação (niche/service/cashback/url/combos/partners/none), cor de fundo, ordem, ativo. Escreve em `home_banners` via `/api/banners` (Admin SDK) |
 | Logs de Auditoria | `/dashboard/controle/logs` | Histórico de todas as ações críticas do admin (verificações, bloqueios, cancelamentos) |
 
 ### Hooks atualizados
