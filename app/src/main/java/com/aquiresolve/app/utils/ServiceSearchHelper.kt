@@ -1,5 +1,7 @@
 package com.aquiresolve.app.utils
 
+import com.aquiresolve.app.models.CatalogService
+import com.aquiresolve.app.models.SearchSuggestion
 import com.aquiresolve.app.models.ServicePricing
 
 /**
@@ -64,6 +66,72 @@ object ServiceSearchHelper {
         "caixa dagua" to listOf("caixa d agua", "caixa d'água", "reservatorio", "boia"),
         "eletrodomestico" to listOf("eletrodomestico", "geladeira", "fogao", "micro-ondas", "maquina de lavar")
     )
+
+    /**
+     * Sugestões instantâneas para a Busca Inteligente da Home (sem IA — matching textual em memória).
+     *
+     * Casa o texto digitado contra o catálogo dinâmico: [services] (de `catalog_services`) e [niches]
+     * (de `service_categories`/fallback). Tolerante a acento e caixa (via [canonicalize]). Ranking:
+     * match exato > começa-com > contém > todas as palavras presentes. Quando o catálogo dinâmico
+     * ainda não carregou (ex.: offline no primeiro uso), complementa com a base estática [search]
+     * (sinônimos), garantindo sugestões mesmo assim. Limita a [limit] itens.
+     */
+    fun suggest(
+        query: String,
+        niches: List<String>,
+        services: List<CatalogService>,
+        limit: Int = 8
+    ): List<SearchSuggestion> {
+        val q = canonicalize(query)
+        if (q.isBlank()) return emptyList()
+        val qWords = q.split(" ").filter { it.isNotBlank() }
+
+        // Pontua um texto-alvo contra a query (0 = não casa).
+        fun score(target: String): Int {
+            val t = canonicalize(target)
+            return when {
+                t == q -> 100
+                t.startsWith(q) -> 80
+                t.contains(q) -> 60
+                qWords.isNotEmpty() && qWords.all { t.contains(it) } -> 40
+                else -> 0
+            }
+        }
+
+        data class Scored(val suggestion: SearchSuggestion, val relevance: Int)
+        val out = mutableListOf<Scored>()
+        val seen = HashSet<String>() // dedup por "type|label|niche" (canônico)
+
+        fun add(label: String, niche: String, type: SearchSuggestion.Type, relevance: Int) {
+            if (relevance <= 0 || label.isBlank()) return
+            val key = "$type|${canonicalize(label)}|${canonicalize(niche)}"
+            if (!seen.add(key)) return
+            out.add(Scored(SearchSuggestion(label, niche, type), relevance))
+        }
+
+        // 1. Nichos que casam → sugestão NICHE (leve bônus para subir um pouco acima de serviços iguais).
+        for (niche in niches) {
+            add(niche, niche, SearchSuggestion.Type.NICHE, score(niche).let { if (it > 0) it + 5 else 0 })
+        }
+
+        // 2. Serviços que casam (pelo nome) → sugestão SERVICE.
+        for (s in services) {
+            add(s.name, s.niche, SearchSuggestion.Type.SERVICE, score(s.name))
+        }
+
+        // 3. Complemento estático (sinônimos) quando o catálogo dinâmico rendeu pouco.
+        if (out.size < limit) {
+            for (r in search(query)) {
+                add(r.serviceType, r.category, SearchSuggestion.Type.SERVICE, 35)
+                if (out.size >= limit * 2) break
+            }
+        }
+
+        return out
+            .sortedWith(compareByDescending<Scored> { it.relevance }.thenBy { it.suggestion.label.lowercase() })
+            .map { it.suggestion }
+            .take(limit)
+    }
 
     /**
      * Busca serviços por texto livre.

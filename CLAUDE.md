@@ -141,6 +141,12 @@ Carrossel no topo da `ClientHomeActivity`, com banners gerenciados pelo painel (
 - **Firestore/Storage:** `home_banners` = `read: isSignedIn()` / `write: false`; `storage.rules` libera `banner_images/{fileName}` para upload autenticado (imagem ≤10MB). Sem índice composto (filtro/sort em memória).
 - **Semear teste:** `node dashboard_admin/scripts/seed-banners.mjs` (3 banners: cashback/niche/service). Recomenda-se imagens ~1200×500.
 
+### Busca Inteligente (sugestões na Home) — sem IA
+Busca instantânea no campo `etSearch` da `ClientHomeActivity`: ao digitar (debounce ~250ms) aparece um dropdown (`sectionSearchSuggestions`) com serviços/nichos do catálogo real; matching textual em memória (sem Firestore por tecla, sem IA — a IA é o plano `06`).
+- **App:** `models/SearchSuggestion.kt`; `ServiceSearchHelper.suggest(query, niches, services)` (normaliza acento/caixa, ranking exato>começa>contém>palavras, limite 8, complemento estático por sinônimos quando o catálogo dinâmico rende pouco); `adapters/SearchSuggestionAdapter.kt` + `item_search_suggestion.xml`. Catálogo de serviços inteiro em cache via **`CatalogServiceRepository.loadAll()`/`allCachedServices()`** (pré-aquecido no `AppApplication`).
+- **Roteamento:** SERVICE → `CreateOrderActivity` com `service_category_name` + **`preselect_service`** (chave nova) + `search_query`; NICHE → só o nicho. A pré-seleção do serviço é aplicada dentro de `CreateOrderActivity.rebuildServiceTypeAdapter` (sobrevive ao rebuild assíncrono do catálogo e seta `selectedPureServiceType`, garantindo o valor no submit). Sem resultado → CTA `tvSearchEmptyCta` abre `ServicesActivity`.
+- **Analytics:** `busca_sugestao_click` (label/niche/type), `busca_sem_resultado` (query). Sem coleção/painel/regra nova (100% app).
+
 ### Recuperação de senha (esqueci minha senha)
 - **Tela:** `ForgotPasswordActivity` (`activity_forgot_password.xml`). Acessível de **3 lugares**:
   login (`MainActivity` → `tvForgotPassword`), cadastro de cliente (`ClientSignUpActivity`) e

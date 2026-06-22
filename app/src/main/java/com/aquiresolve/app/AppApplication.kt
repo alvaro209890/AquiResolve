@@ -31,6 +31,14 @@ class AppApplication : Application() {
                     Log.w("AppApplication", "Falha ao pré-carregar banners: ${e.message}")
                 }
             }
+            // Pré-aquece o catálogo de serviços inteiro para a Busca Inteligente da Home.
+            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+                try {
+                    CatalogServiceRepository.loadAll()
+                } catch (e: Exception) {
+                    Log.w("AppApplication", "Falha ao pré-carregar serviços p/ busca: ${e.message}")
+                }
+            }
             Log.d("AppApplication", "Firebase initialized in Application.onCreate")
         } catch (e: Exception) {
             Log.e("AppApplication", "Error initializing Firebase: ${e.message}", e)

@@ -16,6 +16,7 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
+import androidx.core.widget.addTextChangedListener
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.viewpager2.widget.ViewPager2
@@ -24,9 +25,12 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.request.RequestOptions
 import com.aquiresolve.app.adapters.BannerAdapter
 import com.aquiresolve.app.adapters.HomeCategoryAdapter
+import com.aquiresolve.app.adapters.SearchSuggestionAdapter
 import com.aquiresolve.app.databinding.ActivityClientHomeBinding
 import com.aquiresolve.app.models.HomeBanner
 import com.aquiresolve.app.models.OrderData
+import com.aquiresolve.app.models.SearchSuggestion
+import com.aquiresolve.app.utils.ServiceSearchHelper
 import com.aquiresolve.app.utils.NotificationBadgeHelper
 import com.aquiresolve.app.utils.PriceFormatter
 import com.aquiresolve.app.utils.ServiceNicheCatalog
@@ -51,8 +55,15 @@ class ClientHomeActivity : AppCompatActivity() {
     private var bannerAutoScroll: Runnable? = null
     private var bannerCount = 0
 
+    // Busca Inteligente
+    private var suggestionAdapter: SearchSuggestionAdapter? = null
+    private val searchHandler = Handler(Looper.getMainLooper())
+    private var searchRunnable: Runnable? = null
+    private var lastSearchQuery = ""
+
     companion object {
         private const val BANNER_INTERVAL_MS = 4000L
+        private const val SEARCH_DEBOUNCE_MS = 250L
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -71,6 +82,7 @@ class ClientHomeActivity : AppCompatActivity() {
         setupClickListeners()
         setupCategories()
         setupBannerCarousel()
+        setupSearchSuggestions()
         loadProfileImage()
         loadRecentOrders()
     }
@@ -105,6 +117,7 @@ class ClientHomeActivity : AppCompatActivity() {
         super.onDestroy()
         // Garante que o loop do carrossel não vaze (mesmo cuidado dos listeners)
         stopBannerAutoScroll()
+        searchRunnable?.let { searchHandler.removeCallbacks(it) }
     }
 
     private fun startCentralBadgeListener() {
@@ -430,6 +443,118 @@ class ClientHomeActivity : AppCompatActivity() {
                     putString("actionValue", banner.actionValue)
                     putString("bannerId", banner.id)
                 }
+            )
+        } catch (_: Exception) {
+        }
+    }
+
+    // ───────────────────────────── Busca Inteligente ─────────────────────────────
+
+    /**
+     * Liga a busca instantânea (sem IA): ao digitar em [etSearch], com debounce de ~250ms, mostra
+     * sugestões de serviços/nichos do catálogo em cache ([ServiceSearchHelper.suggest]) num dropdown
+     * abaixo do campo. Tocar leva ao pedido pré-preenchido; sem resultado, um CTA abre a lista completa.
+     * Nada de Firestore por tecla — o catálogo é pré-aquecido (aqui e no `AppApplication`).
+     */
+    private fun setupSearchSuggestions() {
+        suggestionAdapter = SearchSuggestionAdapter(emptyList()) { s -> onSuggestionClick(s) }
+        binding.rvSearchSuggestions.layoutManager = LinearLayoutManager(this)
+        binding.rvSearchSuggestions.adapter = suggestionAdapter
+
+        binding.tvSearchEmptyCta.setOnClickListener {
+            logSearchNoResult(lastSearchQuery)
+            hideSuggestions()
+            startActivity(
+                Intent(this, ServicesActivity::class.java).apply {
+                    if (lastSearchQuery.isNotBlank()) putExtra("search_query", lastSearchQuery)
+                }
+            )
+        }
+
+        binding.etSearch.addTextChangedListener(afterTextChanged = { editable ->
+            val query = editable?.toString().orEmpty()
+            searchRunnable?.let { searchHandler.removeCallbacks(it) }
+            if (query.isBlank()) {
+                hideSuggestions()
+                return@addTextChangedListener
+            }
+            val runnable = Runnable { runSearchSuggestions(query) }
+            searchRunnable = runnable
+            searchHandler.postDelayed(runnable, SEARCH_DEBOUNCE_MS)
+        })
+
+        // Garante o catálogo de serviços em cache para a busca (idempotente com o AppApplication).
+        lifecycleScope.launch {
+            try {
+                CatalogServiceRepository.loadAll()
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    private fun runSearchSuggestions(query: String) {
+        lastSearchQuery = query
+        val suggestions = try {
+            ServiceSearchHelper.suggest(
+                query = query,
+                niches = CatalogRepository.cachedNicheNames(),
+                services = CatalogServiceRepository.allCachedServices()
+            )
+        } catch (_: Exception) {
+            emptyList()
+        }
+
+        binding.sectionSearchSuggestions.visibility = View.VISIBLE
+        if (suggestions.isEmpty()) {
+            binding.rvSearchSuggestions.visibility = View.GONE
+            binding.tvSearchEmptyCta.visibility = View.VISIBLE
+        } else {
+            binding.tvSearchEmptyCta.visibility = View.GONE
+            binding.rvSearchSuggestions.visibility = View.VISIBLE
+            suggestionAdapter?.updateItems(suggestions)
+        }
+    }
+
+    private fun hideSuggestions() {
+        searchRunnable?.let { searchHandler.removeCallbacks(it) }
+        binding.sectionSearchSuggestions.visibility = View.GONE
+        binding.tvSearchEmptyCta.visibility = View.GONE
+    }
+
+    private fun onSuggestionClick(s: SearchSuggestion) {
+        logSearchSuggestionClick(s)
+        hideSuggestions()
+        // Não tenta esconder o teclado aqui: a próxima Activity assume o foco.
+        val intent = Intent(this, CreateOrderActivity::class.java)
+            .putExtra("service_category_name", s.niche)
+        if (s.type == SearchSuggestion.Type.SERVICE) {
+            // `preselect_service` pré-seleciona o serviço exato no dropdown (o nicho já vai correto);
+            // `search_query` fica como fallback para o matcher estático.
+            intent.putExtra("preselect_service", s.label)
+            intent.putExtra("search_query", s.label)
+        }
+        startActivity(intent)
+    }
+
+    private fun logSearchSuggestionClick(s: SearchSuggestion) {
+        try {
+            FirebaseConfig.getAnalytics()?.logEvent(
+                "busca_sugestao_click",
+                android.os.Bundle().apply {
+                    putString("label", s.label)
+                    putString("niche", s.niche)
+                    putString("type", s.type.name)
+                }
+            )
+        } catch (_: Exception) {
+        }
+    }
+
+    private fun logSearchNoResult(query: String) {
+        try {
+            FirebaseConfig.getAnalytics()?.logEvent(
+                "busca_sem_resultado",
+                android.os.Bundle().apply { putString("query", query) }
             )
         } catch (_: Exception) {
         }

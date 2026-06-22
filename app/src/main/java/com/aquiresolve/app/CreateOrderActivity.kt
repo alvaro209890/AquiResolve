@@ -73,7 +73,10 @@ class CreateOrderActivity : AppCompatActivity() {
     
     // Categoria efetiva selecionada nos cards (vinda da intent)
     private var effectiveCategory: String? = null
-    
+    // Serviço a pré-selecionar (Busca Inteligente da Home). Reaplicado a cada rebuild do dropdown,
+    // inclusive após o recarregamento assíncrono do catálogo, para não ser apagado.
+    private var pendingPreselectService: String? = null
+
     // Variáveis para endereços salvos
     private var savedAddresses = mutableListOf<SavedAddress>()
     private var selectedSavedAddress: SavedAddress? = null
@@ -172,13 +175,19 @@ class CreateOrderActivity : AppCompatActivity() {
         // Carregar endereços salvos
         loadSavedAddresses()
         
+        // Busca Inteligente: serviço a pré-selecionar (a sugestão já manda o nicho certo). Definir ANTES
+        // de montar os tipos para que o rebuild (sync e o assíncrono) já aplique a seleção.
+        pendingPreselectService = intent.getStringExtra("preselect_service")?.takeIf { it.isNotBlank() }
+
         if (!effectiveCategory.isNullOrEmpty()) {
             binding.spinnerServiceNiche.setText(effectiveCategory)
             setupServiceTypesForNiche(effectiveCategory!!)
-            
+
+            var preselectedDirectly = pendingPreselectService != null
+
             // Verificar se veio com search_query para tentar pré-selecionar o tipo de serviço
             val searchQuery = intent.getStringExtra("search_query")
-            if (!searchQuery.isNullOrEmpty()) {
+            if (!preselectedDirectly && !searchQuery.isNullOrEmpty()) {
                 val searchResults = com.aquiresolve.app.utils.ServiceSearchHelper.search(searchQuery)
                 val matchedService = searchResults.firstOrNull()
                 if (matchedService != null && matchedService.category.equals(effectiveCategory, ignoreCase = true)) {
@@ -191,6 +200,7 @@ class CreateOrderActivity : AppCompatActivity() {
                                 val item = adapter.getItem(i).toString()
                                 if (item.contains(matchedService.serviceType, ignoreCase = true)) {
                                     binding.spinnerServiceType.setText(item)
+                                    preselectedDirectly = true
                                     break
                                 }
                             }
@@ -198,9 +208,11 @@ class CreateOrderActivity : AppCompatActivity() {
                     }
                 }
             }
-            
-            // Abrir a lista de tipos automaticamente para facilitar a seleção
-            binding.spinnerServiceType.post { binding.spinnerServiceType.showDropDown() }
+
+            // Abre a lista automaticamente só quando nada foi pré-selecionado (evita reabrir por cima da escolha).
+            if (!preselectedDirectly) {
+                binding.spinnerServiceType.post { binding.spinnerServiceType.showDropDown() }
+            }
         }
     }
 
@@ -512,9 +524,23 @@ class CreateOrderActivity : AppCompatActivity() {
             }
         }
 
-        // Limpar seleção atual
-        selectedPureServiceType = ""
-        binding.spinnerServiceType.setText("")
+        // Busca Inteligente: se há um serviço a pré-selecionar e ele existe na lista, já seleciona
+        // (mantém a escolha mesmo após o rebuild assíncrono). Casa por nome exato, depois por "contém".
+        val preselect = pendingPreselectService
+        val match = if (!preselect.isNullOrBlank()) {
+            options.firstOrNull { it.name.equals(preselect, ignoreCase = true) }
+                ?: options.firstOrNull { it.name.contains(preselect, ignoreCase = true) }
+        } else null
+
+        if (match != null) {
+            selectedPureServiceType = match.name
+            val label = if (match.priceLabel.isNotBlank()) "${match.name} — ${match.priceLabel}" else match.name
+            binding.spinnerServiceType.setText(label)
+        } else {
+            // Limpar seleção atual
+            selectedPureServiceType = ""
+            binding.spinnerServiceType.setText("")
+        }
     }
 
     private fun getClientPriceLabel(niche: String, serviceType: String): String {

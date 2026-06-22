@@ -26,6 +26,10 @@ object CatalogServiceRepository {
     // Cache por nome de nicho (normalizado em minúsculas).
     private val cache = ConcurrentHashMap<String, List<CatalogService>>()
 
+    // Lista achatada de TODOS os serviços ativos (alimenta a Busca Inteligente da Home).
+    @Volatile
+    private var allCache: List<CatalogService>? = null
+
     private val db: FirebaseFirestore
         get() = FirebaseFirestore.getInstance()
 
@@ -41,6 +45,13 @@ object CatalogServiceRepository {
         val target = serviceType.trim().lowercase()
         return cache[key(niche)]?.firstOrNull { it.name.trim().lowercase() == target }
     }
+
+    /**
+     * Todos os serviços já em cache (de [loadAll] ou da soma dos nichos carregados).
+     * Usado pela Busca Inteligente da Home; vazio se nada foi carregado ainda.
+     */
+    fun allCachedServices(): List<CatalogService> =
+        allCache ?: cache.values.flatten().takeIf { it.isNotEmpty() } ?: emptyList()
 
     private fun readBoolean(value: Any?): Boolean = when (value) {
         is Boolean -> value
@@ -117,6 +128,52 @@ object CatalogServiceRepository {
         } catch (e: Exception) {
             Log.e(TAG, "Falha ao carregar serviços de '$niche': ${e.message}")
             cache[key(niche)] ?: emptyList()
+        }
+    }
+
+    /**
+     * Carrega TODOS os serviços ativos de `catalog_services` de uma vez e popula os caches
+     * (por nicho + lista achatada). Usado para pré-aquecer a Busca Inteligente da Home, evitando
+     * uma consulta ao Firestore por tecla. Nunca lança — em falha mantém o cache atual.
+     */
+    suspend fun loadAll(): List<CatalogService> {
+        return try {
+            val snapshot = db.collection("catalog_services").get().await()
+            val services = snapshot.documents.mapNotNull { doc ->
+                val data = doc.data ?: return@mapNotNull null
+                if (!readBoolean(data["active"] ?: data["isActive"] ?: data["enabled"])) {
+                    return@mapNotNull null
+                }
+                val name = readString(data["name"], data["title"], data["label"])
+                if (name.isEmpty()) return@mapNotNull null
+                val niche = readString(data["niche"])
+                if (niche.isEmpty()) return@mapNotNull null
+                CatalogService(
+                    niche = niche,
+                    name = name,
+                    description = readString(data["description"]),
+                    estimatedTime = readString(data["estimatedTime"]),
+                    estimatedPrice = readDouble(data["estimatedPrice"]),
+                    providerCommissionPercent = readInt(data["providerCommissionPercent"]),
+                    providerCommission = readDouble(data["providerCommission"]),
+                    isConsult = data["isConsult"] == true,
+                    active = true,
+                    displayOrder = readInt(data["displayOrder"], data["order"], data["sortOrder"])
+                )
+            }.sortedBy { it.displayOrder }
+
+            if (services.isNotEmpty()) {
+                allCache = services
+                // Reagrupa por nicho para reaproveitar o cache por nicho do CreateOrderActivity.
+                services.groupBy { key(it.niche) }.forEach { (k, list) -> cache[k] = list }
+                Log.d(TAG, "Catálogo de serviços carregado por inteiro: ${services.size}")
+            } else {
+                Log.d(TAG, "catalog_services vazio — Busca Inteligente usa fallback estático")
+            }
+            services
+        } catch (e: Exception) {
+            Log.e(TAG, "Falha ao carregar todos os serviços: ${e.message}")
+            allCachedServices()
         }
     }
 }

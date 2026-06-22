@@ -8,12 +8,12 @@
 
 ## 🪜 Fases
 
-### Fase 1 — Fundamentos visuais da Home (entrega rápida, alto impacto)
+### Fase 1 — Fundamentos visuais da Home (entrega rápida, alto impacto) — ✅ CONCLUÍDA (2026-06-22)
 Foco: o cliente bate o olho e em segundos sabe o que fazer.
 
-1. **Categorias horizontais** (`02`) — substitui a navegação atual por nichos em scroll lateral.
-2. **Banner rotativo** (`01`) — topo da Home, comunica cashback/promos/combos/parceiros.
-3. **Busca inteligente** (`05`) — sugestões instantâneas ao digitar → contratação em 1 toque.
+1. ✅ **Categorias horizontais** (`02`) — substitui a navegação atual por nichos em scroll lateral.
+2. ✅ **Banner rotativo** (`01`) — topo da Home, comunica cashback/promos/combos/parceiros.
+3. ✅ **Busca inteligente** (`05`) — sugestões instantâneas ao digitar → contratação em 1 toque.
 
 > Ao final da Fase 1 a Home já parece "premium" e a conversão tende a subir, **sem IA**.
 
@@ -88,7 +88,7 @@ Assistente IA ───────────┘        (IA depende de proxy n
 | 2 | Categorias horizontais | n/a | reusa `service_categories` | [x] | [x] | ✅ Concluído (2026-06-22) |
 | 3 | Combos promocionais | [ ] | [ ] | [ ] | [ ] | ⬜ Não iniciado |
 | 4 | Parceiros | [ ] | [ ] | [ ] | [ ] | ⬜ Não iniciado |
-| 5 | Busca inteligente | n/a | [ ] | [ ] | [ ] | ⬜ Não iniciado |
+| 5 | Busca inteligente | n/a | reusa `catalog_services` | [x] | [x] | ✅ Concluído (2026-06-22) |
 | 6 | Assistente IA | [ ] (proxy) | [ ] | [ ] | [ ] | ⬜ Não iniciado |
 | 7 | Home Premium (montagem) | n/a | n/a | [ ] | [ ] | ⬜ Não iniciado |
 

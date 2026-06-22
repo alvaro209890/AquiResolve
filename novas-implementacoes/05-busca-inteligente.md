@@ -1,6 +1,11 @@
 # 05 — Busca Inteligente
 
-**Prioridade:** 🟢 Alta · **Fase:** 1 · **Complexidade:** Média
+**Prioridade:** 🟢 Alta · **Fase:** 1 · **Complexidade:** Média · **Status:** ✅ Concluído (2026-06-22)
+
+> Implementado e **validado ao vivo no emulador** (Waydroid): ao digitar (debounce ~250ms) surgem
+> sugestões instantâneas do catálogo real; "eletrica" (sem acento) acha "Elétrica"; tocar leva ao
+> `CreateOrderActivity` com **nicho + serviço + preço pré-preenchidos** (ex.: "Instalação de chuveiro
+> — R$ 150,00"); sem resultado, o CTA abre `ServicesActivity`. **Conclui a Fase 1.**
 
 ---
 
@@ -95,23 +100,23 @@ data class SearchSuggestion(
 ## ✔️ Checklist
 
 ### App
-- [ ] Estender `ServiceSearchHelper` (normalização + ranking + limite).
-- [ ] Model `SearchSuggestion`.
-- [ ] `item_search_suggestion.xml` + adapter de sugestões.
-- [ ] `rvSearchSuggestions` no `activity_client_home.xml` (abaixo do card de busca).
-- [ ] `addTextChangedListener` com debounce em `ClientHomeActivity`.
-- [ ] Garantir catálogo carregado em cache (nichos + `catalog_services`) na Home.
-- [ ] Roteamento: sugestão SERVICE/NICHE → criação pré-preenchida.
-- [ ] Estado "sem resultado" com CTA (gancho p/ assistente IA).
-- [ ] Eventos Analytics `busca_sugestao_click` / `busca_sem_resultado`.
+- [x] Estender `ServiceSearchHelper` (`suggest()`: normalização + ranking exato>começa>contém>palavras + limite 8 + complemento estático por sinônimos quando o dinâmico rende pouco).
+- [x] Model `SearchSuggestion` (label/niche/type SERVICE|NICHE).
+- [x] `item_search_suggestion.xml` + `adapters/SearchSuggestionAdapter.kt`.
+- [x] `rvSearchSuggestions` + CTA num card `sectionSearchSuggestions` no `activity_client_home.xml` (topo do conteúdo, GONE por padrão).
+- [x] `addTextChangedListener` com debounce (250ms, `Handler` cancelável) em `ClientHomeActivity`.
+- [x] Catálogo em cache na Home: `CatalogServiceRepository.loadAll()` (novo) + `allCachedServices()`; pré-aquecido no `AppApplication`.
+- [x] Roteamento: SERVICE → `CreateOrderActivity` com `service_category_name` + `preselect_service` (nova chave) + `search_query`; NICHE → só o nicho. `CreateOrderActivity.rebuildServiceTypeAdapter` aplica a pré-seleção (sobrevive ao rebuild assíncrono).
+- [x] Estado "sem resultado" com CTA → `ServicesActivity` (gancho p/ assistente IA no plano `06`).
+- [x] Eventos Analytics `busca_sugestao_click` / `busca_sem_resultado`.
 
-### QA
-- [ ] Digitar mostra sugestões relevantes em < 300ms.
-- [ ] Acentos/maiúsculas não atrapalham ("eletrica" acha "Elétrica").
-- [ ] Tocar leva ao pedido certo, pré-preenchido.
-- [ ] Sem resultado mostra CTA, não tela vazia.
-- [ ] Teclado não cobre as sugestões; fechar limpa o dropdown.
-- [ ] Offline usa o catálogo em cache/fallback sem quebrar.
+### QA (validado no emulador Waydroid)
+- [x] Digitar mostra sugestões relevantes quase instantâneas (cache em memória, sem Firestore por tecla).
+- [x] Acentos/maiúsculas não atrapalham ("eletrica" acha "Elétrica").
+- [x] Tocar leva ao pedido certo, pré-preenchido (nicho + serviço + preço).
+- [x] Sem resultado mostra CTA, não tela vazia (→ `ServicesActivity`).
+- [x] Teclado não cobre as sugestões (dropdown no topo, abaixo da AppBar); limpar o texto fecha o dropdown.
+- [x] Offline usa o catálogo em cache/fallback (estático por sinônimos) sem quebrar.
 
 ---
 
