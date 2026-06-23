@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/white">
+    android:background="@color/surface_color">
 
     <!-- Toolbar -->
     <com.google.android.material.appbar.MaterialToolbar
@@ -71,7 +71,7 @@
                 android:layout_height="wrap_content"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="4dp"
-                app:cardBackgroundColor="@color/white">
+                app:cardBackgroundColor="@color/surface_color">
 
                 <ScrollView
                     android:layout_width="match_parent"

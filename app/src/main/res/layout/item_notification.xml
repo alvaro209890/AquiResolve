@@ -5,7 +5,7 @@
     android:orientation="horizontal"
     android:padding="16dp"
     android:gravity="center_vertical"
-    android:background="@color/white">
+    android:background="@color/surface_color">
 
     <TextView
         android:id="@+id/tvIcon"

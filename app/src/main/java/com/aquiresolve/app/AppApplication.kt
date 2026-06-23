@@ -11,6 +11,8 @@ class AppApplication : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Aplica a preferência de tema (claro/escuro/sistema) antes de qualquer UI.
+        ThemeManager.applyStored(this)
         try {
             FirebaseConfig.initialize(this)
             NotificationManager.createNotificationChannels(this)

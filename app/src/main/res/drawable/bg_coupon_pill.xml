@@ -2,7 +2,7 @@
 <!-- Fundo da "pill" do cupom do parceiro: cantos arredondados, borda tracejada na cor primária. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
-    <solid android:color="@color/white" />
+    <solid android:color="@color/surface_color" />
     <corners android:radius="12dp" />
     <stroke
         android:width="1.5dp"

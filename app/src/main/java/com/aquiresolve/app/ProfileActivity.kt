@@ -118,6 +118,38 @@ class ProfileActivity : AppCompatActivity() {
         
         // Configurar a status bar
         window.statusBarColor = ContextCompat.getColor(this, R.color.primary_color)
+
+        // Refletir o tema atual no subtítulo da linha "Aparência"
+        updateThemeSubtitle()
+    }
+
+    /** Atualiza o subtítulo da linha "Aparência" com o modo de tema atual. */
+    private fun updateThemeSubtitle() {
+        binding.tvThemeValue.text = ThemeManager.label(ThemeManager.current(this))
+    }
+
+    /**
+     * Diálogo de escolha do tema (Sistema / Claro / Escuro).
+     * Ao confirmar, aplica e persiste; o AppCompat recria a Activity sozinho.
+     */
+    private fun showThemeDialog() {
+        val modes = arrayOf(
+            ThemeManager.Mode.SYSTEM,
+            ThemeManager.Mode.LIGHT,
+            ThemeManager.Mode.DARK
+        )
+        val labels = modes.map { ThemeManager.label(it) }.toTypedArray()
+        val checked = modes.indexOf(ThemeManager.current(this)).coerceAtLeast(0)
+
+        AlertDialog.Builder(this)
+            .setTitle("Aparência")
+            .setSingleChoiceItems(labels, checked) { dialog, which ->
+                ThemeManager.apply(this, modes[which])
+                updateThemeSubtitle()
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     /**
@@ -166,7 +198,12 @@ class ProfileActivity : AppCompatActivity() {
         binding.llNotifications.setOnClickListener {
             showNotificationsDialog()
         }
-        
+
+        // Aparência (tema claro/escuro)
+        binding.llAppearance.setOnClickListener {
+            showThemeDialog()
+        }
+
         binding.llPrivacy.setOnClickListener {
             showPrivacyDialog()
         }

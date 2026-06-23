@@ -4,7 +4,7 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/white">
+    android:background="@color/surface_color">
 
     <!-- Toolbar -->
     <com.google.android.material.appbar.MaterialToolbar
@@ -72,7 +72,7 @@
                 android:layout_height="wrap_content"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="4dp"
-                app:cardBackgroundColor="@color/white"
+                app:cardBackgroundColor="@color/surface_color"
                 android:layout_marginBottom="24dp">
 
                 <LinearLayout
@@ -180,7 +180,7 @@
                 android:layout_height="wrap_content"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="4dp"
-                app:cardBackgroundColor="@color/white"
+                app:cardBackgroundColor="@color/surface_color"
                 android:layout_marginBottom="24dp">
 
                 <LinearLayout
@@ -238,7 +238,7 @@
                 android:layout_height="wrap_content"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="4dp"
-                app:cardBackgroundColor="@color/white">
+                app:cardBackgroundColor="@color/surface_color">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -266,7 +266,7 @@
                         app:iconGravity="textStart"
                         app:iconPadding="8dp"
                         app:cornerRadius="8dp"
-                        app:backgroundTint="@color/white"
+                        app:backgroundTint="@color/surface_color"
                         app:strokeColor="@color/gray_300"
                         app:strokeWidth="1dp"
                         android:textColor="@color/text_primary"
@@ -284,7 +284,7 @@
                         app:iconGravity="textStart"
                         app:iconPadding="8dp"
                         app:cornerRadius="8dp"
-                        app:backgroundTint="@color/white"
+                        app:backgroundTint="@color/surface_color"
                         app:strokeColor="@color/gray_300"
                         app:strokeWidth="1dp"
                         android:textColor="@color/text_primary"
@@ -305,7 +305,7 @@
         android:layout_height="match_parent"
         android:orientation="vertical"
         android:gravity="center"
-        android:background="@color/white"
+        android:background="@color/surface_color"
         android:visibility="gone">
 
         <com.google.android.material.progressindicator.CircularProgressIndicator

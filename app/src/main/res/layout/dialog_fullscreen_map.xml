@@ -17,7 +17,7 @@
         android:layout_margin="16dp"
         android:insetTop="0dp"
         android:insetBottom="0dp"
-        android:backgroundTint="@color/white"
+        android:backgroundTint="@color/surface_color"
         android:text="✕"
         android:textColor="@color/text_primary"
         android:textSize="18sp"

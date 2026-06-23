@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Paleta do TEMA ESCURO (dark mode).
+  Sobrescreve APENAS os tokens semânticos de cor. Cores literais/de marca
+  (white, black, primary_*, secondary_*, status, nichos, logos) NÃO são
+  redefinidas aqui de propósito: devem permanecer iguais nos dois modos.
+
+  Regra de ouro: @color/white continua sendo branco (texto/ícone sobre cor de
+  marca). O que vira superfície escura é @color/surface_color / card_background.
+-->
+<resources>
+
+    <!-- ===== Fundos de tela ===== -->
+    <color name="background_primary">#121212</color>
+    <color name="background_secondary">#1A1A1A</color>
+    <color name="background_tertiary">#202020</color>
+    <color name="background_color">#121212</color>
+    <color name="background_light">#1A1A1A</color>
+
+    <!-- ===== Superfícies (cards, sheets) — levemente elevadas ===== -->
+    <color name="surface_color">#1E1E1E</color>
+    <color name="card_background">#1E1E1E</color>
+
+    <!-- ===== Texto ===== -->
+    <color name="text_primary">#F1F5F9</color>
+    <color name="text_secondary">#A8B3C2</color>
+    <color name="text_tertiary">#7A8696</color>
+
+    <!-- ===== Divisórias e bordas ===== -->
+    <color name="divider_color">#2A313C</color>
+    <color name="border_color">#3A4250</color>
+    <color name="divider">#2A313C</color>
+
+    <!-- ===== Escala de cinza — RAMPA INVERTIDA =====
+         No app os índices baixos (100..300) são fundo/divisória e os altos
+         (400..600) são ícone/texto secundário. Invertendo a rampa, ambos os
+         usos ficam corretos no escuro sem tocar em nenhum layout. -->
+    <color name="gray_100">#1C212B</color>
+    <color name="gray_200">#28303C</color>
+    <color name="gray_300">#3A4350</color>
+    <color name="gray_400">#8A97A8</color>
+    <color name="gray_500">#AAB6C6</color>
+    <color name="gray_600">#C9D4E2</color>
+
+    <!-- ===== Cards informativos com tint claro (mantêm o "ar" mas escuros) ===== -->
+    <color name="light_gray">#1C212B</color>
+    <color name="light_blue">#16243A</color>
+
+</resources>

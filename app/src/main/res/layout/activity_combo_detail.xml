@@ -18,7 +18,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:background="@color/white"
+        android:background="@color/surface_color"
         android:elevation="2dp"
         android:paddingStart="8dp"
         android:paddingEnd="16dp"
@@ -128,7 +128,7 @@
                 android:layout_height="wrap_content"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="2dp"
-                app:cardBackgroundColor="@color/white">
+                app:cardBackgroundColor="@color/surface_color">
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/rvComboItems"
@@ -150,7 +150,7 @@
                 android:layout_marginTop="16dp"
                 app:cardCornerRadius="16dp"
                 app:cardElevation="2dp"
-                app:cardBackgroundColor="@color/white">
+                app:cardBackgroundColor="@color/surface_color">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -263,7 +263,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:background="@color/white"
+        android:background="@color/surface_color"
         android:elevation="8dp"
         android:padding="12dp">
 

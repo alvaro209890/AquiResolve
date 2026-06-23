@@ -25,7 +25,7 @@
         android:layout_gravity="start"
         app:cornerRadius="16dp"
         app:cardElevation="2dp"
-        app:cardBackgroundColor="@color/white">
+        app:cardBackgroundColor="@color/surface_color">
 
         <LinearLayout
             android:layout_width="wrap_content"

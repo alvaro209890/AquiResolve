@@ -19,8 +19,9 @@
 
         <!-- Backgrounds -->
         <item name="android:colorBackground">@color/background_primary</item>
-        <item name="colorSurface">@color/background_primary</item>
+        <item name="colorSurface">@color/surface_color</item>
         <item name="colorOnSurface">@color/text_primary</item>
+        <item name="colorOnBackground">@color/text_primary</item>
 
         <!-- Window flags -->
         <item name="android:windowTranslucentStatus">true</item>
@@ -79,7 +80,7 @@
     <style name="LoginCard" parent="Widget.MaterialComponents.CardView">
         <item name="cardCornerRadius">16dp</item>
         <item name="cardElevation">8dp</item>
-        <item name="cardBackgroundColor">@color/white</item>
+        <item name="cardBackgroundColor">@color/surface_color</item>
     </style>
 
 </resources>

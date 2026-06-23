@@ -6,7 +6,7 @@
     android:layout_margin="4dp"
     app:cardCornerRadius="8dp"
     app:cardElevation="2dp"
-    app:cardBackgroundColor="@color/white"
+    app:cardBackgroundColor="@color/surface_color"
     android:clickable="true"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground">

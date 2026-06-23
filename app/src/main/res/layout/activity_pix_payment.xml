@@ -217,7 +217,7 @@
                             android:layout_width="250dp"
                             android:layout_height="250dp"
                             android:layout_marginBottom="16dp"
-                            android:background="@color/white"
+                            android:background="@color/surface_color"
                             android:contentDescription="QR Code PIX"
                             android:padding="8dp"
                             android:scaleType="fitCenter" />
