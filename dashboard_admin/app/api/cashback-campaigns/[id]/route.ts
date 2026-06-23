@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 const COLLECTION = 'cashback_campaigns'
 
@@ -32,6 +33,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireAdminPermission(request, 'gerenciarAquicash')
     const db = getAdminFirestore()
     const body = await request.json()
     const { id } = await params
@@ -80,6 +82,8 @@ export async function PATCH(
     const fresh = await ref.get()
     return NextResponse.json({ success: true, campaign: serializeCampaign(fresh) })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao atualizar campanha de cashback:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
@@ -87,15 +91,18 @@ export async function PATCH(
 }
 
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireAdminPermission(request, 'gerenciarAquicash')
     const db = getAdminFirestore()
     const { id } = await params
     await db.collection(COLLECTION).doc(id).delete()
     return NextResponse.json({ success: true })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao remover campanha de cashback:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })

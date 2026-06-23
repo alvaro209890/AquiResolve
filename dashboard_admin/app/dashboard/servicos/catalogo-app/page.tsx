@@ -6,6 +6,7 @@ import {
   onSnapshot,
 } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { adminFetch } from "@/lib/admin-api"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -269,7 +270,7 @@ export default function CatalogoAppPage() {
 
     setSaving(true)
     try {
-      const res = await fetch("/api/catalog", {
+      const res = await adminFetch("/api/catalog", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -296,7 +297,7 @@ export default function CatalogoAppPage() {
   }
 
   const handleToggleActive = async (service: ServiceCategoryDoc) => {
-    const res = await fetch("/api/catalog", {
+    const res = await adminFetch("/api/catalog", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -319,7 +320,7 @@ export default function CatalogoAppPage() {
   }
 
   const handleDelete = async (service: ServiceCategoryDoc) => {
-    const res = await fetch(`/api/catalog?id=${encodeURIComponent(service.id)}`, {
+    const res = await adminFetch(`/api/catalog?id=${encodeURIComponent(service.id)}`, {
       method: "DELETE",
     })
     if (!res.ok) {

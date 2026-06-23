@@ -10,6 +10,8 @@ import { useToast } from "@/hooks/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Search, RefreshCw, Eye, ArrowRightLeft, XCircle, ChevronLeft, ChevronRight, AlertTriangle, User, MapPin, Download } from "lucide-react"
 import Link from "next/link"
+import { adminFetch } from "@/lib/admin-api"
+import { usePermissions } from "@/hooks/use-permissions"
 
 const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
   awaiting_payment: { label: "Aguardando Pagamento", color: "bg-yellow-100 text-yellow-800" },
@@ -65,6 +67,8 @@ function exportToCSV(orders: Order[]) {
 }
 
 export default function VisualizarServicosPage() {
+  const { hasPermission } = usePermissions()
+  const canOperateOrders = hasPermission("operarPedidos")
   const [orders, setOrders] = useState<Order[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -90,7 +94,7 @@ export default function VisualizarServicosPage() {
       const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) })
       if (statusFilter !== "all") params.set("status", statusFilter)
       if (search) params.set("cliente", search)
-      const res = await fetch(`/api/orders?${params}`)
+      const res = await adminFetch(`/api/orders?${params}`)
       const data = await res.json()
       if (data.success) { setOrders(data.data ?? []); setTotal(data.pagination?.total ?? 0) }
     } catch { toast({ title: "Erro ao carregar pedidos", variant: "destructive" }) }
@@ -102,7 +106,7 @@ export default function VisualizarServicosPage() {
   // Carrega prestadores aprovados ao abrir o dialog de redirecionamento
   useEffect(() => {
     if (!redirectOrder) return
-    fetch("/api/providers/active")
+    adminFetch("/api/providers/active")
       .then(r => r.json())
       .then(d => setProviders(d.providers ?? []))
       .catch(() => null)
@@ -118,7 +122,7 @@ export default function VisualizarServicosPage() {
         body.newProviderId = selectedProviderId
         body.newProviderName = prov?.nome ?? prov?.name ?? prov?.fullName ?? selectedProviderId
       }
-      const res = await fetch(`/api/orders/${redirectOrder.id}/redirect`, {
+      const res = await adminFetch(`/api/orders/${redirectOrder.id}/redirect`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
       })
@@ -135,7 +139,7 @@ export default function VisualizarServicosPage() {
     if (!cancelOrder) return
     setCancelling(true)
     try {
-      const res = await fetch(`/api/orders/${cancelOrder.id}`, {
+      const res = await adminFetch(`/api/orders/${cancelOrder.id}`, {
         method: "PATCH", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: "cancelled", cancelledBy: "admin", cancellationReason: cancelReason }),
       })
@@ -151,7 +155,7 @@ export default function VisualizarServicosPage() {
   async function handleExportAll() {
     setExportingAll(true)
     try {
-      const res = await fetch(`/api/orders?limit=1000&page=1`)
+      const res = await adminFetch(`/api/orders?limit=1000&page=1`)
       const data = await res.json()
       if (data.success) exportToCSV(data.data ?? [])
       else throw new Error(data.error)
@@ -229,13 +233,13 @@ export default function VisualizarServicosPage() {
                       <Button variant="ghost" size="icon" className="h-7 w-7" asChild title="Ver OS">
                         <Link href={`/dashboard/servicos/os/${order.id}`}><Eye className="h-4 w-4" /></Link>
                       </Button>
-                      {canRedirect && (
+                      {canOperateOrders && canRedirect && (
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-amber-600" title="Redirecionar"
                           onClick={() => { setRedirectOrder(order); setRedirectReason(""); setSelectedProviderId("pool") }}>
                           <ArrowRightLeft className="h-4 w-4" />
                         </Button>
                       )}
-                      {canCancel && (
+                      {canOperateOrders && canCancel && (
                         <Button variant="ghost" size="icon" className="h-7 w-7 text-red-500" title="Cancelar"
                           onClick={() => { setCancelOrder(order); setCancelReason("") }}>
                           <XCircle className="h-4 w-4" />

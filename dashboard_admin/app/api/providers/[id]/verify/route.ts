@@ -1,19 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAdminFirestore, getAdminAuth } from '@/lib/firebase-admin'
+import { getAdminFirestore } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
-
-async function verifyAdminToken(request: NextRequest): Promise<string | null> {
-  const authorization = request.headers.get('authorization')
-  if (!authorization?.startsWith('Bearer ')) return null
-  try {
-    const token = authorization.split('Bearer ')[1]
-    const adminAuth = getAdminAuth()
-    const decoded = await adminAuth.verifyIdToken(token)
-    return decoded.uid
-  } catch {
-    return null
-  }
-}
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 // PATCH /api/providers/[id]/verify — aprova ou rejeita um prestador
 export async function PATCH(
@@ -21,6 +9,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const actor = await requireAdminPermission(request, 'aprovarPrestadores')
     const db = getAdminFirestore()
     const { id } = await params
     const providerId = id
@@ -89,6 +78,8 @@ export async function PATCH(
       targetType: 'provider',
       payload: { status, rejectionReason: rejectionReason ?? null },
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      actorUid: actor.uid,
+      actorEmail: actor.email,
     })
 
     return NextResponse.json({
@@ -102,6 +93,8 @@ export async function PATCH(
         : 'Status atualizado',
     })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao verificar prestador:', message)
     return NextResponse.json(
@@ -113,10 +106,11 @@ export async function PATCH(
 
 // GET /api/providers/[id]/verify — retorna status de verificação do prestador
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireAdminPermission(request, 'aprovarPrestadores')
     const db = getAdminFirestore()
     const { id } = await params
     const providerId = id
@@ -137,6 +131,8 @@ export async function GET(
       history: historySnap.docs.map(d => ({ id: d.id, ...d.data() })),
     })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
   }

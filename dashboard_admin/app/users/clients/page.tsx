@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { PageWithBack } from "@/components/layout/page-with-back"
+import { usePermissions } from "@/hooks/use-permissions"
 
 export default function ClientsPage() {
   const [search, setSearch] = useState("")
@@ -30,6 +31,8 @@ export default function ClientsPage() {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const { toast } = useToast()
+  const { hasPermission } = usePermissions()
+  const canAdministerUsers = hasPermission("administrarUsuarios")
 
   // Hook de debug para ver todos os usuários
   const { allUsers, loading: debugLoading, refetch: refetchDebug } = useUsersDebug()
@@ -243,14 +246,16 @@ export default function ClientsPage() {
               <Download className="h-4 w-4 mr-1.5" />
               Exportar
             </Button>
-            <Button
-              size="sm"
-              onClick={() => { setSelectedUserId(null); setModalOpen(true) }}
-              className="bg-primary hover:bg-primary-hover text-primary-foreground shadow-primary"
-            >
-              <Plus className="h-4 w-4 mr-1.5" />
-              Novo Cliente
-            </Button>
+            {canAdministerUsers && (
+              <Button
+                size="sm"
+                onClick={() => { setSelectedUserId(null); setModalOpen(true) }}
+                className="bg-primary hover:bg-primary-hover text-primary-foreground shadow-primary"
+              >
+                <Plus className="h-4 w-4 mr-1.5" />
+                Novo Cliente
+              </Button>
+            )}
           </div>
         </div>
 
@@ -316,11 +321,11 @@ export default function ClientsPage() {
           users={clientUsers}
           loading={loading || debugLoading || clientsLoading}
           onView={(id) => { setSelectedUserId(id); setModalOpen(true) }}
-          onEdit={(id) => { setSelectedUserId(id); setModalOpen(true) }}
-          onDelete={handleDeleteUser}
-          onToggleStatus={(id, isActive) => handleToggleStatus(id, isActive)}
-          onBlock={(id) => blockUser(id)}
-          onUnblock={(id) => unblockUser(id)}
+          onEdit={canAdministerUsers ? (id) => { setSelectedUserId(id); setModalOpen(true) } : undefined}
+          onDelete={canAdministerUsers ? handleDeleteUser : undefined}
+          onToggleStatus={canAdministerUsers ? (id, isActive) => handleToggleStatus(id, isActive) : undefined}
+          onBlock={canAdministerUsers ? (id) => blockUser(id) : undefined}
+          onUnblock={canAdministerUsers ? (id) => unblockUser(id) : undefined}
         />
 
         {/* User Modal */}
@@ -329,7 +334,7 @@ export default function ClientsPage() {
           isOpen={modalOpen}
           onClose={() => setModalOpen(false)}
           onSave={selectedUser ? handleUpdateUser : handleCreateUser}
-          mode={selectedUser ? 'edit' : 'create'}
+          mode={selectedUser ? (canAdministerUsers ? 'edit' : 'view') : 'create'}
         />
       </PageWithBack>
     </AppShell>

@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
+import { adminFetch } from "@/lib/admin-api"
 import { storage } from "@/lib/firebase"
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage"
 import {
@@ -78,7 +79,7 @@ export default function ParceirosConfigPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/partners")
+      const res = await adminFetch("/api/partners")
       const data = await res.json()
       if (data.success) setPartners(data.partners as Partner[])
       else throw new Error(data.error || "Falha ao carregar")
@@ -156,7 +157,7 @@ export default function ParceirosConfigPage() {
     }
     setSaving(true)
     try {
-      const res = await fetch("/api/partners", {
+      const res = await adminFetch("/api/partners", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -176,7 +177,7 @@ export default function ParceirosConfigPage() {
 
   const toggleActive = async (p: Partner) => {
     try {
-      const res = await fetch("/api/partners", {
+      const res = await adminFetch("/api/partners", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...p, active: !p.active }),
@@ -193,7 +194,7 @@ export default function ParceirosConfigPage() {
   const remove = async (p: Partner) => {
     if (!confirm(`Remover o parceiro "${p.name || p.id}"?`)) return
     try {
-      const res = await fetch(`/api/partners?id=${encodeURIComponent(p.id)}`, { method: "DELETE" })
+      const res = await adminFetch(`/api/partners?id=${encodeURIComponent(p.id)}`, { method: "DELETE" })
       const data = await res.json()
       if (!data.success) throw new Error(data.error || "Falha")
       toast({ title: "Parceiro removido" })

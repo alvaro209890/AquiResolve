@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 interface RouteCtx {
   params: Promise<{ providerId: string }>
@@ -10,6 +11,7 @@ interface RouteCtx {
 // Zera o contador de unread do papel informado.
 export async function PATCH(request: NextRequest, ctx: RouteCtx) {
   try {
+    await requireAdminPermission(request, 'controle')
     const { providerId } = await ctx.params
     const { searchParams } = new URL(request.url)
     const role = searchParams.get('role') ?? 'admin'
@@ -26,6 +28,8 @@ export async function PATCH(request: NextRequest, ctx: RouteCtx) {
 
     return NextResponse.json({ success: true })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
   }

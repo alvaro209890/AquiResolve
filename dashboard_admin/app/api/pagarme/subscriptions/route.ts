@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 import { pagarmeService } from '@/lib/services/pagarme-service'
 
 /**
@@ -7,6 +8,7 @@ import { pagarmeService } from '@/lib/services/pagarme-service'
  */
 export async function GET(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'financeiro')
     const { searchParams } = new URL(request.url)
     
     const query = {
@@ -37,6 +39,8 @@ export async function GET(request: NextRequest) {
       paging: response.paging,
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao listar assinaturas:', error)
     return NextResponse.json(
       {
@@ -54,6 +58,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'operarFinanceiro')
     const body = await request.json()
 
     // Validação básica
@@ -88,6 +93,8 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao criar assinatura:', error)
     return NextResponse.json(
       {
@@ -98,4 +105,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore } from '@/lib/firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 // GET /api/client-chats?status=active|archived&unreadOnly=true&limit=100
 // Lista os chats Base↔Cliente, ordenados por lastMessageAt desc.
@@ -28,6 +29,7 @@ function toMillis(value: unknown): number {
 
 export async function GET(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'controle')
     const db = getAdminFirestore()
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') ?? 'active'
@@ -70,6 +72,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, chats: result })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao listar client-chats:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })

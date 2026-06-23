@@ -10,6 +10,7 @@ import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Logo } from "@/components/logo"
 import { usePermissions } from "@/hooks/use-permissions"
 import { useAuth } from "@/components/auth-provider"
+import type { AdminPermission } from "@/lib/admin-permissions"
 import {
   LayoutDashboard,
   Users,
@@ -35,6 +36,7 @@ import {
   Handshake,
   BookOpen,
   Wrench,
+  Activity,
 } from "lucide-react"
 
 const navigation = [
@@ -50,9 +52,9 @@ const navigation = [
     icon: ClipboardList,
     permission: "dashboard",
     children: [
-      { name: "Visão Geral", href: "/dashboard/servicos", icon: ClipboardList },
-      { name: "Catálogo do App", href: "/dashboard/servicos/catalogo-app", icon: Layers },
-      { name: "Combos Promocionais", href: "/dashboard/servicos/combos", icon: Flame },
+      { name: "Visão Geral", href: "/dashboard/servicos", icon: ClipboardList, permission: "dashboard" },
+      { name: "Catálogo do App", href: "/dashboard/servicos/catalogo-app", icon: Layers, permission: "gerenciarCatalogo" },
+      { name: "Combos Promocionais", href: "/dashboard/servicos/combos", icon: Flame, permission: "gerenciarCombos" },
     ],
   },
   {
@@ -60,12 +62,13 @@ const navigation = [
     icon: MousePointer,
     permission: "controle",
     children: [
-      { name: "Monitoramento de Chat", href: "/dashboard/controle/chat", icon: MessageSquare },
-      { name: "Central Operacional", href: "/dashboard/controle/chat-operacional", icon: Radio },
-      { name: "Chat com Clientes", href: "/dashboard/controle/chat-clientes", icon: Megaphone },
-      { name: "Chat com Prestadores", href: "/dashboard/controle/chat-prestadores", icon: Wrench },
-      { name: "Aceitação de Prestadores", href: "/dashboard/controle/aceitacao-prestadores", icon: BadgeCheck },
-      { name: "Especialidades", href: "/dashboard/controle/especialidades", icon: Layers },
+      { name: "Monitoramento de Chat", href: "/dashboard/controle/chat", icon: MessageSquare, permission: "controle" },
+      { name: "Monitoramento de Pedidos", href: "/dashboard/controle/monitoramento", icon: Activity, permission: "gestaoPedidos" },
+      { name: "Central Operacional", href: "/dashboard/controle/chat-operacional", icon: Radio, permission: "controle" },
+      { name: "Chat com Clientes", href: "/dashboard/controle/chat-clientes", icon: Megaphone, permission: "controle" },
+      { name: "Chat com Prestadores", href: "/dashboard/controle/chat-prestadores", icon: Wrench, permission: "controle" },
+      { name: "Aceitação de Prestadores", href: "/dashboard/controle/aceitacao-prestadores", icon: BadgeCheck, permission: "aprovarPrestadores" },
+      { name: "Especialidades", href: "/dashboard/controle/especialidades", icon: Layers, permission: "aprovarPrestadores" },
     ],
   },
   {
@@ -73,9 +76,9 @@ const navigation = [
     icon: Users,
     permission: "gestaoUsuarios",
     children: [
-      { name: "Pessoas cadastradas", href: "/users/clients", icon: Users },
-      { name: "Prestadores", href: "/users/providers", icon: UserCheck },
-      { name: "Classificação", href: "/users/classificacao-prestadores", icon: Layers },
+      { name: "Pessoas cadastradas", href: "/users/clients", icon: Users, permission: "gestaoUsuarios" },
+      { name: "Prestadores", href: "/users/providers", icon: UserCheck, permission: "gestaoUsuarios" },
+      { name: "Classificação", href: "/users/classificacao-prestadores", icon: Layers, permission: "gestaoUsuarios" },
     ],
   },
   {
@@ -83,7 +86,7 @@ const navigation = [
     icon: ShoppingCart,
     permission: "gestaoPedidos",
     children: [
-      { name: "Todos os Pedidos", href: "/orders", icon: ShoppingCart },
+      { name: "Todos os Pedidos", href: "/orders", icon: ShoppingCart, permission: "gestaoPedidos" },
     ],
   },
   {
@@ -91,8 +94,8 @@ const navigation = [
     icon: DollarSign,
     permission: "financeiro",
     children: [
-      { name: "Painel Financeiro", href: "/dashboard/financeiro", icon: BarChart3 },
-      { name: "Pagamentos", href: "/dashboard/financeiro/faturamento", icon: FileText },
+      { name: "Painel Financeiro", href: "/dashboard/financeiro", icon: BarChart3, permission: "financeiro" },
+      { name: "Pagamentos", href: "/dashboard/financeiro/faturamento", icon: FileText, permission: "financeiro" },
     ],
   },
   {
@@ -100,7 +103,7 @@ const navigation = [
     icon: BarChart3,
     permission: "relatorios",
     children: [
-      { name: "Central de Relatórios", href: "/reports", icon: TrendingUp },
+      { name: "Central de Relatórios", href: "/reports", icon: TrendingUp, permission: "relatorios" },
     ],
   },
   {
@@ -108,10 +111,10 @@ const navigation = [
     icon: Settings,
     permission: "configuracoes",
     children: [
-      { name: "Geral", href: "/dashboard/configuracoes", icon: Settings },
-      { name: "Banners da Home", href: "/dashboard/configuracoes/banners", icon: ImageIcon },
-      { name: "Parceiros AquiResolve", href: "/dashboard/configuracoes/parceiros", icon: Handshake },
-      { name: "Equipes", href: "/dashboard/configuracoes/equipes", icon: UserCheck },
+      { name: "Geral", href: "/dashboard/configuracoes", icon: Settings, permission: "configuracoes" },
+      { name: "Banners da Home", href: "/dashboard/configuracoes/banners", icon: ImageIcon, permission: "visualizarBanners" },
+      { name: "Parceiros AquiResolve", href: "/dashboard/configuracoes/parceiros", icon: Handshake, permission: "gerenciarParceiros" },
+      { name: "Equipes", href: "/dashboard/configuracoes/equipes", icon: UserCheck, permission: "configuracoes" },
     ],
   },
   {
@@ -124,7 +127,7 @@ const navigation = [
     name: "Área Master",
     href: "/master",
     icon: Shield,
-    permission: "gestaoUsuarios",
+    permission: "gerenciarAdministradores",
     isMaster: true,
   },
 ]
@@ -159,9 +162,20 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
   const isActive = (href: string, exact = false) =>
     pathname === href || (!exact && href !== "/" && pathname.startsWith(href + "/"))
 
-  const filteredNavigation = navigation.filter(item =>
-    !item.permission || hasPermission(item.permission as keyof import("@/hooks/use-permissions").UserPermissions)
-  )
+  const filteredNavigation = navigation
+    .map((item) => item.children
+      ? {
+          ...item,
+          children: item.children.filter((child) =>
+            !child.permission || hasPermission(child.permission as AdminPermission)
+          ),
+        }
+      : item
+    )
+    .filter((item) => item.children
+      ? item.children.length > 0
+      : !item.permission || hasPermission(item.permission as AdminPermission)
+    )
 
   const userInitial = user?.displayName?.charAt(0) || user?.email?.charAt(0) || "A"
   const userName = user?.displayName || user?.email?.split("@")[0] || "Usuário"

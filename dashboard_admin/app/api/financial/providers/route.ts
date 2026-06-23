@@ -1,5 +1,7 @@
 ﻿import { NextResponse } from 'next/server'
 import { adminApp } from '@/lib/firebase-admin'
+import type { NextRequest } from 'next/server'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 import {
   buildOrderPayoutSnapshot,
   centsToAmount,
@@ -75,8 +77,9 @@ const createProviderEntry = (
  * GET /api/financial/providers
  * Calcula saldo de pagamento dos prestadores a partir de orders.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'financeiro')
     if (!adminApp) {
       return NextResponse.json(
         {
@@ -198,6 +201,8 @@ export async function GET() {
       warning,
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao buscar prestadores:', error)
     return NextResponse.json(
       {
@@ -209,4 +214,3 @@ export async function GET() {
     )
   }
 }
-

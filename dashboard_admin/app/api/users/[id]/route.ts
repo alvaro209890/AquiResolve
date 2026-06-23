@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore, getAdminAuth } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 // GET /api/users/[id] — retorna dados de um usuário
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireAdminPermission(request, 'gestaoUsuarios')
     const { id } = await params
     const db = getAdminFirestore()
     const snap = await db.collection('users').doc(id).get()
@@ -16,6 +18,8 @@ export async function GET(
     }
     return NextResponse.json({ success: true, user: { id: snap.id, ...snap.data() } })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
@@ -27,6 +31,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const actor = await requireAdminPermission(request, 'administrarUsuarios')
     const db = getAdminFirestore()
     const authAdmin = getAdminAuth()
     const { id } = await params
@@ -111,6 +116,8 @@ export async function PATCH(
           blockedUntil: blocked && blockType === 'temporary' ? (blockedUntil ?? null) : null,
         },
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        actorUid: actor.uid,
+        actorEmail: actor.email,
       })
     }
 
@@ -121,6 +128,8 @@ export async function PATCH(
       message: 'Usuário atualizado com sucesso',
     })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao atualizar usuário:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
@@ -129,10 +138,11 @@ export async function PATCH(
 
 // DELETE /api/users/[id] — bloqueia permanentemente (não apaga por segurança)
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireAdminPermission(request, 'administrarUsuarios')
     const db = getAdminFirestore()
     const authAdmin = getAdminAuth()
     const { id } = await params
@@ -154,6 +164,8 @@ export async function DELETE(
       message: 'Usuário desativado com sucesso (conta bloqueada no Firebase Auth)',
     })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao desativar usuário:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })

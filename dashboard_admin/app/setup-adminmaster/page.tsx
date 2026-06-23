@@ -38,8 +38,9 @@ export default function SetupAdminMasterPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [result, setResult] = useState<SetupResult | null>(null)
   const [customEmail, setCustomEmail] = useState("master@aquiresolve.com")
-  const [customPassword, setCustomPassword] = useState("admin123")
+  const [customPassword, setCustomPassword] = useState("")
   const [customName, setCustomName] = useState("Administrador Master")
+  const [setupToken, setSetupToken] = useState("")
 
   const handleSetup = async () => {
     setIsLoading(true)
@@ -50,6 +51,7 @@ export default function SetupAdminMasterPage() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(setupToken ? { 'X-Admin-Setup-Token': setupToken } : {}),
         },
         body: JSON.stringify({
           email: customEmail,
@@ -133,7 +135,7 @@ export default function SetupAdminMasterPage() {
                     value={customPassword}
                     onChange={(e) => setCustomPassword(e.target.value)}
                     className="border-border"
-                    placeholder="admin123"
+                    placeholder="Mínimo de 10 caracteres"
                   />
                 </div>
               </div>
@@ -149,6 +151,20 @@ export default function SetupAdminMasterPage() {
                   onChange={(e) => setCustomName(e.target.value)}
                   className="border-border"
                   placeholder="Administrador Master"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="setupToken" className="text-foreground font-medium">
+                  Token de configuração inicial
+                </Label>
+                <Input
+                  id="setupToken"
+                  type="password"
+                  value={setupToken}
+                  onChange={(e) => setSetupToken(e.target.value)}
+                  className="border-border"
+                  placeholder="ADMIN_SETUP_TOKEN"
                 />
               </div>
             </div>

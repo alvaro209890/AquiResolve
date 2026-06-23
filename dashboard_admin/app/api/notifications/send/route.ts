@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore, adminApp } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 // POST /api/notifications/send — envia notificação FCM para um usuário ou grupo
 export async function POST(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'enviarNotificacoes')
     if (!adminApp) {
       return NextResponse.json(
         { success: false, error: 'Firebase Admin SDK não configurado' },
@@ -120,6 +122,8 @@ export async function POST(request: NextRequest) {
       message: `Notificação enviada: ${results.sent} sucesso(s), ${results.failed} falha(s)`,
     })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao enviar notificação:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })

@@ -18,6 +18,8 @@ import { FirebaseProvidersService, type FirebaseProvider } from "@/lib/services/
 import { mapProviderStatusToLegacy } from "@/lib/providers/status"
 import { mapRawVerificationStatus } from "@/lib/verification-status"
 import { toIsoStringFromUnknown } from "@/lib/date-utils"
+import { adminFetch } from "@/lib/admin-api"
+import { usePermissions } from "@/hooks/use-permissions"
 
 interface Provider {
   id: string
@@ -81,6 +83,8 @@ const BLOCK_REASONS = [
 ]
 
 export function ProvidersTable() {
+  const { hasPermission } = usePermissions()
+  const canAdministerUsers = hasPermission("administrarUsuarios")
   const [providers, setProviders] = useState<Provider[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -179,7 +183,7 @@ export function ProvidersTable() {
     try {
       setBlocking(true)
       setError(null)
-      const res = await fetch(`/api/providers/${blockTarget.id}/block`, {
+      const res = await adminFetch(`/api/providers/${blockTarget.id}/block`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -203,7 +207,7 @@ export function ProvidersTable() {
     try {
       setUpdatingProviderId(provider.id)
       setError(null)
-      const res = await fetch(`/api/providers/${provider.id}/block`, { method: "DELETE" })
+      const res = await adminFetch(`/api/providers/${provider.id}/block`, { method: "DELETE" })
       if (!res.ok) throw new Error((await res.json()).error || "Falha ao desbloquear")
       await fetchProviders()
     } catch (err) {
@@ -378,7 +382,7 @@ export function ProvidersTable() {
                           <Button variant="ghost" size="sm" onClick={() => handleViewProvider(provider)}>
                             <Eye className="h-4 w-4" />
                           </Button>
-                          {provider.blocked ? (
+                          {canAdministerUsers && (provider.blocked ? (
                             <Button
                               variant="ghost"
                               size="sm"
@@ -400,7 +404,7 @@ export function ProvidersTable() {
                             >
                               <UserX className="h-4 w-4 text-red-600" />
                             </Button>
-                          )}
+                          ))}
                         </div>
                       </TableCell>
                     </TableRow>

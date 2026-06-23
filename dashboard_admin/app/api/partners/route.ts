@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 // Parceiros patrocinadores da Home do app — coleção `partners`, um doc por parceiro.
 // Escrita exclusiva via Admin SDK (as Firestore rules bloqueiam o client SDK). O app apenas lê
@@ -31,8 +32,9 @@ function normalizeBenefitType(value: string | undefined): BenefitType {
 }
 
 // GET /api/partners — lista todos os parceiros ordenados por displayOrder.
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'gerenciarParceiros')
     const db = getAdminFirestore()
     const snapshot = await db.collection(COLLECTION).get()
 
@@ -57,6 +59,8 @@ export async function GET() {
 
     return NextResponse.json({ success: true, partners })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao listar parceiros:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
@@ -66,6 +70,7 @@ export async function GET() {
 // POST /api/partners — cria ou atualiza (quando `id` é enviado) um parceiro.
 export async function POST(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'gerenciarParceiros')
     const db = getAdminFirestore()
     const input = (await request.json()) as PartnerInput
 
@@ -117,6 +122,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, id })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao salvar parceiro:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
@@ -126,6 +133,7 @@ export async function POST(request: NextRequest) {
 // DELETE /api/partners?id=xxx — remove um parceiro.
 export async function DELETE(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'gerenciarParceiros')
     const db = getAdminFirestore()
     const id = request.nextUrl.searchParams.get('id')?.trim()
     if (!id) {
@@ -136,6 +144,8 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true, id })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao remover parceiro:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore, adminApp } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
 import { PagarmeService } from '@/lib/services/pagarme-service'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 async function notify(
   db: admin.firestore.Firestore,
@@ -39,6 +40,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const actor = await requireAdminPermission(request, 'operarFinanceiro')
     const db = getAdminFirestore()
     const { id } = await params
     const orderId = id
@@ -170,6 +172,8 @@ export async function POST(
         results,
       },
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      actorUid: actor.uid,
+      actorEmail: actor.email,
     })
 
     return NextResponse.json({
@@ -181,6 +185,8 @@ export async function POST(
       message: allOk ? 'Reembolso processado com sucesso' : 'Reembolso parcial: algumas cobranças falharam',
     })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao reembolsar pedido:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
+import { adminFetch } from "@/lib/admin-api"
 import { DollarSign, Award, Percent, Save, RefreshCw, Info, Plus, Trash2 } from "lucide-react"
 
 interface CashbackConfig {
@@ -133,7 +134,7 @@ export default function AquiCashConfigPage() {
     setCampaignDraft(prev => ({ ...prev, [key]: value }))
 
   const loadCampaigns = useCallback(async () => {
-    const res = await fetch("/api/cashback-campaigns")
+    const res = await adminFetch("/api/cashback-campaigns")
     const data = await res.json()
     if (data.success) {
       setCampaigns(data.campaigns || [])
@@ -143,7 +144,7 @@ export default function AquiCashConfigPage() {
   useEffect(() => {
     async function load() {
       try {
-        const configResponse = await fetch("/api/cashback-config")
+        const configResponse = await adminFetch("/api/cashback-config")
         const configData = await configResponse.json()
         if (configData.success && configData.config) setConfig({ ...DEFAULTS, ...configData.config })
         await loadCampaigns()
@@ -160,7 +161,7 @@ export default function AquiCashConfigPage() {
   async function save() {
     setSaving(true)
     try {
-      const res = await fetch("/api/cashback-config", {
+      const res = await adminFetch("/api/cashback-config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(config),
@@ -182,7 +183,7 @@ export default function AquiCashConfigPage() {
   async function createCampaign() {
     setCampaignSaving(true)
     try {
-      const res = await fetch("/api/cashback-campaigns", {
+      const res = await adminFetch("/api/cashback-campaigns", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -210,7 +211,7 @@ export default function AquiCashConfigPage() {
   async function updateCampaign(id: string, payload: Partial<CashbackCampaign>) {
     setCampaignUpdating(id)
     try {
-      const res = await fetch(`/api/cashback-campaigns/${id}`, {
+      const res = await adminFetch(`/api/cashback-campaigns/${id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -233,7 +234,7 @@ export default function AquiCashConfigPage() {
     if (!confirm("Remover esta campanha de cashback?")) return
     setCampaignUpdating(id)
     try {
-      const res = await fetch(`/api/cashback-campaigns/${id}`, { method: "DELETE" })
+      const res = await adminFetch(`/api/cashback-campaigns/${id}`, { method: "DELETE" })
       const data = await res.json()
       if (!data.success) throw new Error(data.error)
       await loadCampaigns()

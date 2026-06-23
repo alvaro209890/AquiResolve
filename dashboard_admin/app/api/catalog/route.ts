@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 // Catálogo de serviços do app (service_categories + service_types).
 // Escrita exclusiva via Admin SDK — as Firestore rules bloqueiam escrita pelo client SDK,
@@ -31,6 +32,7 @@ interface CatalogInput {
 // POST /api/catalog — cria ou atualiza (quando `id` é enviado) um serviço do catálogo.
 export async function POST(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'gerenciarCatalogo')
     const db = getAdminFirestore()
     const input = (await request.json()) as CatalogInput
 
@@ -76,6 +78,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, id })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao salvar catálogo:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
@@ -85,6 +89,7 @@ export async function POST(request: NextRequest) {
 // DELETE /api/catalog?id=xxx — remove um serviço do catálogo das duas coleções.
 export async function DELETE(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'gerenciarCatalogo')
     const db = getAdminFirestore()
     const id = request.nextUrl.searchParams.get('id')?.trim()
     if (!id) {
@@ -100,6 +105,8 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true, id })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao remover do catálogo:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })

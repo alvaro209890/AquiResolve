@@ -13,6 +13,7 @@ import { db } from '@/lib/firebase'
 import { doc, getDoc, getDocs, collection, query, where, documentId, limit } from 'firebase/firestore'
 import { extractServiceCategories } from '@/lib/services/firebase-providers'
 import { resolveQueueVerificationStatus } from '@/lib/verification-status'
+import { adminFetch } from '@/lib/admin-api'
 
 export const useDocumentVerification = () => {
   const [verifications, setVerifications] = useState<DocumentVerification[]>([])
@@ -287,7 +288,7 @@ export const useDocumentVerification = () => {
       // provider_verifications tem allow write: if false nas Firestore rules — escrita exclusiva
       // via Admin SDK. A rota /api/providers/[id]/verify já grava o histórico via Admin SDK,
       // portanto não tentamos escrever aqui pelo client SDK (causaria PERMISSION_DENIED).
-      const verifyRes = await fetch(`/api/providers/${verification.providerId}/verify`, {
+      const verifyRes = await adminFetch(`/api/providers/${verification.providerId}/verify`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'approved' }),
@@ -333,7 +334,7 @@ export const useDocumentVerification = () => {
       // provider_verifications tem allow write: if false nas Firestore rules — escrita exclusiva
       // via Admin SDK. A rota /api/providers/[id]/verify já grava o histórico via Admin SDK,
       // portanto não tentamos escrever aqui pelo client SDK (causaria PERMISSION_DENIED).
-      const verifyRes = await fetch(`/api/providers/${verification.providerId}/verify`, {
+      const verifyRes = await adminFetch(`/api/providers/${verification.providerId}/verify`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'rejected', rejectionReason }),

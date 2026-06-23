@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
+import { adminFetch } from "@/lib/admin-api"
 import { Truck, DollarSign, Percent, Save, RefreshCw, Info } from "lucide-react"
 
 interface GuinchoConfig {
@@ -39,7 +40,7 @@ export default function GuinchoConfigPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/guincho-config")
+      const res = await adminFetch("/api/guincho-config")
       const data = await res.json()
       if (data.success && data.config) {
         setConfig({ ...DEFAULTS, ...data.config })
@@ -58,7 +59,7 @@ export default function GuinchoConfigPage() {
   const save = async () => {
     setSaving(true)
     try {
-      const res = await fetch("/api/guincho-config", {
+      const res = await adminFetch("/api/guincho-config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(config),

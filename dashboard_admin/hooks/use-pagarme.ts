@@ -9,6 +9,7 @@ import {
   PagarmeBalance,
   PagarmeAnalytics,
 } from '@/types/pagarme'
+import { adminFetch } from '@/lib/admin-api'
 
 interface ApiEnvelope<T> {
   success: boolean
@@ -38,7 +39,7 @@ export function usePagarmeOrders(options?: {
       if (options?.status) params.append('status', options.status)
       if (options?.customer_id) params.append('customer_id', options.customer_id)
 
-      const response = await fetch(`/api/pagarme/orders?${params.toString()}`)
+      const response = await adminFetch(`/api/pagarme/orders?${params.toString()}`)
       const data = (await response.json()) as ApiEnvelope<PagarmeOrder[]>
 
       if (data.success) {
@@ -72,7 +73,7 @@ export function usePagarmeOrders(options?: {
 
   const createOrder = async (orderData: unknown) => {
     try {
-      const response = await fetch('/api/pagarme/orders', {
+      const response = await adminFetch('/api/pagarme/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(orderData),
@@ -93,7 +94,7 @@ export function usePagarmeOrders(options?: {
 
   const cancelOrder = async (orderId: string) => {
     try {
-      const response = await fetch(`/api/pagarme/orders/${orderId}`, {
+      const response = await adminFetch(`/api/pagarme/orders/${orderId}`, {
         method: 'DELETE',
       })
       const data = (await response.json()) as ApiEnvelope<PagarmeOrder>
@@ -131,7 +132,7 @@ export function usePagarmeCustomers() {
       setLoading(true)
       setError(null)
 
-      const response = await fetch('/api/pagarme/customers')
+      const response = await adminFetch('/api/pagarme/customers')
       const data = (await response.json()) as ApiEnvelope<PagarmeCustomer[]>
 
       if (data.success) {
@@ -153,7 +154,7 @@ export function usePagarmeCustomers() {
 
   const createCustomer = async (customerData: Partial<PagarmeCustomer>) => {
     try {
-      const response = await fetch('/api/pagarme/customers', {
+      const response = await adminFetch('/api/pagarme/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(customerData),
@@ -174,7 +175,7 @@ export function usePagarmeCustomers() {
 
   const updateCustomer = async (customerId: string, customerData: Partial<PagarmeCustomer>) => {
     try {
-      const response = await fetch(`/api/pagarme/customers/${customerId}`, {
+      const response = await adminFetch(`/api/pagarme/customers/${customerId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(customerData),
@@ -223,7 +224,7 @@ export function usePagarmeCharges(options?: {
       if (options?.status) params.append('status', options.status)
       if (options?.customer_id) params.append('customer_id', options.customer_id)
 
-      const response = await fetch(`/api/pagarme/charges?${params.toString()}`)
+      const response = await adminFetch(`/api/pagarme/charges?${params.toString()}`)
       const data = (await response.json()) as ApiEnvelope<PagarmeCharge[]>
 
       if (data.success) {
@@ -257,7 +258,7 @@ export function usePagarmeCharges(options?: {
 
   const refundCharge = async (chargeId: string, amount?: number) => {
     try {
-      const response = await fetch(`/api/pagarme/charges/${chargeId}/refund`, {
+      const response = await adminFetch(`/api/pagarme/charges/${chargeId}/refund`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ amount }),
@@ -278,7 +279,7 @@ export function usePagarmeCharges(options?: {
 
   const cancelCharge = async (chargeId: string) => {
     try {
-      const response = await fetch(`/api/pagarme/charges/${chargeId}`, {
+      const response = await adminFetch(`/api/pagarme/charges/${chargeId}`, {
         method: 'DELETE',
       })
       const data = (await response.json()) as ApiEnvelope<PagarmeCharge>
@@ -324,7 +325,7 @@ export function usePagarmeSubscriptions(options?: {
       if (options?.status) params.append('status', options.status)
       if (options?.customer_id) params.append('customer_id', options.customer_id)
 
-      const response = await fetch(`/api/pagarme/subscriptions?${params.toString()}`)
+      const response = await adminFetch(`/api/pagarme/subscriptions?${params.toString()}`)
       const data = (await response.json()) as ApiEnvelope<PagarmeSubscription[]>
 
       if (data.success) {
@@ -355,7 +356,7 @@ export function usePagarmeSubscriptions(options?: {
 
   const createSubscription = async (subscriptionData: unknown) => {
     try {
-      const response = await fetch('/api/pagarme/subscriptions', {
+      const response = await adminFetch('/api/pagarme/subscriptions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(subscriptionData),
@@ -376,7 +377,7 @@ export function usePagarmeSubscriptions(options?: {
 
   const cancelSubscription = async (subscriptionId: string) => {
     try {
-      const response = await fetch(`/api/pagarme/subscriptions/${subscriptionId}`, {
+      const response = await adminFetch(`/api/pagarme/subscriptions/${subscriptionId}`, {
         method: 'DELETE',
       })
       const data = (await response.json()) as ApiEnvelope<PagarmeSubscription>
@@ -415,7 +416,7 @@ export function usePagarmeBalance(autoRefresh?: boolean) {
       setError(null)
       setWarning(null)
 
-      const response = await fetch('/api/pagarme/balance')
+      const response = await adminFetch('/api/pagarme/balance')
       const data = (await response.json()) as ApiEnvelope<PagarmeBalance>
 
       if (data.success) {
@@ -473,7 +474,7 @@ export function usePagarmeAnalytics(startDate: string, endDate: string) {
         end_date: endDate,
       })
 
-      const response = await fetch(`/api/pagarme/analytics?${params.toString()}`)
+      const response = await adminFetch(`/api/pagarme/analytics?${params.toString()}`)
       const data = (await response.json()) as ApiEnvelope<PagarmeAnalytics>
 
       if (data.success) {

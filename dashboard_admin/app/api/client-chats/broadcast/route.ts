@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore, adminApp } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 const BATCH_LIMIT = 400 // Firestore batch limit é 500; deixamos margem
 const TRUNCATE_PREVIEW = 120
@@ -52,6 +53,7 @@ async function resolveAudience(
 // Body: { text, type?, audience: 'all'|'active'|'specific', userIds?: string[], adminId?, adminName? }
 export async function POST(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'controle')
     const db = getAdminFirestore()
     const body = (await request.json()) as {
       text: string
@@ -180,6 +182,8 @@ export async function POST(request: NextRequest) {
       fcm: { sent: fcmSent, failed: fcmFailed },
     })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('[client-chats broadcast] erro:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })

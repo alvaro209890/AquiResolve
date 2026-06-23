@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pagarmeService } from '@/lib/services/pagarme-service'
 import { PagarmeFirebaseSync } from '@/lib/services/pagarme-firebase-sync'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 /**
  * POST /api/pagarme/sync
@@ -8,6 +9,7 @@ import { PagarmeFirebaseSync } from '@/lib/services/pagarme-firebase-sync'
  */
 export async function POST(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'operarFinanceiro')
     const body = await request.json()
     const { type = 'all', limit = 100 } = body
 
@@ -62,6 +64,8 @@ export async function POST(request: NextRequest) {
       }
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('❌ Erro na sincronização:', error)
     
     // Registrar log de erro
@@ -85,6 +89,7 @@ export async function POST(request: NextRequest) {
  */
 export async function GET(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'financeiro')
     // Buscar última sincronização do Firebase
     const orders = await PagarmeFirebaseSync.getOrders({ limit: 1 })
     const charges = await PagarmeFirebaseSync.getCharges({ limit: 1 })
@@ -99,6 +104,8 @@ export async function GET(request: NextRequest) {
       }
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('❌ Erro ao buscar status:', error)
     return NextResponse.json(
       {
@@ -109,4 +116,3 @@ export async function GET(request: NextRequest) {
     )
   }
 }
-

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 const COLLECTION = 'cashback_campaigns'
 
@@ -27,8 +28,9 @@ function serializeCampaign(doc: admin.firestore.QueryDocumentSnapshot | admin.fi
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'gerenciarAquicash')
     const db = getAdminFirestore()
     const snap = await db.collection(COLLECTION).orderBy('createdAt', 'desc').get()
     return NextResponse.json({
@@ -36,6 +38,8 @@ export async function GET() {
       campaigns: snap.docs.map(serializeCampaign),
     })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao listar campanhas de cashback:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
@@ -44,6 +48,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'gerenciarAquicash')
     const db = getAdminFirestore()
     const body = await request.json()
     const name = String(body.name || '').trim()
@@ -80,6 +85,8 @@ export async function POST(request: NextRequest) {
       campaign: serializeCampaign(doc),
     })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao criar campanha de cashback:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })

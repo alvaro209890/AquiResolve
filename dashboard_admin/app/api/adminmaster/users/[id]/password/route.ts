@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import * as admin from 'firebase-admin'
 import { adminApp, getAdminAuth, getAdminFirestore } from '@/lib/firebase-admin'
+import { requireMasterSession } from '@/lib/server/master-session'
 
 export async function PUT(
   request: NextRequest,
@@ -8,6 +9,8 @@ export async function PUT(
 ) {
   const { id } = await params
   try {
+    const denied = await requireMasterSession(request)
+    if (denied) return denied
     console.log('🔐 Iniciando alteração de senha do usuário:', id)
 
     if (!adminApp) {

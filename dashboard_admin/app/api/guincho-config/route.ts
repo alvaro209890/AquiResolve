@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 const CONFIG_COLLECTION = 'app_config'
 const CONFIG_DOC = 'guincho'
@@ -14,8 +15,9 @@ const DEFAULTS = {
 }
 
 // GET /api/guincho-config — lê a configuração de precificação do guincho
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'gerenciarGuincho')
     const db = getAdminFirestore()
     const snap = await db.collection(CONFIG_COLLECTION).doc(CONFIG_DOC).get()
 
@@ -29,6 +31,8 @@ export async function GET() {
 
     return NextResponse.json({ success: true, config: { ...DEFAULTS, ...snap.data() } })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao ler config do guincho:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
@@ -38,6 +42,7 @@ export async function GET() {
 // POST /api/guincho-config — salva a configuração (Admin SDK bypassa allow write: if false)
 export async function POST(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'gerenciarGuincho')
     const db = getAdminFirestore()
     const body = await request.json()
 
@@ -68,6 +73,8 @@ export async function POST(request: NextRequest) {
       config,
     })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao salvar config do guincho:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })

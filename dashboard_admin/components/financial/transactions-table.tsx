@@ -11,12 +11,15 @@ import { Search, Download, RefreshCw, AlertCircle, Loader2 } from "lucide-react"
 import { usePagarmeCharges } from "@/hooks/use-pagarme"
 import { PagarmeService } from "@/lib/services/pagarme-service"
 import { useToast } from "@/hooks/use-toast"
+import { usePermissions } from "@/hooks/use-permissions"
 
 export function TransactionsTable() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>("all")
   const { toast } = useToast()
+  const { hasPermission } = usePermissions()
+  const canOperateFinance = hasPermission("operarFinanceiro")
 
   const {
     charges,
@@ -256,12 +259,12 @@ export function TransactionsTable() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        {charge.status === "paid" ? (
+                        {canOperateFinance && charge.status === "paid" ? (
                           <Button variant="ghost" size="sm" onClick={() => void handleRefund(charge.id)} title="Reembolsar">
                             <RefreshCw className="h-4 w-4" />
                           </Button>
                         ) : null}
-                        {charge.status === "pending" || charge.status === "processing" ? (
+                        {canOperateFinance && (charge.status === "pending" || charge.status === "processing") ? (
                           <Button variant="ghost" size="sm" onClick={() => void handleCancel(charge.id)} title="Cancelar">
                             <AlertCircle className="h-4 w-4" />
                           </Button>

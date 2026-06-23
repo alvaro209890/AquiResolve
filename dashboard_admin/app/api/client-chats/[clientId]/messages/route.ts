@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore, adminApp } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 const TRUNCATE_PREVIEW = 120
 
@@ -11,6 +12,7 @@ interface RouteCtx {
 // GET /api/client-chats/[clientId]/messages?limit=100
 export async function GET(request: NextRequest, ctx: RouteCtx) {
   try {
+    await requireAdminPermission(request, 'controle')
     const { clientId } = await ctx.params
     const db = getAdminFirestore()
     const { searchParams } = new URL(request.url)
@@ -28,6 +30,8 @@ export async function GET(request: NextRequest, ctx: RouteCtx) {
 
     return NextResponse.json({ success: true, messages })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
@@ -37,6 +41,7 @@ export async function GET(request: NextRequest, ctx: RouteCtx) {
 // Body: { text, type?, relatedOrderId?, adminId?, adminName? }
 export async function POST(request: NextRequest, ctx: RouteCtx) {
   try {
+    await requireAdminPermission(request, 'controle')
     const { clientId } = await ctx.params
     const db = getAdminFirestore()
     const body = (await request.json()) as {
@@ -142,6 +147,8 @@ export async function POST(request: NextRequest, ctx: RouteCtx) {
 
     return NextResponse.json({ success: true, messageId: msgRef.id })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('[client-chats POST] erro:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })

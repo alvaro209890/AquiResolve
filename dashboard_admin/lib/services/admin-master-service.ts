@@ -13,6 +13,7 @@ import {
 } from "firebase/firestore"
 import bcrypt from "bcryptjs"
 import { db } from "@/lib/firebase"
+import type { AdminPermissions } from "@/lib/admin-permissions"
 
 const BCRYPT_ROUNDS = 10
 
@@ -21,30 +22,14 @@ export interface AdminMaster {
   email: string
   senhaHash: string
   nome: string
-  permissoes: {
-    dashboard: boolean
-    controle: boolean
-    gestaoUsuarios: boolean
-    gestaoPedidos: boolean
-    financeiro: boolean
-    relatorios: boolean
-    configuracoes: boolean
-  }
+  permissoes: AdminPermissions
 }
 
 export interface MasterUser {
   id: string
   email: string
   nome: string
-  permissoes: {
-    dashboard: boolean
-    controle: boolean
-    gestaoUsuarios: boolean
-    gestaoPedidos: boolean
-    financeiro: boolean
-    relatorios: boolean
-    configuracoes: boolean
-  }
+  permissoes: AdminPermissions
 }
 
 export class AdminMasterService {

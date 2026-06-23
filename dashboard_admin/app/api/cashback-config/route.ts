@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+import {
+  adminAuthorizationResponse,
+  requireAdminPermission,
+  requireAnyAdminPermission,
+} from '@/lib/server/admin-authorization'
 
 const CONFIG_COLLECTION = 'app_config'
 const CONFIG_DOC = 'cashback'
 
 // GET /api/cashback-config — lê configuração de cashback
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    await requireAnyAdminPermission(request, ['gerenciarAquicash', 'gerenciarCombos'])
     const db = getAdminFirestore()
     const snap = await db.collection(CONFIG_COLLECTION).doc(CONFIG_DOC).get()
 
@@ -21,6 +27,8 @@ export async function GET() {
 
     return NextResponse.json({ success: true, config: snap.data() })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao ler cashback config:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
@@ -30,6 +38,7 @@ export async function GET() {
 // POST /api/cashback-config — salva configuração de cashback (Admin SDK bypassa a regra allow write: if false)
 export async function POST(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'gerenciarAquicash')
     const db = getAdminFirestore()
     const body = await request.json()
 
@@ -89,6 +98,8 @@ export async function POST(request: NextRequest) {
       config,
     })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao salvar cashback config:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/firestore'
 import { toDateFromUnknown } from '@/lib/date-utils'
+import { adminAuthorizationResponse, requireAnyAdminPermission } from '@/lib/server/admin-authorization'
 
 type TransactionRecord = Record<string, unknown> & {
   id: string
@@ -46,6 +47,7 @@ const buildCategories = (transactions: TransactionRecord[]) => {
 
 export async function GET(request: NextRequest) {
   try {
+    await requireAnyAdminPermission(request, ['financeiro', 'relatorios'])
     const { searchParams } = new URL(request.url)
     const periodo = searchParams.get('periodo') || 'mes'
     const tipo = searchParams.get('tipo') || 'resumo'
@@ -114,6 +116,8 @@ export async function GET(request: NextRequest) {
           : undefined,
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao gerar relatorio financeiro:', error)
     return NextResponse.json(
       { success: false, error: 'Erro interno do servidor' },

@@ -1,11 +1,13 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore } from '@/lib/firebase-admin'
+import { adminAuthorizationResponse, requireAnyAdminPermission } from '@/lib/server/admin-authorization'
 
 export const dynamic = 'force-dynamic'
 
 // GET /api/providers/active — lista prestadores aprovados e ativos para seleção
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    await requireAnyAdminPermission(request, ['gestaoPedidos', 'gestaoUsuarios'])
     const db = getAdminFirestore()
 
     const snap = await db.collection('providers')
@@ -28,6 +30,8 @@ export async function GET() {
 
     return NextResponse.json({ success: true, providers, count: providers.length })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json({ success: false, error: message, providers: [] }, { status: 500 })
   }

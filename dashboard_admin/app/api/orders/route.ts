@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCollection } from '@/lib/firestore'
 import { toDateFromUnknown, toIsoStringFromUnknown } from '@/lib/date-utils'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 type OrderRecord = Record<string, unknown> & {
   id: string
@@ -37,6 +38,7 @@ const getOrderAmount = (order: OrderRecord): number =>
 
 export async function GET(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'gestaoPedidos')
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const cliente = searchParams.get('cliente')?.trim().toLowerCase()
@@ -109,6 +111,8 @@ export async function GET(request: NextRequest) {
       generatedAt: toIsoStringFromUnknown(new Date()),
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao listar pedidos:', error)
     return NextResponse.json(
       { success: false, error: 'Erro interno do servidor' },

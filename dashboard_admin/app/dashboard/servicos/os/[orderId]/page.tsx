@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
+import { adminFetch } from "@/lib/admin-api"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -93,7 +94,7 @@ export default function OsDetailPage() {
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch(`/api/checklists/${orderId}`)
+    adminFetch(`/api/checklists/${orderId}`)
       .then(r => r.json())
       .then(data => {
         if (!data.success) throw new Error(data.error)

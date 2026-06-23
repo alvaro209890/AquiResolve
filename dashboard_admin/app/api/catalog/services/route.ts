@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+import {
+  adminAuthorizationResponse,
+  requireAdminPermission,
+  requireAnyAdminPermission,
+} from '@/lib/server/admin-authorization'
 
 // Serviços do catálogo do app (coleção `catalog_services`) — um doc por serviço,
 // com nicho, valor ao cliente e % do prestador. Escrita exclusiva via Admin SDK
@@ -46,6 +51,7 @@ interface ServiceInput {
 // GET /api/catalog/services?niche=Elétrica — lista os serviços (todos ou de um nicho).
 export async function GET(request: NextRequest) {
   try {
+    await requireAnyAdminPermission(request, ['gerenciarCatalogo', 'gerenciarCombos'])
     const db = getAdminFirestore()
     const niche = request.nextUrl.searchParams.get('niche')?.trim()
 
@@ -77,6 +83,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, services })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao listar serviços do catálogo:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
@@ -88,6 +96,7 @@ export async function GET(request: NextRequest) {
 // garantindo que app/backend continuem consumindo o valor absoluto em R$.
 export async function POST(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'gerenciarCatalogo')
     const db = getAdminFirestore()
     const input = (await request.json()) as ServiceInput
 
@@ -143,6 +152,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, id, providerCommission })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao salvar serviço do catálogo:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
@@ -152,6 +163,7 @@ export async function POST(request: NextRequest) {
 // DELETE /api/catalog/services?id=xxx — remove um serviço do catálogo.
 export async function DELETE(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'gerenciarCatalogo')
     const db = getAdminFirestore()
     const id = request.nextUrl.searchParams.get('id')?.trim()
     if (!id) {
@@ -162,6 +174,8 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true, id })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao remover serviço do catálogo:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })

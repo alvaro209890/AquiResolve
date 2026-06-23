@@ -1,6 +1,7 @@
 "use client"
 
 import { useCallback, useEffect, useState } from 'react'
+import { adminFetch } from '@/lib/admin-api'
 
 export interface PagarmeAnalyticsData {
   totalRevenue: number
@@ -48,7 +49,7 @@ export function usePagarmeAnalytics() {
         warning: null,
       }))
 
-      const response = await fetch('/api/pagarme/analytics', {
+      const response = await adminFetch('/api/pagarme/analytics', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore, getAdminAuth } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 // POST /api/providers/[id]/block — suspende ou bloqueia definitivamente um prestador.
 // Body: { blockType: 'suspension' | 'permanent', reason: string, blockedUntil?: ISOString }
@@ -9,6 +10,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const actor = await requireAdminPermission(request, 'administrarUsuarios')
     const db = getAdminFirestore()
     const authAdmin = getAdminAuth()
     const { id } = await params
@@ -79,6 +81,8 @@ export async function POST(
       targetType: 'provider',
       payload: { blockType: type, reason, blockedUntil: blockedUntil ?? null },
       createdAt: now,
+      actorUid: actor.uid,
+      actorEmail: actor.email,
     })
 
     return NextResponse.json({
@@ -88,6 +92,8 @@ export async function POST(
       message: type === 'suspension' ? 'Prestador suspenso' : 'Prestador bloqueado definitivamente',
     })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao bloquear prestador:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
@@ -96,10 +102,11 @@ export async function POST(
 
 // DELETE /api/providers/[id]/block — desbloqueia o prestador
 export async function DELETE(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const actor = await requireAdminPermission(request, 'administrarUsuarios')
     const db = getAdminFirestore()
     const authAdmin = getAdminAuth()
     const { id } = await params
@@ -139,10 +146,14 @@ export async function DELETE(
       targetType: 'provider',
       payload: {},
       createdAt: now,
+      actorUid: actor.uid,
+      actorEmail: actor.email,
     })
 
     return NextResponse.json({ success: true, providerId, message: 'Prestador desbloqueado' })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao desbloquear prestador:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })

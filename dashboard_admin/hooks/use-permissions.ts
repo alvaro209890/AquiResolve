@@ -1,126 +1,150 @@
 "use client"
 
-import React, { useState, useEffect, createContext, useContext } from "react"
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { useAuth } from "@/components/auth-provider"
-import { AdminMasterService } from "@/lib/services/admin-master-service"
+import {
+  AdminPermission,
+  AdminPermissions,
+  firstAllowedPath,
+  hasAdminPermission,
+  hasAnyAdminPermission,
+  normalizeAdminPermissions,
+} from "@/lib/admin-permissions"
+import { adminFetch } from "@/lib/admin-api"
 
-export interface UserPermissions {
-  dashboard: boolean
-  controle: boolean
-  gestaoUsuarios: boolean
-  gestaoPedidos: boolean
-  financeiro: boolean
-  relatorios: boolean
-  configuracoes: boolean
+export type UserPermissions = AdminPermissions
+
+export interface AdminProfile {
+  uid: string
+  email: string
+  name: string
+  isMaster: boolean
 }
 
 interface PermissionsContextType {
-  permissions: UserPermissions | null
+  permissions: AdminPermissions | null
+  profile: AdminProfile | null
   loading: boolean
-  hasPermission: (permission: keyof UserPermissions) => boolean
+  error: string | null
+  hasPermission: (permission: AdminPermission) => boolean
+  hasAnyPermission: (permissions: readonly AdminPermission[]) => boolean
   canAccess: (module: string) => boolean
+  firstAllowedPath: string | null
+  refreshPermissions: () => Promise<void>
 }
 
-/** Acesso total — bootstrap quando as permissões ainda não foram provisionadas no banco. */
-const FULL_ACCESS: UserPermissions = {
-  dashboard: true,
-  controle: true,
-  gestaoUsuarios: true,
-  gestaoPedidos: true,
-  financeiro: true,
-  relatorios: true,
-  configuracoes: true,
+const MODULE_PERMISSION_MAP: Record<string, AdminPermission> = {
+  dashboard: "dashboard",
+  controle: "controle",
+  "gestao-usuarios": "gestaoUsuarios",
+  "gestao-pedidos": "gestaoPedidos",
+  financeiro: "financeiro",
+  relatorios: "relatorios",
+  configuracoes: "configuracoes",
 }
 
 const PermissionsContext = createContext<PermissionsContextType>({
   permissions: null,
+  profile: null,
   loading: true,
+  error: null,
   hasPermission: () => false,
+  hasAnyPermission: () => false,
   canAccess: () => false,
+  firstAllowedPath: null,
+  refreshPermissions: async () => undefined,
 })
 
 export function PermissionsProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
-  const { user } = useAuth()
-  const [permissions, setPermissions] = useState<UserPermissions | null>(null)
+  const { user, loading: authLoading } = useAuth()
+  const [permissions, setPermissions] = useState<AdminPermissions | null>(null)
+  const [profile, setProfile] = useState<AdminProfile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const requestSequence = useRef(0)
+
+  const loadUserPermissions = useCallback(async () => {
+    const requestId = ++requestSequence.current
+    if (authLoading) return
+    if (!user) {
+      setPermissions(null)
+      setProfile(null)
+      setError(null)
+      setLoading(false)
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await adminFetch("/api/auth/permissions", { cache: "no-store" })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.success || !data.actor) {
+        throw new Error(data.error || "Acesso administrativo não provisionado")
+      }
+      if (requestId !== requestSequence.current) return
+
+      setPermissions(normalizeAdminPermissions(data.actor.permissions, { inheritLegacy: true }))
+      setProfile({
+        uid: String(data.actor.uid ?? user.uid),
+        email: String(data.actor.email ?? user.email ?? ""),
+        name: String(data.actor.name ?? user.displayName ?? user.email ?? "Administrador"),
+        isMaster: data.actor.isMaster === true,
+      })
+    } catch (loadError: unknown) {
+      if (requestId !== requestSequence.current) return
+      setPermissions(null)
+      setProfile(null)
+      setError(loadError instanceof Error ? loadError.message : "Falha ao validar permissões")
+    } finally {
+      if (requestId === requestSequence.current) setLoading(false)
+    }
+  }, [authLoading, user])
 
   useEffect(() => {
-    const loadUserPermissions = async () => {
-      if (!user) {
-        setPermissions(null)
-        setLoading(false)
-        return
-      }
+    void loadUserPermissions()
+  }, [loadUserPermissions])
 
-      try {
-        setLoading(true)
-        
-        // Primeiro, verificar se é AdminMaster
-        const adminMaster = await AdminMasterService.getAdminMaster()
-        
-        if (adminMaster && adminMaster.email === user.email) {
-          // É AdminMaster - tem todas as permissões
-          setPermissions({
-            dashboard: true,
-            controle: true,
-            gestaoUsuarios: true,
-            gestaoPedidos: true,
-            financeiro: true,
-            relatorios: true,
-            configuracoes: true
-          })
-          setLoading(false)
-          return
-        }
+  const hasPermission = useCallback((permission: AdminPermission): boolean => {
+    return permissions ? hasAdminPermission(permissions, permission) : false
+  }, [permissions])
 
-        // Buscar nas subcoleções de usuários
-        const userPermissions = await AdminMasterService.getUsuarioByEmail(user.email ?? "")
-        // Fallback: usuário autenticado sem permissões provisionadas recebe acesso total
-        // (evita painel/sidebar vazios). Provisione o AdminMaster para gating fino.
-        setPermissions(userPermissions?.permissoes || FULL_ACCESS)
-      } catch (error: unknown) {
-        const code = (error as { code?: string })?.code ?? ''
-        if (!String(code).includes('permission-denied')) {
-          console.error('Erro ao carregar permissões:', error)
-        }
-        // Mesmo em erro de leitura (ex.: regras Firestore), não deixar o admin sem menu.
-        setPermissions(FULL_ACCESS)
-      } finally {
-        setLoading(false)
-      }
-    }
+  const hasAnyPermission = useCallback((required: readonly AdminPermission[]): boolean => {
+    return permissions ? hasAnyAdminPermission(permissions, required) : false
+  }, [permissions])
 
-    loadUserPermissions()
-  }, [user])
-
-  const hasPermission = (permission: keyof UserPermissions): boolean => {
-    if (!permissions) return false
-    return permissions[permission] === true
-  }
-
-  const canAccess = (module: string): boolean => {
-    if (!permissions) return false
-    
-    const moduleMap: Record<string, keyof UserPermissions> = {
-      'dashboard': 'dashboard',
-      'controle': 'controle',
-      'gestao-usuarios': 'gestaoUsuarios',
-      'gestao-pedidos': 'gestaoPedidos',
-      'financeiro': 'financeiro',
-      'relatorios': 'relatorios',
-      'configuracoes': 'configuracoes'
-    }
-
-    const permission = moduleMap[module]
+  const canAccess = useCallback((module: string): boolean => {
+    const permission = MODULE_PERMISSION_MAP[module]
     return permission ? hasPermission(permission) : false
-  }
+  }, [hasPermission])
 
-  const contextValue = {
+  const landingPath = useMemo(
+    () => permissions ? firstAllowedPath(permissions) : null,
+    [permissions]
+  )
+
+  const contextValue = useMemo<PermissionsContextType>(() => ({
     permissions,
-    loading,
+    profile,
+    loading: authLoading || loading,
+    error,
     hasPermission,
-    canAccess
-  }
+    hasAnyPermission,
+    canAccess,
+    firstAllowedPath: landingPath,
+    refreshPermissions: loadUserPermissions,
+  }), [
+    permissions,
+    profile,
+    authLoading,
+    loading,
+    error,
+    hasPermission,
+    hasAnyPermission,
+    canAccess,
+    landingPath,
+    loadUserPermissions,
+  ])
 
   return React.createElement(
     PermissionsContext.Provider,

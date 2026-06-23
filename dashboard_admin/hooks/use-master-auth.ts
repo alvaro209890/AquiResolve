@@ -3,20 +3,14 @@
 import React, { useState, useEffect, createContext, useContext } from "react"
 import { AdminMasterService } from "@/lib/services/admin-master-service"
 import { clientSessionEncryption } from "@/lib/client-session-encryption"
+import type { AdminPermissions } from "@/lib/admin-permissions"
+import { normalizeAdminPermissions } from "@/lib/admin-permissions"
 
 export interface MasterUser {
   id: string
   email: string
   nome: string
-  permissoes: {
-    dashboard: boolean
-    controle: boolean
-    gestaoUsuarios: boolean
-    gestaoPedidos: boolean
-    financeiro: boolean
-    relatorios: boolean
-    configuracoes: boolean
-  }
+  permissoes: AdminPermissions
 }
 
 export interface AdminMaster {
@@ -24,15 +18,7 @@ export interface AdminMaster {
   email: string
   senhaHash: string
   nome: string
-  permissoes: {
-    dashboard: boolean
-    controle: boolean
-    gestaoUsuarios: boolean
-    gestaoPedidos: boolean
-    financeiro: boolean
-    relatorios: boolean
-    configuracoes: boolean
-  }
+  permissoes: AdminPermissions
 }
 
 interface MasterAuthContextType {
@@ -87,20 +73,18 @@ export function MasterAuthProvider({ children }: { children: React.ReactNode }) 
           setLoading(false)
           return
         }
+        const sessionResponse = await fetch('/api/auth/master-session', { cache: 'no-store' })
+        const sessionData = await sessionResponse.json().catch(() => ({}))
+        if (!sessionResponse.ok || !sessionData?.success || !sessionData?.user) {
+          throw new Error('Sessão Master inválida ou expirada')
+        }
         if (cancelled) return
+        const verifiedUser = sessionData.user as MasterUser
         const user: MasterUser = {
-          id: payload.userId,
-          email: payload.email,
-          nome: payload.nome ?? 'Master',
-          permissoes: {
-            dashboard: Boolean(payload.permissoes?.dashboard),
-            controle: Boolean(payload.permissoes?.controle),
-            gestaoUsuarios: Boolean(payload.permissoes?.gestaoUsuarios),
-            gestaoPedidos: Boolean(payload.permissoes?.gestaoPedidos),
-            financeiro: Boolean(payload.permissoes?.financeiro),
-            relatorios: Boolean(payload.permissoes?.relatorios),
-            configuracoes: Boolean(payload.permissoes?.configuracoes),
-          },
+          id: verifiedUser.id,
+          email: verifiedUser.email,
+          nome: verifiedUser.nome ?? 'Master',
+          permissoes: normalizeAdminPermissions(verifiedUser.permissoes, { master: true }),
         }
         setMasterUser(user)
         setIsMasterAuthenticated(true)
@@ -181,6 +165,7 @@ export function MasterAuthProvider({ children }: { children: React.ReactNode }) 
   }
 
   const masterLogout = () => {
+    void fetch('/api/auth/master-logout', { method: 'POST' }).catch(() => undefined)
     setMasterUser(null)
     setIsMasterAuthenticated(false)
     setUsuarios([])

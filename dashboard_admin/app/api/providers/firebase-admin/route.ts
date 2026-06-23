@@ -1,10 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { adminStorage } from '@/lib/firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'gestaoUsuarios')
     if (!adminStorage) {
       return NextResponse.json({
         providers: [],
@@ -63,6 +65,8 @@ export async function GET() {
       warning: providersMap.size === 0 ? 'Nenhum documento real encontrado no Storage.' : undefined,
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro no Firebase Admin SDK:', error)
     return NextResponse.json({
       providers: [],

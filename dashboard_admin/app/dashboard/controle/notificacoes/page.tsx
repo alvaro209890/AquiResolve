@@ -11,6 +11,7 @@ import { Bell, Send, Users, User, RefreshCw, CheckCircle } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { db } from "@/lib/firebase"
 import { collection, getDocs, query, where, limit } from "firebase/firestore"
+import { adminFetch } from "@/lib/admin-api"
 
 interface SentRecord {
   id: string
@@ -67,7 +68,7 @@ export default function NotificacoesPage() {
         return
       }
 
-      const res = await fetch("/api/notifications/send", {
+      const res = await adminFetch("/api/notifications/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

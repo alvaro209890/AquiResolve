@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "build": "next build",
+    "test:permissions": "ts-node --compiler-options '{\"module\":\"CommonJS\",\"moduleResolution\":\"Node\"}' tests/admin-permissions.test.ts",
+    "test:monitoring": "ts-node --compiler-options '{\"module\":\"CommonJS\",\"moduleResolution\":\"Node\"}' tests/order-monitoring.test.ts",
     "setup:master": "node scripts/setup-master-login.js",
     "firebase:read-schema": "node scripts/read-firestore-schema.js",
     "firebase:export-collection": "node scripts/export-firestore-collection.js",

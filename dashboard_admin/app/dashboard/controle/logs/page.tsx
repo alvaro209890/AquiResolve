@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { RefreshCw, ShieldCheck, Clock } from "lucide-react"
 import { formatDistanceToNow } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import { adminFetch } from "@/lib/admin-api"
 
 const ACTION_CONFIG: Record<string, { label: string; color: string }> = {
   verify_provider:    { label: "Verificação prestador",  color: "bg-amber-100 text-amber-800" },
@@ -41,7 +42,7 @@ export default function AuditLogsPage() {
       const params = new URLSearchParams({ limit: "100" })
       if (actionFilter !== "all") params.set("action", actionFilter)
       if (typeFilter !== "all") params.set("targetType", typeFilter)
-      const res = await fetch(`/api/admin-logs?${params}`)
+      const res = await adminFetch(`/api/admin-logs?${params}`)
       const data = await res.json()
       if (data.success) setLogs(data.logs ?? [])
     } finally {

@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+import {
+  adminAuthorizationResponse,
+  authorizeAdminRequest,
+  requireAdminPermission,
+} from '@/lib/server/admin-authorization'
 
 export interface AdminLogEntry {
   action: string          // 'verify_provider' | 'block_user' | 'unblock_user' | 'cancel_order' | 'redirect_order' | 'send_notification'
@@ -14,6 +19,7 @@ export interface AdminLogEntry {
 // POST /api/admin-logs — grava uma ação do admin
 export async function POST(request: NextRequest) {
   try {
+    const actor = await authorizeAdminRequest(request)
     const db = getAdminFirestore()
     const body = await request.json() as AdminLogEntry
 
@@ -28,7 +34,8 @@ export async function POST(request: NextRequest) {
       action: body.action,
       targetId: body.targetId,
       targetType: body.targetType,
-      adminId: body.adminId ?? null,
+      adminId: actor.uid,
+      adminEmail: actor.email,
       payload: body.payload ?? null,
       note: body.note ?? null,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
@@ -36,6 +43,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, id: ref.id })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
@@ -44,6 +53,7 @@ export async function POST(request: NextRequest) {
 // GET /api/admin-logs — lista os últimos 100 logs
 export async function GET(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'controle')
     const db = getAdminFirestore()
     const { searchParams } = new URL(request.url)
     const limitN = Math.min(parseInt(searchParams.get('limit') ?? '100'), 200)
@@ -66,6 +76,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, logs, total: logs.length })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
   }

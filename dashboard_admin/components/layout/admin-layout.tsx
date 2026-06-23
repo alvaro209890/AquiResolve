@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 
 import { useAuth } from "@/components/auth-provider"
 import { ResponsiveLayout } from "./responsive-layout"
+import { AdminAccessGuard } from "@/components/auth/admin-access-guard"
 
 interface AdminLayoutProps {
   children: React.ReactNode
@@ -35,7 +36,7 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <ResponsiveLayout>
-      {children}
+      <AdminAccessGuard>{children}</AdminAccessGuard>
     </ResponsiveLayout>
   )
 }

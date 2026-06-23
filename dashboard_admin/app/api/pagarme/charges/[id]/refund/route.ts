@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pagarmeService } from '@/lib/services/pagarme-service'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 /**
  * POST /api/pagarme/charges/:id/refund
@@ -11,6 +12,7 @@ export async function POST(
 ) {
   const { id } = await params
   try {
+    await requireAdminPermission(request, 'operarFinanceiro')
     const body = await request.json()
     const amount = body.amount // Opcional: valor parcial do reembolso
 
@@ -32,6 +34,8 @@ export async function POST(
       message: 'Cobrança reembolsada com sucesso',
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao reembolsar cobrança:', error)
     return NextResponse.json(
       {
@@ -42,4 +46,3 @@ export async function POST(
     )
   }
 }
-

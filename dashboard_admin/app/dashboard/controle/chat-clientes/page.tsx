@@ -33,6 +33,7 @@ import {
   Search,
 } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
+import { adminFetch } from "@/lib/admin-api"
 
 interface ChatMeta {
   id: string
@@ -100,7 +101,7 @@ export default function ChatClientesPage() {
         status: filter,
         ...(unreadOnly ? { unreadOnly: "true" } : {}),
       })
-      const res = await fetch(`/api/client-chats?${qs.toString()}`, { cache: "no-store" })
+      const res = await adminFetch(`/api/client-chats?${qs.toString()}`, { cache: "no-store" })
       const json = await res.json()
       if (json.success) setChats(json.chats as ChatMeta[])
     } finally {
@@ -118,7 +119,7 @@ export default function ChatClientesPage() {
   const loadMessages = useCallback(async (clientId: string, silent = false) => {
     if (!silent) setLoadingMsgs(true)
     try {
-      const res = await fetch(`/api/client-chats/${clientId}/messages?limit=200`, { cache: "no-store" })
+      const res = await adminFetch(`/api/client-chats/${clientId}/messages?limit=200`, { cache: "no-store" })
       const json = await res.json()
       if (json.success) setMessages(json.messages as ChatMessage[])
     } finally {
@@ -130,7 +131,7 @@ export default function ChatClientesPage() {
   useEffect(() => {
     if (!selected) return
     loadMessages(selected.clientId)
-    fetch(`/api/client-chats/${selected.clientId}/read?role=admin`, { method: "PATCH" }).catch(() => null)
+    adminFetch(`/api/client-chats/${selected.clientId}/read?role=admin`, { method: "PATCH" }).catch(() => null)
     const t = setInterval(() => loadMessages(selected.clientId, true), 5000)
     return () => clearInterval(t)
   }, [selected, loadMessages])
@@ -162,7 +163,7 @@ export default function ChatClientesPage() {
     if (!selected || !draft.trim() || sending) return
     setSending(true)
     try {
-      const res = await fetch(`/api/client-chats/${selected.clientId}/messages`, {
+      const res = await adminFetch(`/api/client-chats/${selected.clientId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -187,7 +188,7 @@ export default function ChatClientesPage() {
   }
 
   async function togglePin(c: ChatMeta) {
-    await fetch(`/api/client-chats/${c.clientId}`, {
+    await adminFetch(`/api/client-chats/${c.clientId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pinned: !c.pinned }),
@@ -196,7 +197,7 @@ export default function ChatClientesPage() {
   }
 
   async function toggleArchive(c: ChatMeta) {
-    await fetch(`/api/client-chats/${c.clientId}`, {
+    await adminFetch(`/api/client-chats/${c.clientId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ archived: !c.archived }),
@@ -463,7 +464,7 @@ function BroadcastDialog({ open, onOpenChange, adminId, adminName, onSent }: Bro
     if (!text.trim()) return
     setSending(true)
     try {
-      const res = await fetch("/api/client-chats/broadcast", {
+      const res = await adminFetch("/api/client-chats/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

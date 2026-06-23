@@ -15,6 +15,8 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { storage } from "@/lib/firebase"
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage"
+import { adminFetch } from "@/lib/admin-api"
+import { usePermissions } from "@/hooks/use-permissions"
 import {
   ImageIcon,
   Plus,
@@ -68,6 +70,11 @@ function needsActionValue(actionType: string): boolean {
 
 export default function BannersConfigPage() {
   const { toast } = useToast()
+  const { hasPermission } = usePermissions()
+  const canCreate = hasPermission("criarBanners")
+  const canEdit = hasPermission("editarBanners")
+  const canPublish = hasPermission("publicarBanners")
+  const canDelete = hasPermission("excluirBanners")
   const [banners, setBanners] = useState<Banner[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -79,7 +86,7 @@ export default function BannersConfigPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch("/api/banners")
+      const res = await adminFetch("/api/banners")
       const data = await res.json()
       if (data.success) setBanners(data.banners as Banner[])
       else throw new Error(data.error || "Falha ao carregar")
@@ -98,7 +105,7 @@ export default function BannersConfigPage() {
   const set = (patch: Partial<Banner>) => setForm((f) => ({ ...f, ...patch }))
 
   const startNew = () => {
-    setForm({ ...EMPTY, displayOrder: banners.length })
+    setForm({ ...EMPTY, active: canPublish, displayOrder: banners.length })
     setShowForm(true)
   }
 
@@ -152,7 +159,7 @@ export default function BannersConfigPage() {
     }
     setSaving(true)
     try {
-      const res = await fetch("/api/banners", {
+      const res = await adminFetch("/api/banners", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -172,7 +179,7 @@ export default function BannersConfigPage() {
 
   const toggleActive = async (b: Banner) => {
     try {
-      const res = await fetch("/api/banners", {
+      const res = await adminFetch("/api/banners", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...b, active: !b.active }),
@@ -189,7 +196,7 @@ export default function BannersConfigPage() {
   const remove = async (b: Banner) => {
     if (!confirm(`Remover o banner "${b.title || b.id}"?`)) return
     try {
-      const res = await fetch(`/api/banners?id=${encodeURIComponent(b.id)}`, { method: "DELETE" })
+      const res = await adminFetch(`/api/banners?id=${encodeURIComponent(b.id)}`, { method: "DELETE" })
       const data = await res.json()
       if (!data.success) throw new Error(data.error || "Falha")
       toast({ title: "Banner removido" })
@@ -216,7 +223,7 @@ export default function BannersConfigPage() {
             </p>
           </div>
         </div>
-        {!showForm && (
+        {!showForm && canCreate && (
           <Button onClick={startNew} className="gap-2">
             <Plus className="h-4 w-4" /> Novo banner
           </Button>
@@ -358,7 +365,11 @@ export default function BannersConfigPage() {
 
             <div className="flex items-center justify-between rounded-lg border p-3">
               <span className="text-sm font-medium">Banner ativo</span>
-              <Switch checked={form.active} onCheckedChange={(v) => set({ active: v })} />
+              <Switch
+                checked={form.active}
+                disabled={!canPublish}
+                onCheckedChange={(v) => set({ active: v })}
+              />
             </div>
 
             <div className="flex justify-end">
@@ -403,13 +414,22 @@ export default function BannersConfigPage() {
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
-                  <Switch checked={b.active} onCheckedChange={() => toggleActive(b)} />
-                  <Button variant="ghost" size="icon" onClick={() => startEdit(b)}>
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" onClick={() => remove(b)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
+                  <Switch
+                    checked={b.active}
+                    disabled={!canPublish}
+                    onCheckedChange={() => toggleActive(b)}
+                    aria-label={canPublish ? "Alterar publicação do banner" : "Sem permissão para publicar"}
+                  />
+                  {canEdit && (
+                    <Button variant="ghost" size="icon" onClick={() => startEdit(b)}>
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  )}
+                  {canDelete && (
+                    <Button variant="ghost" size="icon" onClick={() => remove(b)}>
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

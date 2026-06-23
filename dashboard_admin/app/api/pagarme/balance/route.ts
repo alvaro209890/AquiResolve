@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 import { pagarmeService } from '@/lib/services/pagarme-service'
 import type { PagarmeBalance } from '@/types/pagarme'
 
@@ -24,6 +25,7 @@ function emptyBalancePayload(warning: string) {
  */
 export async function GET(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'financeiro')
     const hasPrivateKey = Boolean(process.env.API_KEY_PRIVATE_PAGARME?.trim())
     if (!hasPrivateKey) {
       return NextResponse.json(emptyBalancePayload('API_KEY_PRIVATE_PAGARME não configurada'))
@@ -43,8 +45,9 @@ export async function GET(request: NextRequest) {
       source: 'pagarme',
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao buscar saldo:', error)
     return NextResponse.json(emptyBalancePayload('Erro ao buscar saldo'))
   }
 }
-

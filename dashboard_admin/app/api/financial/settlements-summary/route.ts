@@ -1,12 +1,14 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore } from '@/lib/firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 // GET /api/financial/settlements-summary
 // Agrega order_settlements via Admin SDK (a coleção tem read: if isAdmin() nas regras,
 // então o client SDK do painel não consegue ler diretamente sem custom claim).
 // Devolve os totais usados nos KPIs de Cashback Distribuído e Comissões Liquidadas.
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'financeiro')
     const db = getAdminFirestore()
     const snap = await db.collection('order_settlements').get()
 
@@ -25,6 +27,8 @@ export async function GET() {
       totalCashbackDistributed,
     })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao agregar order_settlements:', message)
     return NextResponse.json(

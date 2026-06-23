@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore } from '@/lib/firebase-admin'
 import bcrypt from 'bcryptjs'
+import {
+  MASTER_SESSION_COOKIE,
+  createMasterSessionToken,
+  masterSessionCookieOptions,
+} from '@/lib/server/master-session'
+import { normalizeAdminPermissions } from '@/lib/admin-permissions'
 
 const BCRYPT_PREFIX = '$2'
 
@@ -66,22 +72,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    return NextResponse.json({
+    const response = NextResponse.json({
       user: {
         id: snap.id,
         email: data.email,
         nome: data.nome ?? 'Administrador Master',
-        permissoes: data.permissoes ?? {
-          dashboard: true,
-          controle: true,
-          gestaoUsuarios: true,
-          gestaoPedidos: true,
-          financeiro: true,
-          relatorios: true,
-          configuracoes: true,
-        },
+        permissoes: normalizeAdminPermissions(data.permissoes, { master: true }),
       },
     })
+    response.cookies.set(
+      MASTER_SESSION_COOKIE,
+      createMasterSessionToken(senhaHash),
+      masterSessionCookieOptions
+    )
+    return response
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : String(err)
     if (message.includes('Firebase Admin não inicializado')) {

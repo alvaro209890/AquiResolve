@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 // POST /api/orders/[id]/redirect — remove prestador atual e reatribui (ou volta a distribuindo)
 export async function POST(
@@ -8,6 +9,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const actor = await requireAdminPermission(request, 'operarPedidos')
     const db = getAdminFirestore()
     const { id } = await params
     const orderId = id
@@ -68,6 +70,8 @@ export async function POST(
       reason,
       redirectedAt: admin.firestore.FieldValue.serverTimestamp(),
       source: 'admin_panel',
+      actorUid: actor.uid,
+      actorEmail: actor.email,
     })
 
     return NextResponse.json({
@@ -79,6 +83,8 @@ export async function POST(
         : 'Prestador removido — pedido volta para distribuição',
     })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao redirecionar pedido:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })

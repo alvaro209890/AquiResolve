@@ -1,10 +1,12 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { adminStorage } from '@/lib/firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'gestaoUsuarios')
     // Buscar prestadores via Firebase Admin SDK
     if (adminStorage) {
       
@@ -69,6 +71,8 @@ export async function GET() {
     })
     
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao buscar prestadores:', error)
     return NextResponse.json({ 
       providers: [],

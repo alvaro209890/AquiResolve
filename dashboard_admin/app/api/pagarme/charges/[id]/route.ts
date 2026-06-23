@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pagarmeService } from '@/lib/services/pagarme-service'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 /**
  * GET /api/pagarme/charges/:id
@@ -11,6 +12,7 @@ export async function GET(
 ) {
   const { id } = await params
   try {
+    await requireAdminPermission(request, 'financeiro')
     const response = await pagarmeService.getCharge(id)
 
     if (response.errors) {
@@ -28,6 +30,8 @@ export async function GET(
       data: response.data,
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao buscar cobrança:', error)
     return NextResponse.json(
       {
@@ -49,6 +53,7 @@ export async function DELETE(
 ) {
   const { id } = await params
   try {
+    await requireAdminPermission(request, 'operarFinanceiro')
     const response = await pagarmeService.cancelCharge(id)
 
     if (response.errors) {
@@ -67,6 +72,8 @@ export async function DELETE(
       message: 'Cobrança cancelada com sucesso',
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao cancelar cobrança:', error)
     return NextResponse.json(
       {
@@ -77,4 +84,3 @@ export async function DELETE(
     )
   }
 }
-

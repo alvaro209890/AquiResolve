@@ -1,6 +1,7 @@
 import { getCollection } from '../firestore'
 import { toDateFromUnknown } from '@/lib/date-utils'
 import { getCanonicalUserRole, isUserActive } from '@/lib/user-schema'
+import { adminFetch } from '@/lib/admin-api'
 
 interface SettlementsSummary {
   totalProviderCommission: number
@@ -10,7 +11,7 @@ interface SettlementsSummary {
 /** Agrega order_settlements via API route (Admin SDK). Nunca lança — devolve zeros em falha. */
 async function fetchSettlementsSummary(): Promise<SettlementsSummary> {
   try {
-    const res = await fetch('/api/financial/settlements-summary', { cache: 'no-store' })
+    const res = await adminFetch('/api/financial/settlements-summary', { cache: 'no-store' })
     if (!res.ok) return { totalProviderCommission: 0, totalCashbackDistributed: 0 }
     const data = await res.json()
     return {

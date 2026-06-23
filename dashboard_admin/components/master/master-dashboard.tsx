@@ -20,6 +20,13 @@ import {
 } from "@/components/ui/alert-dialog"
 import { useMasterAuth } from "@/hooks/use-master-auth"
 import type { MasterUser } from "@/lib/services/admin-master-service"
+import {
+  FULL_ADMIN_PERMISSIONS,
+  PERMISSION_GROUPS,
+  normalizeAdminPermissions,
+  type AdminPermission,
+  type AdminPermissions,
+} from "@/lib/admin-permissions"
 import { Logo } from "@/components/logo"
 import {
   Users,
@@ -46,6 +53,13 @@ import {
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+const EMPTY_PERMISSIONS = normalizeAdminPermissions({}, { inheritLegacy: false })
+const permissionLabels = Object.fromEntries(
+  PERMISSION_GROUPS.flatMap((group) =>
+    group.permissions.map((permission) => [permission.key, permission.label])
+  )
+) as Record<AdminPermission, string>
+
 export function MasterDashboard() {
   const { 
     masterUser, 
@@ -69,17 +83,9 @@ export function MasterDashboard() {
     nome: "",
     email: "",
     password: "",
-    permissoes: {
-      dashboard: false,
-      controle: false,
-      gestaoUsuarios: false,
-      gestaoPedidos: false,
-      financeiro: false,
-      relatorios: false,
-      configuracoes: false
-    }
+    permissoes: { ...EMPTY_PERMISSIONS }
   })
-  const [tempPermissions, setTempPermissions] = useState<Record<string, any>>({})
+  const [tempPermissions, setTempPermissions] = useState<Record<string, AdminPermissions>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -134,15 +140,7 @@ export function MasterDashboard() {
         nome: "",
         email: "",
         password: "",
-        permissoes: {
-          dashboard: false,
-          controle: false,
-          gestaoUsuarios: false,
-          gestaoPedidos: false,
-          financeiro: false,
-          relatorios: false,
-          configuracoes: false
-        }
+        permissoes: { ...EMPTY_PERMISSIONS }
       })
       
       // Fechar modal após 1 segundo
@@ -238,88 +236,95 @@ export function MasterDashboard() {
     })
   }
 
-  const updatePermission = (userId: string, permission: string, value: boolean) => {
+  const bannerDependencyPatch = (permission: AdminPermission, value: boolean): Partial<AdminPermissions> => {
+    if (permission !== "visualizarBanners" && permission.endsWith("Banners") && value) {
+      return { visualizarBanners: true }
+    }
+    if (permission === "visualizarBanners" && !value) {
+      return {
+        criarBanners: false,
+        editarBanners: false,
+        publicarBanners: false,
+        excluirBanners: false,
+      }
+    }
+    return {}
+  }
+
+  const updatePermission = (userId: string, permission: AdminPermission, value: boolean) => {
     setTempPermissions(prev => ({
       ...prev,
       [userId]: {
         ...prev[userId],
-        [permission]: value
+        [permission]: value,
+        ...bannerDependencyPatch(permission, value),
       }
     }))
   }
 
-  const updateNewUserPermission = (permission: string, value: boolean) => {
+  const updateNewUserPermission = (permission: AdminPermission, value: boolean) => {
     setNewUser(prev => ({
       ...prev,
       permissoes: {
         ...prev.permissoes,
-        [permission]: value
+        [permission]: value,
+        ...bannerDependencyPatch(permission, value),
       }
     }))
-  }
-
-  const permissionLabels = {
-    dashboard: "Dashboard",
-    controle: "Controle",
-    gestaoUsuarios: "Gestão de Usuários",
-    gestaoPedidos: "Gestão de Pedidos",
-    financeiro: "Financeiro",
-    relatorios: "Relatórios",
-    configuracoes: "Configurações"
   }
 
   const permissionTemplates = {
     admin: {
       name: "Administrador Completo",
       description: "Acesso total ao sistema",
-      permissions: {
-        dashboard: true,
-        controle: true,
-        gestaoUsuarios: true,
-        gestaoPedidos: true,
-        financeiro: true,
-        relatorios: true,
-        configuracoes: true
-      }
+      permissions: { ...FULL_ADMIN_PERMISSIONS }
     },
     manager: {
       name: "Gerente",
-      description: "Acesso a gestão e relatórios",
-      permissions: {
+      description: "Gestão operacional sem administrar acessos",
+      permissions: normalizeAdminPermissions({
         dashboard: true,
         controle: true,
-        gestaoUsuarios: false,
         gestaoPedidos: true,
         financeiro: true,
         relatorios: true,
-        configuracoes: false
-      }
+        operarPedidos: true,
+        operarFinanceiro: true,
+        aprovarPrestadores: true,
+      }, { inheritLegacy: false })
     },
     operator: {
       name: "Operador",
-      description: "Acesso básico ao sistema",
-      permissions: {
+      description: "Pedidos, chats e prestadores",
+      permissions: normalizeAdminPermissions({
         dashboard: true,
         controle: true,
-        gestaoUsuarios: false,
         gestaoPedidos: true,
-        financeiro: false,
-        relatorios: false,
-        configuracoes: false
-      }
+        operarPedidos: true,
+        aprovarPrestadores: true,
+      }, { inheritLegacy: false })
+    },
+    content: {
+      name: "Editor de Conteúdo",
+      description: "Cria conteúdo sem publicar ou excluir banners",
+      permissions: normalizeAdminPermissions({
+        dashboard: true,
+        configuracoes: true,
+        visualizarBanners: true,
+        criarBanners: true,
+        editarBanners: true,
+        gerenciarCatalogo: true,
+        gerenciarCombos: true,
+        gerenciarParceiros: true,
+      }, { inheritLegacy: false })
     },
     viewer: {
       name: "Visualizador",
       description: "Apenas visualização",
-      permissions: {
+      permissions: normalizeAdminPermissions({
         dashboard: true,
-        controle: false,
-        gestaoUsuarios: false,
-        gestaoPedidos: false,
-        financeiro: false,
         relatorios: true,
-        configuracoes: false
-      }
+      }, { inheritLegacy: false })
     }
   }
 
@@ -517,15 +522,7 @@ export function MasterDashboard() {
                         onClick={() => {
                           setNewUser(prev => ({
                             ...prev,
-                            permissoes: {
-                              dashboard: true,
-                              controle: true,
-                              gestaoUsuarios: true,
-                              gestaoPedidos: true,
-                              financeiro: true,
-                              relatorios: true,
-                              configuracoes: true
-                            }
+                            permissoes: { ...FULL_ADMIN_PERMISSIONS }
                           }))
                         }}
                         className="text-xs px-2 py-1 rounded border hover:bg-muted/50"
@@ -538,15 +535,7 @@ export function MasterDashboard() {
                         onClick={() => {
                           setNewUser(prev => ({
                             ...prev,
-                            permissoes: {
-                              dashboard: false,
-                              controle: false,
-                              gestaoUsuarios: false,
-                              gestaoPedidos: false,
-                              financeiro: false,
-                              relatorios: false,
-                              configuracoes: false
-                            }
+                            permissoes: { ...EMPTY_PERMISSIONS }
                           }))
                         }}
                         className="text-xs px-2 py-1 rounded border hover:bg-muted/50"
@@ -556,35 +545,47 @@ export function MasterDashboard() {
                       </button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-1 gap-3 mt-3">
-                    {Object.entries(permissionLabels).map(([key, label]) => {
-                      const checked = Boolean(newUser.permissoes[key as keyof typeof newUser.permissoes])
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => updateNewUserPermission(key, !checked)}
-                          className={`flex w-full items-center justify-between rounded-md px-3 py-3 border text-left focus:outline-none focus:ring-2 transition-colors hover:opacity-90 min-h-[48px] ${
-                            checked ? 'bg-[#FEECDC] border-[#F7931E]' : 'bg-white border-[#E5E7EB] hover:border-[#F7931E]'
-                          }`}
-                          aria-pressed={checked}
-                        >
-                          <span className="text-sm font-medium" style={{ color: '#1F2B3D' }}>{label}</span>
-                          <span
-                            aria-hidden
-                            className={`inline-block h-5 w-9 rounded-full transition-colors shrink-0 ${
-                              checked ? 'bg-[#F7931E]' : 'bg-[#E5E7EB]'
-                            }`}
-                          >
-                            <span
-                              className={`block h-5 w-5 bg-white rounded-full shadow transform transition-transform ${
-                                checked ? 'translate-x-4' : 'translate-x-0'
-                              }`}
-                            />
-                          </span>
-                        </button>
-                      )
-                    })}
+                  <div className="mt-3 space-y-5">
+                    {PERMISSION_GROUPS.map((group) => (
+                      <section key={group.id} aria-labelledby={`new-user-${group.id}`}>
+                        <h4 id={`new-user-${group.id}`} className="mb-2 text-sm font-semibold text-slate-700">
+                          {group.label}
+                        </h4>
+                        <div className="grid grid-cols-1 gap-2">
+                          {group.permissions.map((permission) => {
+                            const checked = newUser.permissoes[permission.key]
+                            return (
+                              <button
+                                key={permission.key}
+                                type="button"
+                                onClick={() => updateNewUserPermission(permission.key, !checked)}
+                                className={`flex w-full items-center justify-between gap-3 rounded-md border px-3 py-3 text-left focus:outline-none focus:ring-2 transition-colors min-h-[56px] ${
+                                  checked ? 'bg-[#FEECDC] border-[#F7931E]' : 'bg-white border-[#E5E7EB] hover:border-[#F7931E]'
+                                }`}
+                                aria-pressed={checked}
+                              >
+                                <span>
+                                  <span className="block text-sm font-medium text-slate-800">{permission.label}</span>
+                                  <span className="block text-xs text-slate-500">{permission.description}</span>
+                                </span>
+                                <span
+                                  aria-hidden
+                                  className={`inline-block h-5 w-9 shrink-0 rounded-full transition-colors ${
+                                    checked ? 'bg-[#F7931E]' : 'bg-[#E5E7EB]'
+                                  }`}
+                                >
+                                  <span
+                                    className={`block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                                      checked ? 'translate-x-4' : 'translate-x-0'
+                                    }`}
+                                  />
+                                </span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </section>
+                    ))}
                   </div>
                 </div>
                 <div className="flex flex-col sm:flex-row justify-end space-y-2 sm:space-y-0 sm:space-x-2 pt-4 border-t border-border">
@@ -740,42 +741,55 @@ export function MasterDashboard() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {Object.entries(permissionLabels).map(([key, label]) => {
-                    const Icon = permissionIcons[key as keyof typeof permissionIcons]
-                    const isChecked = editingUser === user.id 
-                      ? tempPermissions[user.id]?.[key] ?? user.permissoes[key as keyof typeof user.permissoes]
-                      : user.permissoes[key as keyof typeof user.permissoes]
-                    
-                    return (
-                      <button
-                        key={key}
-                        type="button"
-                        onClick={() => editingUser === user.id && updatePermission(user.id, key, !isChecked)}
-                        className={`flex items-center justify-between rounded-lg px-4 py-4 border-2 text-left w-full transition-all duration-200 min-h-[52px] ${
-                          isChecked ? 'bg-[#FEF3C7] border-[#F7931E] shadow-md' : 'bg-white border-[#D1D5DB] hover:border-[#9CA3AF]'
-                        } ${editingUser !== user.id ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer hover:shadow-sm'}`}
-                        aria-pressed={isChecked}
-                      >
-                        <div className="flex items-center space-x-2 min-w-0 flex-1">
-                          <Icon className="h-4 w-4 shrink-0" style={{ color: '#6B7280' }} />
-                          <span className="text-sm font-medium truncate" style={{ color: '#1F2B3D' }}>{label}</span>
-                        </div>
-                        <span
-                          aria-hidden
-                          className={`inline-block h-5 w-9 rounded-full transition-colors shrink-0 ${
-                            isChecked ? 'bg-[#F7931E]' : 'bg-[#E5E7EB]'
-                          }`}
-                        >
-                          <span
-                            className={`block h-5 w-5 bg-white rounded-full shadow transform transition-transform ${
-                              isChecked ? 'translate-x-4' : 'translate-x-0'
-                            }`}
-                          />
-                        </span>
-                      </button>
-                    )
-                  })}
+                <div className="space-y-5">
+                  {PERMISSION_GROUPS.map((group) => (
+                    <section key={group.id} aria-labelledby={`${user.id}-${group.id}`}>
+                      <h4 id={`${user.id}-${group.id}`} className="mb-2 text-sm font-semibold text-slate-700">
+                        {group.label}
+                      </h4>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        {group.permissions.map((permission) => {
+                          const Icon = permissionIcons[permission.key as keyof typeof permissionIcons] ?? Shield
+                          const isChecked = editingUser === user.id
+                            ? tempPermissions[user.id]?.[permission.key] ?? user.permissoes[permission.key]
+                            : user.permissoes[permission.key]
+
+                          return (
+                            <button
+                              key={permission.key}
+                              type="button"
+                              disabled={editingUser !== user.id}
+                              onClick={() => updatePermission(user.id, permission.key, !isChecked)}
+                              className={`flex min-h-[64px] w-full items-center justify-between gap-3 rounded-lg border-2 px-4 py-3 text-left transition-all ${
+                                isChecked ? 'bg-[#FEF3C7] border-[#F7931E] shadow-sm' : 'bg-white border-[#D1D5DB]'
+                              } ${editingUser !== user.id ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:shadow-sm'}`}
+                              aria-pressed={isChecked}
+                            >
+                              <div className="flex min-w-0 flex-1 items-start gap-2">
+                                <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+                                <span>
+                                  <span className="block text-sm font-medium text-slate-800">{permission.label}</span>
+                                  <span className="block text-xs text-slate-500">{permission.description}</span>
+                                </span>
+                              </div>
+                              <span
+                                aria-hidden
+                                className={`inline-block h-5 w-9 shrink-0 rounded-full transition-colors ${
+                                  isChecked ? 'bg-[#F7931E]' : 'bg-[#E5E7EB]'
+                                }`}
+                              >
+                                <span
+                                  className={`block h-5 w-5 rounded-full bg-white shadow transition-transform ${
+                                    isChecked ? 'translate-x-4' : 'translate-x-0'
+                                  }`}
+                                />
+                              </span>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </section>
+                  ))}
                 </div>
               </CardContent>
             </Card>

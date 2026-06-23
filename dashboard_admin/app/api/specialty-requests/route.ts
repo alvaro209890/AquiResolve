@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 // GET /api/specialty-requests?status=pending
 export async function GET(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'aprovarPrestadores')
     const db = getAdminFirestore()
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') ?? 'pending'
@@ -22,6 +24,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, requests })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
@@ -31,6 +35,7 @@ export async function GET(request: NextRequest) {
 // Body: { requestId, action: 'approve' | 'reject', rejectionReason?: string }
 export async function POST(request: NextRequest) {
   try {
+    const actor = await requireAdminPermission(request, 'aprovarPrestadores')
     const db = getAdminFirestore()
     const body = await request.json()
     const { requestId, action, rejectionReason } = body as {
@@ -89,6 +94,8 @@ export async function POST(request: NextRequest) {
         targetType: 'provider',
         payload: { requestId, services: data.requestedServices },
         createdAt: now,
+        actorUid: actor.uid,
+        actorEmail: actor.email,
       })
     } else {
       await reqRef.update({
@@ -114,6 +121,8 @@ export async function POST(request: NextRequest) {
         targetType: 'provider',
         payload: { requestId, rejectionReason: rejectionReason ?? null },
         createdAt: now,
+        actorUid: actor.uid,
+        actorEmail: actor.email,
       })
     }
 
@@ -124,6 +133,8 @@ export async function POST(request: NextRequest) {
       message: action === 'approve' ? 'Especialidades aprovadas e atualizadas' : 'Solicitação rejeitada',
     })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao processar solicitação de especialidade:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })

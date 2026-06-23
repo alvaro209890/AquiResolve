@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { UsersService, type UserFilters, type UserStats } from '@/lib/services/users-service'
 import type { UserData } from '@/lib/services/firestore-analytics'
+import { adminFetch } from '@/lib/admin-api'
 
 export function useUsers(filters?: UserFilters) {
   const [users, setUsers] = useState<UserData[]>([])
@@ -84,7 +85,7 @@ export function useUsers(filters?: UserFilters) {
   const blockUser = async (userId: string, reason?: string) => {
     try {
       // Usa Admin SDK via API route (não depende de custom claims)
-      const res = await fetch(`/api/users/${userId}`, {
+      const res = await adminFetch(`/api/users/${userId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ blocked: true, isActive: false, blockedReason: reason ?? 'Bloqueado pelo administrador' }),
@@ -103,7 +104,7 @@ export function useUsers(filters?: UserFilters) {
 
   const unblockUser = async (userId: string) => {
     try {
-      const res = await fetch(`/api/users/${userId}`, {
+      const res = await adminFetch(`/api/users/${userId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ blocked: false, isActive: true }),

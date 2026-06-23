@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { CheckCircle, XCircle, Clock, RefreshCw, Layers } from "lucide-react"
-import { useAuth } from "@/components/auth-provider"
+import { adminFetch } from "@/lib/admin-api"
 
 interface SpecialtyRequest {
   id: string
@@ -48,7 +48,6 @@ const STATUS_CONFIG = {
 }
 
 export default function EspecialidadesPage() {
-  const { user } = useAuth()
   const [requests, setRequests] = useState<SpecialtyRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<"pending" | "approved" | "rejected" | "all">("pending")
@@ -59,28 +58,23 @@ export default function EspecialidadesPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const token = await user?.getIdToken()
-      const res = await fetch(`/api/specialty-requests?status=${filter}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      })
+      const res = await adminFetch(`/api/specialty-requests?status=${filter}`)
       const json = await res.json()
       if (json.success) setRequests(json.requests)
     } finally {
       setLoading(false)
     }
-  }, [filter, user])
+  }, [filter])
 
   useEffect(() => { load() }, [load])
 
   async function act(requestId: string, action: "approve" | "reject", reason?: string) {
     setSubmitting(requestId)
     try {
-      const token = await user?.getIdToken()
-      const res = await fetch("/api/specialty-requests", {
+      const res = await adminFetch("/api/specialty-requests", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({ requestId, action, rejectionReason: reason }),
       })

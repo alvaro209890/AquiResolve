@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { addDocument, getCollection } from '@/lib/firestore'
 import { toDateFromUnknown } from '@/lib/date-utils'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 type TransactionRecord = Record<string, unknown> & {
   id: string
@@ -28,6 +29,7 @@ const getTransactionDate = (transaction: TransactionRecord) =>
 
 export async function GET(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'financeiro')
     const { searchParams } = new URL(request.url)
     const tipo = searchParams.get('tipo')
     const status = searchParams.get('status')
@@ -97,6 +99,8 @@ export async function GET(request: NextRequest) {
           : undefined,
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao listar transacoes:', error)
     return NextResponse.json(
       { success: false, error: 'Erro interno do servidor' },
@@ -107,6 +111,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'operarFinanceiro')
     const body = await request.json()
 
     if (!body.descricao || !body.tipo || body.valor === undefined || !body.conta) {
@@ -136,6 +141,8 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao criar transacao:', error)
     return NextResponse.json(
       { success: false, error: 'Erro interno do servidor' },

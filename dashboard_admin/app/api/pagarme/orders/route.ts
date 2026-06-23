@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 import { pagarmeService } from '@/lib/services/pagarme-service'
 import { PagarmeFirebaseSync } from '@/lib/services/pagarme-firebase-sync'
 
@@ -18,6 +19,7 @@ function emptyOrdersPayload(warning: string) {
  */
 export async function GET(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'financeiro')
     const hasPrivateKey = Boolean(process.env.API_KEY_PRIVATE_PAGARME?.trim())
     if (!hasPrivateKey) {
       return NextResponse.json(emptyOrdersPayload('API_KEY_PRIVATE_PAGARME não configurada'))
@@ -50,6 +52,8 @@ export async function GET(request: NextRequest) {
       source: 'pagarme',
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao listar pedidos:', error)
     return NextResponse.json(
       emptyOrdersPayload('Erro ao listar pedidos')
@@ -63,6 +67,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'operarFinanceiro')
     const body = await request.json()
 
     if (!body.customer || !body.items || !body.payments) {
@@ -109,6 +114,8 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao criar pedido:', error)
     return NextResponse.json(
       {

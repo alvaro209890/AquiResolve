@@ -3,6 +3,7 @@
 import { useRef, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { adminFetch } from "@/lib/admin-api"
 import { Textarea } from "@/components/ui/textarea"
 import { Bot, Send, User, Loader2 } from "lucide-react"
 
@@ -42,7 +43,7 @@ export function AssistantChat() {
     requestAnimationFrame(() => listRef.current?.scrollTo({ top: listRef.current.scrollHeight }))
 
     try {
-      const res = await fetch("/api/assistant", {
+      const res = await adminFetch("/api/assistant", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

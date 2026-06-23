@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore } from '@/lib/firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 // GET /api/checklists/[orderId] — lê checklist + fotos de uma OS
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ orderId: string }> }
 ) {
   try {
+    await requireAdminPermission(request, 'gestaoPedidos')
     const db = getAdminFirestore()
     const { orderId } = await params
 
@@ -28,6 +30,8 @@ export async function GET(
       order: orderSnap.exists ? { id: orderSnap.id, ...orderSnap.data() } : null,
     })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
   }

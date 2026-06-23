@@ -34,6 +34,7 @@ import {
   Plus,
 } from "lucide-react"
 import { useAuth } from "@/components/auth-provider"
+import { adminFetch } from "@/lib/admin-api"
 
 interface ChatMeta {
   id: string
@@ -102,7 +103,7 @@ export default function ChatPrestadoresPage() {
         status: filter,
         ...(unreadOnly ? { unreadOnly: "true" } : {}),
       })
-      const res = await fetch(`/api/provider-chats?${qs.toString()}`, { cache: "no-store" })
+      const res = await adminFetch(`/api/provider-chats?${qs.toString()}`, { cache: "no-store" })
       const json = await res.json()
       if (json.success) setChats(json.chats as ChatMeta[])
     } finally {
@@ -120,7 +121,7 @@ export default function ChatPrestadoresPage() {
   const loadMessages = useCallback(async (providerId: string, silent = false) => {
     if (!silent) setLoadingMsgs(true)
     try {
-      const res = await fetch(`/api/provider-chats/${providerId}/messages?limit=200`, { cache: "no-store" })
+      const res = await adminFetch(`/api/provider-chats/${providerId}/messages?limit=200`, { cache: "no-store" })
       const json = await res.json()
       if (json.success) setMessages(json.messages as ChatMessage[])
     } finally {
@@ -134,7 +135,7 @@ export default function ChatPrestadoresPage() {
     loadMessages(selected.providerId)
     const exists = chats.some((c) => c.providerId === selected.providerId)
     if (exists) {
-      fetch(`/api/provider-chats/${selected.providerId}/read?role=admin`, { method: "PATCH" }).catch(() => null)
+      adminFetch(`/api/provider-chats/${selected.providerId}/read?role=admin`, { method: "PATCH" }).catch(() => null)
     }
     const t = setInterval(() => loadMessages(selected.providerId, true), 5000)
     return () => clearInterval(t)
@@ -168,7 +169,7 @@ export default function ChatPrestadoresPage() {
     if (!selected || !draft.trim() || sending) return
     setSending(true)
     try {
-      const res = await fetch(`/api/provider-chats/${selected.providerId}/messages`, {
+      const res = await adminFetch(`/api/provider-chats/${selected.providerId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -193,7 +194,7 @@ export default function ChatPrestadoresPage() {
   }
 
   async function togglePin(c: ChatMeta) {
-    await fetch(`/api/provider-chats/${c.providerId}`, {
+    await adminFetch(`/api/provider-chats/${c.providerId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ pinned: !c.pinned }),
@@ -202,7 +203,7 @@ export default function ChatPrestadoresPage() {
   }
 
   async function toggleArchive(c: ChatMeta) {
-    await fetch(`/api/provider-chats/${c.providerId}`, {
+    await adminFetch(`/api/provider-chats/${c.providerId}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ archived: !c.archived }),
@@ -501,7 +502,7 @@ function NewConversationDialog({
   useEffect(() => {
     if (!open) return
     setLoading(true)
-    fetch("/api/provider-chats/directory?limit=200", { cache: "no-store" })
+    adminFetch("/api/provider-chats/directory?limit=200", { cache: "no-store" })
       .then((r) => r.json())
       .then((json) => {
         if (json.success) setProviders(json.providers as ProviderRow[])
@@ -597,7 +598,7 @@ function BroadcastDialog({ open, onOpenChange, adminId, adminName, onSent }: Bro
     if (!text.trim()) return
     setSending(true)
     try {
-      const res = await fetch("/api/provider-chats/broadcast", {
+      const res = await adminFetch("/api/provider-chats/broadcast", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

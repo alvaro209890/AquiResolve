@@ -1,6 +1,7 @@
 ﻿import { NextRequest, NextResponse } from 'next/server'
 import * as admin from 'firebase-admin'
 import { adminApp } from '@/lib/firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 import {
   amountToCents,
   buildOrderPayoutSnapshot,
@@ -84,6 +85,7 @@ const resolveProviderUid = (providerId: string, providerData: Record<string, unk
  */
 export async function POST(request: NextRequest) {
   try {
+    const actor = await requireAdminPermission(request, 'operarFinanceiro')
     if (!adminApp) {
       return NextResponse.json(
         {
@@ -285,7 +287,8 @@ export async function POST(request: NextRequest) {
         allocations,
         totalOrdersAffected: allocations.length,
         processedAt: admin.firestore.FieldValue.serverTimestamp(),
-        processedBy: 'admin',
+        processedBy: actor.uid,
+        processedByEmail: actor.email,
       })
 
       return {
@@ -311,6 +314,8 @@ export async function POST(request: NextRequest) {
       data: result,
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     if (error instanceof HttpError) {
       return NextResponse.json(
         {

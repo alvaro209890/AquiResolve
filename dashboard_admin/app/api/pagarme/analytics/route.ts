@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 import { PagarmeService } from '@/lib/services/pagarme-service'
 import type { PagarmeAnalytics } from '@/types/pagarme'
 
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
     new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
 
   try {
+    await requireAdminPermission(request, 'financeiro')
     const hasPrivateKey = Boolean(process.env.API_KEY_PRIVATE_PAGARME?.trim())
     if (!hasPrivateKey) {
       const analytics = emptyAnalytics(startDate, endDate)
@@ -78,6 +80,8 @@ export async function GET(request: NextRequest) {
       source: 'pagarme',
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao buscar analytics do Pagar.me:', error)
 
     const analytics = emptyAnalytics(startDate, endDate)

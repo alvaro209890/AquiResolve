@@ -19,6 +19,8 @@ import { OrderPdfActions } from "@/components/orders/order-pdf-actions"
 import { statusLabelPt } from "@/lib/orders/normalize-order"
 import { format } from "date-fns"
 import { ptBR } from "date-fns/locale"
+import { adminFetch } from "@/lib/admin-api"
+import { usePermissions } from "@/hooks/use-permissions"
 
 type OrderStatus = "pending" | "assigned" | "in_progress" | "completed" | "cancelled"
 type OrderPriority = "low" | "medium" | "high" | "urgent"
@@ -137,6 +139,9 @@ export function OrderDetailModal({
   })
 
   const [refunding, setRefunding] = useState(false)
+  const { hasPermission } = usePermissions()
+  const canOperateOrders = hasPermission("operarPedidos")
+  const canOperateFinance = hasPermission("operarFinanceiro")
 
   const handleRefund = async (orderId: string) => {
     const reason = window.prompt(
@@ -147,7 +152,7 @@ export function OrderDetailModal({
     }
     setRefunding(true)
     try {
-      const res = await fetch(`/api/orders/${orderId}/refund`, {
+      const res = await adminFetch(`/api/orders/${orderId}/refund`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reason: reason || undefined }),
@@ -453,12 +458,12 @@ export function OrderDetailModal({
             <Button type="button" variant="outline" onClick={onClose} className="w-full sm:w-auto">
               {mode === "view" ? "Fechar" : "Cancelar"}
             </Button>
-            {mode === "edit" && onUpdate ? (
+            {mode === "edit" && onUpdate && canOperateOrders ? (
               <Button type="submit" className="w-full bg-orange-500 text-white hover:bg-orange-600 sm:w-auto">
                 Salvar alteracoes
               </Button>
             ) : null}
-            {mode === "view" && order.paymentStatus === "paid" ? (
+            {mode === "view" && order.paymentStatus === "paid" && canOperateFinance ? (
               <Button
                 type="button"
                 variant="outline"
@@ -470,7 +475,7 @@ export function OrderDetailModal({
                 Reembolsar
               </Button>
             ) : null}
-            {mode === "view" && onDelete ? (
+            {mode === "view" && onDelete && canOperateOrders ? (
               <Button type="button" variant="outline" onClick={() => onDelete(order.id)} className="w-full text-red-600 hover:text-red-700 sm:w-auto">
                 <Trash2 className="mr-2 h-4 w-4" />
                 Deletar

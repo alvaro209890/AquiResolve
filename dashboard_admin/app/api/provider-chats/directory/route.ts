@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore } from '@/lib/firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 // GET /api/provider-chats/directory?search=&limit=50
 // Lista os prestadores (id, nome, email) para o admin INICIAR uma conversa nova — já que o doc
@@ -7,6 +8,7 @@ import { getAdminFirestore } from '@/lib/firebase-admin'
 
 export async function GET(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'controle')
     const db = getAdminFirestore()
     const { searchParams } = new URL(request.url)
     const search = (searchParams.get('search') ?? '').trim().toLowerCase()
@@ -44,6 +46,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, providers: providers.slice(0, limit) })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao listar diretório de prestadores:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })

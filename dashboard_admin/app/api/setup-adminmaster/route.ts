@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore } from '@/lib/firebase-admin'
 import bcrypt from 'bcryptjs'
+import { FULL_ADMIN_PERMISSIONS } from '@/lib/admin-permissions'
 
 const BCRYPT_ROUNDS = 10
 
@@ -19,9 +20,33 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({}))
-    const email = typeof body?.email === 'string' && body.email.trim() ? body.email.trim() : 'master@aquiresolve.com'
-    const senha = typeof body?.senha === 'string' && body.senha ? body.senha : 'admin123'
-    const nome = typeof body?.nome === 'string' && body.nome.trim() ? body.nome.trim() : 'Administrador Master'
+    const email = typeof body?.email === 'string' ? body.email.trim().toLowerCase() : ''
+    const senha = typeof body?.password === 'string' ? body.password : ''
+    const nome = typeof body?.nome === 'string' ? body.nome.trim() : ''
+
+    const existing = await db.collection('adminmaster').doc('master').get()
+    if (existing.exists) {
+      return NextResponse.json(
+        { success: false, error: 'AdminMaster já configurado; o setup não pode sobrescrevê-lo' },
+        { status: 409 }
+      )
+    }
+
+    const configuredToken = process.env.ADMIN_SETUP_TOKEN?.trim()
+    const suppliedToken = request.headers.get('x-admin-setup-token')?.trim()
+    if (process.env.NODE_ENV === 'production' && (!configuredToken || suppliedToken !== configuredToken)) {
+      return NextResponse.json(
+        { success: false, error: 'Token de configuração inicial inválido' },
+        { status: 403 }
+      )
+    }
+
+    if (!email || !nome || senha.length < 10) {
+      return NextResponse.json(
+        { success: false, error: 'Informe nome, email e uma senha com pelo menos 10 caracteres' },
+        { status: 400 }
+      )
+    }
 
     console.log('👑 Configurando AdminMaster...')
 
@@ -31,15 +56,7 @@ export async function POST(request: NextRequest) {
       email,
       senhaHash,
       nome,
-      permissoes: {
-        dashboard: true,
-        controle: true,
-        gestaoUsuarios: true,
-        gestaoPedidos: true,
-        financeiro: true,
-        relatorios: true,
-        configuracoes: true,
-      },
+      permissoes: FULL_ADMIN_PERMISSIONS,
       criadoEm: new Date().toISOString(),
       ativo: true,
     }
@@ -97,9 +114,6 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   return NextResponse.json({
-    message: 'Use POST para configurar o AdminMaster',
-    endpoint: '/api/setup-adminmaster',
-    method: 'POST',
-    body: { email: 'opcional', senha: 'opcional', nome: 'opcional' },
+    message: 'Configuração inicial protegida',
   })
 }

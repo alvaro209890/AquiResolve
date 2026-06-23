@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { useToast } from "@/hooks/use-toast"
+import { adminFetch } from "@/lib/admin-api"
 import { storage } from "@/lib/firebase"
 import { getDownloadURL, ref, uploadBytes } from "firebase/storage"
 import {
@@ -134,9 +135,9 @@ export default function CombosPage() {
     setLoading(true)
     try {
       const [combosRes, servicesRes, cfgRes] = await Promise.all([
-        fetch("/api/combos").then((r) => r.json()),
-        fetch("/api/catalog/services").then((r) => r.json()),
-        fetch("/api/cashback-config").then((r) => r.json()),
+        adminFetch("/api/combos").then((r) => r.json()),
+        adminFetch("/api/catalog/services").then((r) => r.json()),
+        adminFetch("/api/cashback-config").then((r) => r.json()),
       ])
       if (combosRes.success) setCombos(combosRes.combos as Combo[])
       if (servicesRes.success) {
@@ -259,7 +260,7 @@ export default function CombosPage() {
     setSaving(true)
     try {
       const payload = { ...form, fullPrice: computedFull }
-      const res = await fetch("/api/combos", {
+      const res = await adminFetch("/api/combos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -279,7 +280,7 @@ export default function CombosPage() {
 
   const toggleActive = async (c: Combo) => {
     try {
-      const res = await fetch("/api/combos", {
+      const res = await adminFetch("/api/combos", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...c, active: !c.active }),
@@ -296,7 +297,7 @@ export default function CombosPage() {
   const remove = async (c: Combo) => {
     if (!confirm(`Remover o combo "${c.name || c.id}"?`)) return
     try {
-      const res = await fetch(`/api/combos?id=${encodeURIComponent(c.id)}`, { method: "DELETE" })
+      const res = await adminFetch(`/api/combos?id=${encodeURIComponent(c.id)}`, { method: "DELETE" })
       const data = await res.json()
       if (!data.success) throw new Error(data.error || "Falha")
       toast({ title: "Combo removido" })

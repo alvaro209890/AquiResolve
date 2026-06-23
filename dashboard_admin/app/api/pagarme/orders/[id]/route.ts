@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pagarmeService } from '@/lib/services/pagarme-service'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 /**
  * GET /api/pagarme/orders/:id
@@ -11,6 +12,7 @@ export async function GET(
 ) {
   const { id } = await params
   try {
+    await requireAdminPermission(request, 'financeiro')
     const response = await pagarmeService.getOrder(id)
 
     if (response.errors) {
@@ -28,6 +30,8 @@ export async function GET(
       data: response.data,
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao buscar pedido:', error)
     return NextResponse.json(
       {
@@ -49,6 +53,7 @@ export async function DELETE(
 ) {
   const { id } = await params
   try {
+    await requireAdminPermission(request, 'operarFinanceiro')
     const response = await pagarmeService.cancelOrder(id)
 
     if (response.errors) {
@@ -67,6 +72,8 @@ export async function DELETE(
       message: 'Pedido cancelado com sucesso',
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao cancelar pedido:', error)
     return NextResponse.json(
       {
@@ -77,4 +84,3 @@ export async function DELETE(
     )
   }
 }
-

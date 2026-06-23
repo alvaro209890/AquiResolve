@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useState } from 'react'
+import { adminFetch } from '@/lib/admin-api'
 
 export interface ProviderBilling {
   id: string
@@ -52,7 +53,7 @@ export function useProvidersBilling(options?: {
       setError(null)
       setWarning(null)
 
-      const response = await fetch('/api/financial/providers', {
+      const response = await adminFetch('/api/financial/providers', {
         method: 'GET',
         cache: 'no-store',
       })
@@ -104,4 +105,3 @@ export function useProvidersBilling(options?: {
     totalEarnings,
   }
 }
-

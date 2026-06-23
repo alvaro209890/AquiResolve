@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore, adminApp } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
 import { settleCompletedOrderAdmin } from '@/lib/services/order-settlement-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 async function pushAndPersist(
   db: admin.firestore.Firestore,
@@ -41,10 +42,11 @@ const VALID_STATUSES = [
 
 // GET /api/orders/[id] — retorna um pedido pelo ID
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    await requireAdminPermission(request, 'gestaoPedidos')
     const { id } = await params
     const db = getAdminFirestore()
     const snap = await db.collection('orders').doc(id).get()
@@ -53,6 +55,8 @@ export async function GET(
     }
     return NextResponse.json({ success: true, order: { id: snap.id, ...snap.data() } })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
@@ -64,6 +68,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const actor = await requireAdminPermission(request, 'operarPedidos')
     const db = getAdminFirestore()
     const { id } = await params
     const orderId = id
@@ -162,6 +167,8 @@ export async function PATCH(
           cancelledBy: cancelledBy ?? 'admin',
         },
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        actorUid: actor.uid,
+        actorEmail: actor.email,
       })
     }
 
@@ -173,6 +180,8 @@ export async function PATCH(
       message: 'Pedido atualizado com sucesso',
     })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao atualizar pedido:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })

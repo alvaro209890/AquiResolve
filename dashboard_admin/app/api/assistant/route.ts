@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { manualAsPromptContext } from '@/lib/manual-content'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 // Copiloto IA do painel admin (plano 08). O admin pergunta "como faço X no painel?" dentro da
 // aba Manual e a IA responde em passos, citando o caminho exato de menus/botões.
@@ -41,6 +42,15 @@ function buildSystemPrompt(): string {
 }
 
 export async function POST(req: NextRequest) {
+  try {
+    await requireAdminPermission(req, 'dashboard')
+  } catch (error: unknown) {
+    return adminAuthorizationResponse(error) ?? NextResponse.json(
+      { success: false, error: 'Falha ao validar acesso' },
+      { status: 500 }
+    )
+  }
+
   let body: { question?: string; history?: ChatMessage[] }
   try {
     body = await req.json()

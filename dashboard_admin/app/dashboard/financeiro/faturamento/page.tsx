@@ -38,8 +38,12 @@ import { Textarea } from "@/components/ui/textarea"
 import { useToast } from "@/hooks/use-toast"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useProvidersBilling, type ProviderBilling } from "@/hooks/use-providers-billing"
+import { adminFetch } from "@/lib/admin-api"
+import { usePermissions } from "@/hooks/use-permissions"
 
 export default function FaturamentoPage() {
+  const { hasPermission } = usePermissions()
+  const canOperateFinance = hasPermission("operarFinanceiro")
   const [search, setSearch] = useState("")
   const [filterEarnings, setFilterEarnings] = useState<string>("all")
   const [paymentDialogOpen, setPaymentDialogOpen] = useState(false)
@@ -201,7 +205,7 @@ export default function FaturamentoPage() {
     setProcessingPayment(true)
 
     try {
-      const response = await fetch("/api/financial/providers/payment", {
+      const response = await adminFetch("/api/financial/providers/payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -484,7 +488,7 @@ export default function FaturamentoPage() {
                       </TableCell>
 
                       <TableCell className="text-right">
-                        <Button
+                        {canOperateFinance && <Button
                           size="sm"
                           onClick={() => handleOpenPaymentDialog(provider)}
                           disabled={provider.totalEarnings <= 0}
@@ -492,7 +496,7 @@ export default function FaturamentoPage() {
                         >
                           <CreditCard className="h-4 w-4 mr-2" />
                           {`Pagar ${formatCurrency(provider.totalEarnings)}`}
-                        </Button>
+                        </Button>}
                       </TableCell>
                     </TableRow>
                   ))

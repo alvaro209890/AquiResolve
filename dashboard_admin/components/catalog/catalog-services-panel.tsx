@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react"
 import { collection, onSnapshot, query, where } from "firebase/firestore"
 import { db } from "@/lib/firebase"
+import { adminFetch } from "@/lib/admin-api"
 import { toast } from "sonner"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -209,7 +210,7 @@ export function CatalogServicesPanel({ niches }: { niches: NicheOption[] }) {
 
     setSaving(true)
     try {
-      const res = await fetch("/api/catalog/services", {
+      const res = await adminFetch("/api/catalog/services", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -241,7 +242,7 @@ export function CatalogServicesPanel({ niches }: { niches: NicheOption[] }) {
   }
 
   const handleToggleActive = async (service: CatalogServiceDoc) => {
-    const res = await fetch("/api/catalog/services", {
+    const res = await adminFetch("/api/catalog/services", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -267,7 +268,7 @@ export function CatalogServicesPanel({ niches }: { niches: NicheOption[] }) {
   }
 
   const handleDelete = async (service: CatalogServiceDoc) => {
-    const res = await fetch(`/api/catalog/services?id=${encodeURIComponent(service.id)}`, {
+    const res = await adminFetch(`/api/catalog/services?id=${encodeURIComponent(service.id)}`, {
       method: "DELETE",
     })
     const data = await res.json().catch(() => ({}))

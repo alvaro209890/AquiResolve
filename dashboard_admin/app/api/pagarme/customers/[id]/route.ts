@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { pagarmeService } from '@/lib/services/pagarme-service'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 /**
  * GET /api/pagarme/customers/:id
@@ -11,6 +12,7 @@ export async function GET(
 ) {
   const { id } = await params
   try {
+    await requireAdminPermission(request, 'financeiro')
     const response = await pagarmeService.getCustomer(id)
 
     if (response.errors) {
@@ -28,6 +30,8 @@ export async function GET(
       data: response.data,
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao buscar cliente:', error)
     return NextResponse.json(
       {
@@ -49,6 +53,7 @@ export async function PUT(
 ) {
   const { id } = await params
   try {
+    await requireAdminPermission(request, 'operarFinanceiro')
     const body = await request.json()
     const response = await pagarmeService.updateCustomer(id, body)
 
@@ -68,6 +73,8 @@ export async function PUT(
       message: 'Cliente atualizado com sucesso',
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao atualizar cliente:', error)
     return NextResponse.json(
       {
@@ -78,4 +85,3 @@ export async function PUT(
     )
   }
 }
-

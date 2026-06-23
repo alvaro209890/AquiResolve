@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { addDocument, getCollection } from '@/lib/firestore'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 type AccountRecord = Record<string, unknown> & {
   id: string
@@ -11,6 +12,7 @@ const readString = (value: unknown): string => (typeof value === 'string' ? valu
 
 export async function GET(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'financeiro')
     const { searchParams } = new URL(request.url)
     const tipo = searchParams.get('tipo')
     const status = searchParams.get('status')
@@ -35,6 +37,8 @@ export async function GET(request: NextRequest) {
           : undefined,
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao buscar contas:', error)
     return NextResponse.json(
       { success: false, error: 'Erro interno do servidor' },
@@ -45,6 +49,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'operarFinanceiro')
     const body = await request.json()
 
     if (!body.nome || !body.banco || !body.agencia || !body.conta) {
@@ -74,6 +79,8 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     )
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao criar conta:', error)
     return NextResponse.json(
       { success: false, error: 'Erro interno do servidor' },

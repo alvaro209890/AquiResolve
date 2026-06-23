@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore } from '@/lib/firebase-admin'
 import * as admin from 'firebase-admin'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 
 // Combos promocionais (vitrine) da Home do app — coleção `home_combos`, um doc por combo.
 // Escrita exclusiva via Admin SDK (as Firestore rules bloqueiam o client SDK). O app apenas lê
@@ -54,8 +55,9 @@ function normalizeItems(items: ComboItemInput[] | undefined) {
 }
 
 // GET /api/combos — lista todos os combos ordenados por displayOrder.
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'gerenciarCombos')
     const db = getAdminFirestore()
     const snapshot = await db.collection(COLLECTION).get()
 
@@ -85,6 +87,8 @@ export async function GET() {
 
     return NextResponse.json({ success: true, combos })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao listar combos:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
@@ -96,6 +100,7 @@ export async function GET() {
 // divergência (fullPrice deve ser a soma dos preços do catálogo, calculada no cliente).
 export async function POST(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'gerenciarCombos')
     const db = getAdminFirestore()
     const input = (await request.json()) as ComboInput
 
@@ -150,6 +155,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, id, promoPrice, savings })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao salvar combo:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
@@ -159,6 +166,7 @@ export async function POST(request: NextRequest) {
 // DELETE /api/combos?id=xxx — remove um combo.
 export async function DELETE(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'gerenciarCombos')
     const db = getAdminFirestore()
     const id = request.nextUrl.searchParams.get('id')?.trim()
     if (!id) {
@@ -169,6 +177,8 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ success: true, id })
   } catch (error: unknown) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     const message = error instanceof Error ? error.message : String(error)
     console.error('Erro ao remover combo:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })

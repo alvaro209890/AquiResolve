@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server/admin-authorization'
 import { pagarmeService } from '@/lib/services/pagarme-service'
 
 function emptyChargesPayload(warning: string) {
@@ -17,6 +18,7 @@ function emptyChargesPayload(warning: string) {
  */
 export async function GET(request: NextRequest) {
   try {
+    await requireAdminPermission(request, 'financeiro')
     const hasPrivateKey = Boolean(process.env.API_KEY_PRIVATE_PAGARME?.trim())
     if (!hasPrivateKey) {
       return NextResponse.json(emptyChargesPayload('API_KEY_PRIVATE_PAGARME não configurada'))
@@ -48,6 +50,8 @@ export async function GET(request: NextRequest) {
       source: 'pagarme',
     })
   } catch (error) {
+    const denied = adminAuthorizationResponse(error)
+    if (denied) return denied
     console.error('Erro ao listar cobranças:', error)
     return NextResponse.json(
       emptyChargesPayload('Erro ao listar cobranças')

@@ -7,6 +7,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { PagarmeFirebaseSync } from '@/lib/services/pagarme-firebase-sync'
+import { adminFetch } from '@/lib/admin-api'
 import {
   PagarmeOrder,
   PagarmeCharge,
@@ -47,7 +48,7 @@ export function usePagarmeOrdersFirebase(options?: {
       const params = new URLSearchParams()
       if (options?.status) params.append('status', options.status)
 
-      const response = await fetch(`/api/pagarme/orders?${params.toString()}`)
+      const response = await adminFetch(`/api/pagarme/orders?${params.toString()}`)
       const data = await response.json()
 
       if (data.success) {
@@ -110,7 +111,7 @@ export function usePagarmeChargesFirebase(options?: {
       const params = new URLSearchParams()
       if (options?.status) params.append('status', options.status)
 
-      const response = await fetch(`/api/pagarme/charges?${params.toString()}`)
+      const response = await adminFetch(`/api/pagarme/charges?${params.toString()}`)
       const data = await response.json()
 
       if (data.success) {
@@ -157,7 +158,7 @@ export function usePagarmeSync() {
   const syncAll = async () => {
     try {
       setSyncing(true)
-      const response = await fetch('/api/pagarme/sync', {
+      const response = await adminFetch('/api/pagarme/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'all', limit: 100 })
@@ -180,7 +181,7 @@ export function usePagarmeSync() {
 
   const getSyncStatus = async () => {
     try {
-      const response = await fetch('/api/pagarme/sync')
+      const response = await adminFetch('/api/pagarme/sync')
       const data = await response.json()
       if (data.success) {
         setLastSync(data.data)
@@ -201,4 +202,3 @@ export function usePagarmeSync() {
     getSyncStatus,
   }
 }
-
