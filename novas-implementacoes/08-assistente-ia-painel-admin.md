@@ -1,6 +1,23 @@
 # 08 — Assistente IA do Painel Admin (Groq, dentro do Manual)
 
-**Prioridade:** 🟡 Média · **Fase:** 3 (trilha do **painel**, paralela à IA do app `06`) · **Complexidade:** Média · **Status:** ⬜ Não iniciado
+**Prioridade:** 🟡 Média · **Fase:** 3 (trilha do **painel**, paralela à IA do app `06`) · **Complexidade:** Média · **Status:** 🟢 Código pronto (falta chave + teste)
+
+---
+
+## ✅ Implementado (2026-06-22, commit `4d93917`)
+
+Código **completo e passando no `tsc --noEmit`**. Falta só configurar `GROQ_API_KEY` na Vercel +
+deploy + teste — ver runbook [`09-ativacao-ia-runbook.md`](./09-ativacao-ia-runbook.md).
+
+| Camada | Arquivo |
+|--------|---------|
+| Conteúdo único | `dashboard_admin/lib/manual-content.ts` (`SECTIONS/CONCEPTS/INFRA` + `manualAsPromptContext()`) |
+| Rota IA | `dashboard_admin/app/api/assistant/route.ts` (`POST`; `runtime='nodejs'`; chave só no servidor) |
+| Widget | `dashboard_admin/components/manual/assistant-chat.tsx` (chat + exemplos + estados) |
+| Integração | `app/dashboard/manual/page.tsx` consome o lib e renderiza `<AssistantChat />` no topo |
+
+> A página do Manual **deixou de declarar o conteúdo inline** — agora importa de `lib/manual-content.ts`.
+> Ao adicionar uma área nova ao painel, edite **esse** arquivo: Manual e Copiloto acompanham juntos.
 
 > **Diferente do plano `06`** (que é a IA do **app cliente**, identifica nicho a partir do problema).
 > Aqui a IA é para o **administrador**: dentro da aba **Manual do Painel** (`/dashboard/manual`),

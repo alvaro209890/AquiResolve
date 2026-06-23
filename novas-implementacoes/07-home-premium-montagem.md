@@ -4,6 +4,20 @@
 
 ---
 
+## ✅ Implementado (2026-06-22, commit `4d93917`)
+
+Home montada na ordem Premium e **compilando** (`compileDebugKotlin` + `processDebugResources`).
+Falta apenas QA visual no device.
+
+- **Ordem final** (`activity_client_home.xml`): Busca → Banner → Saudação (1 linha, com o nome) →
+  Categorias → **Cashback** → Combos → Parceiros → Pedidos recentes → **CTA Assistente IA** (`cardAssistant`).
+- **Botão "Ver Serviços" removido** (redundante com categorias + bottom nav).
+- **Pull-to-refresh:** `NestedScrollView` (`contentScroll`) dentro de `SwipeRefreshLayout`
+  (`swipeRefresh`); `setupSwipeRefresh()` re-chama os `setup*`/`load*`.
+- Cada seção dinâmica segue isolada (erro/vazio → `GONE`); insets preservados em `setupWindowInsets`.
+
+---
+
 ## 🎯 Objetivo
 
 Integrar todas as seções (banner, categorias, combos, parceiros, busca, IA) numa **Home Premium**

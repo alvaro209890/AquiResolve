@@ -173,14 +173,14 @@ O cliente descreve o problema em linguagem natural ("minha pia está vazando") e
 - **App:** `AssistantActivity.kt` + `activity_assistant.xml` (registrada no Manifest). `AssistantClient.kt` (OkHttp, espelha o `RouteClient`) chama `POST /api/ai/classify` com `Authorization: Bearer <ID token>` — a chave Groq **nunca** fica no APK. Envia `CatalogRepository.cachedNicheNames()`; valida o nicho retornado contra o catálogo. "Continuar" → `CreateOrderActivity` (`service_category_name`). **Acessos:** card `cardAssistant` na Home + gancho no estado "sem resultado" da busca (abre o Assistente com `EXTRA_PREFILL`).
 - **Backend:** `POST /api/ai/classify` (`backend/src/routes/ai.routes.js` + `services/ai-classify.service.js`): exige ID token (`authenticateRequest`), rate-limit `aiLimiter` (15/min/IP), chama Groq (`llama-3.3-70b-versatile`, `temperature:0`, `response_format: json_object`), valida `niche ∈ niches` (anti-alucinação), nunca derruba o fluxo. **Env:** `GROQ_API_KEY` (+ opcional `GROQ_MODEL`) no Render. **autoDeploy off → deploy manual** após setar a chave.
 - **Analytics:** `ia_assistente_open`, `ia_nicho_sugerido` (niche/confidence), `ia_sugestao_aceita`.
-- **Status:** código pronto e compilando; **falta** `GROQ_API_KEY` no Render + teste ponta a ponta.
+- **Status:** código pronto e compilando; **falta** `GROQ_API_KEY` no Render + deploy + teste. Passo a passo em `novas-implementacoes/09-ativacao-ia-runbook.md`.
 
 ### Copiloto IA do Painel (plano 08) — aba Manual
 Widget de chat no topo de `/dashboard/manual`: o admin pergunta "como faço X?" e recebe passos com onde clicar, **fundamentado** no conteúdo real do Manual.
 - **Conteúdo único:** `dashboard_admin/lib/manual-content.ts` exporta `SECTIONS/CONCEPTS/INFRA` (movidos de `page.tsx`) + `manualAsPromptContext()`. A página **renderiza** e a rota **injeta no prompt** — Manual e IA nunca divergem. Ao adicionar área nova ao painel, edite **este** arquivo.
 - **Rota:** `app/api/assistant/route.ts` (POST, `runtime='nodejs'`): system prompt + grounding do Manual + histórico curto → Groq. Chave `GROQ_API_KEY` **só no servidor** (Vercel), nunca no browser. Trata erro/timeout (502/504/503).
 - **Widget:** `components/manual/assistant-chat.tsx` (chat + exemplos clicáveis + estados).
-- **Status:** código pronto e passando no typecheck; **falta** `GROQ_API_KEY` na Vercel + teste.
+- **Status:** código pronto e passando no typecheck; **falta** `GROQ_API_KEY` na Vercel + deploy + teste. Passo a passo em `novas-implementacoes/09-ativacao-ia-runbook.md`.
 
 ### Manual do Painel — `/dashboard/manual`
 Aba "Manual do Painel" na sidebar (`app/dashboard/manual/page.tsx`, ícone `BookOpen`): documentação navegável (índice + âncoras) de **cada área do painel** (Painel, Serviços, Controle, Usuários, Pedidos, Financeiro, Relatórios, Configurações, Área Master), além de **conceitos** ("conteúdo é dado, não código", segurança das coleções, preço do catálogo) e **infraestrutura** (Firebase/Render/Vercel). Conteúdo estático em arrays no próprio componente — atualizar ao adicionar área nova.

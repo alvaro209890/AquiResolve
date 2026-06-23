@@ -5,12 +5,28 @@
 > **Observação importante:** invista primeiro em organização visual e experiência do usuário antes da IA. A maior oportunidade hoje é fazer o cliente encontrar e contratar um serviço em menos de 30 segundos. Isso gera conversão imediatamente. 🚀💙🧡"
 
 > **INSTRUÇÃO PARA A PRÓXIMA IA DESENVOLVEDORA:**
-> Você está assumindo a base de código atual do app cliente (Android/Kotlin nativo). Embora haja recomendações externas para uso de Flutter, **o desenvolvimento deve continuar na base nativa atual (`app/src/main/java...`)**. Sua missão é localizar as implementações já iniciadas e polir a **Home Premium**, garantindo a melhor UX possível. A Inteligência Artificial será a última etapa.
+> Você está assumindo a base de código atual do app cliente (Android/Kotlin nativo). Embora haja recomendações externas para uso de Flutter, **o desenvolvimento deve continuar na base nativa atual (`app/src/main/java...`)**.
 
 **Stack confirmada:** implementação **no app Kotlin existente** (`app/`), reaproveitando
 toda a base já pronta (Firebase, catálogo dinâmico, pagamentos, cashback, chat).
 
-> **Status:** As features individuais (Fase 1 e 2) já tiveram seu código base estruturado. O seu foco principal agora é a **Montagem da Home Premium (Plano 07)**, garantindo o visual e usabilidade descritos na mensagem do gestor, antes de focar na IA (Plano 06 e 08). Detalhe na tabela de [`00-roadmap-e-prioridades.md`](./00-roadmap-e-prioridades.md).
+---
+
+## ✅ Estado atual (2026-06-22) — leva concluída em código
+
+Os **8 planos** estão com **código pronto e validado** (app compila: `compileDebugKotlin` +
+`processDebugResources`; backend monta com as rotas; painel passa `tsc --noEmit`). Commit `4d93917`.
+
+| Plano | O que falta |
+|-------|-------------|
+| 1–5 (Banner, Categorias, Combos, Parceiros, Busca) | Apenas QA visual no device. |
+| **7 — Home Premium** | Montada (ordem Premium + pull-to-refresh + CTA IA). Só QA no device. |
+| **6 — Assistente IA (app)** | **Configurar `GROQ_API_KEY` no Render** + deploy do backend + teste. |
+| **8 — Copiloto IA (painel)** | **Configurar `GROQ_API_KEY` na Vercel** + deploy do painel + teste. |
+
+> 👉 **Para ligar a IA (planos 6 e 8), siga o passo a passo em
+> [`09-ativacao-ia-runbook.md`](./09-ativacao-ia-runbook.md).** Sem a chave Groq, o app e o painel
+> continuam funcionando normalmente — a IA apenas exibe um fallback amigável ("ver todos os serviços").
 
 ---
 
@@ -27,9 +43,10 @@ toda a base já pronta (Firebase, catálogo dinâmico, pagamentos, cashback, cha
 | 6 | [`06-assistente-ia-groq.md`](./06-assistente-ia-groq.md) | 🤖 Assistente do **app cliente**: descreve o problema → IA identifica o nicho e direciona | 🔵 Baixa (último) |
 | 7 | [`07-home-premium-montagem.md`](./07-home-premium-montagem.md) | Montagem final: reorganização da Home unindo todas as seções | 🟢 (fecha a leva) |
 | 8 | [`08-assistente-ia-painel-admin.md`](./08-assistente-ia-painel-admin.md) | 🤖 Copiloto do **painel admin** (Groq, dentro da aba Manual): admin pergunta "como faço X?" → passos com onde clicar | 🟡 Média |
+| 9 | [`09-ativacao-ia-runbook.md`](./09-ativacao-ia-runbook.md) | 🔑 **Runbook**: como obter a chave Groq, configurar no Render/Vercel, fazer deploy e testar a IA dos planos 6 e 8 | 🟢 Operacional |
 
 > **Nota:** os planos `01–07` evoluem o **app cliente**; o plano `08` é uma trilha **do painel admin**
-> (web), independente da Home do app — pode ser feito em paralelo.
+> (web), independente da Home do app. O plano `09` é o **runbook operacional** para ativar a IA.
 
 ---
 

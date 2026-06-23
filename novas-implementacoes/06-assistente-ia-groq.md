@@ -4,6 +4,22 @@
 
 ---
 
+## ✅ Implementado (2026-06-22, commit `4d93917`)
+
+Código **completo e compilando**. Falta só configurar `GROQ_API_KEY` no Render + deploy + teste —
+ver runbook [`09-ativacao-ia-runbook.md`](./09-ativacao-ia-runbook.md).
+
+| Camada | Arquivo |
+|--------|---------|
+| App — tela | `app/.../AssistantActivity.kt` + `res/layout/activity_assistant.xml` (no Manifest) |
+| App — rede | `app/.../AssistantClient.kt` (OkHttp; chave **nunca** no APK; espelha `RouteClient`) |
+| App — acessos | Card `cardAssistant` na Home + gancho na busca sem resultado (`EXTRA_PREFILL`) |
+| Backend — rota | `backend/src/routes/ai.routes.js` (`POST /api/ai/classify`; ID token + `aiLimiter` 15/min) |
+| Backend — serviço | `backend/src/services/ai-classify.service.js` (Groq; valida `niche ∈ niches`) |
+| Backend — config | `GROQ_API_KEY`/`GROQ_MODEL` em `backend/src/config/env.js` |
+
+---
+
 ## 🎯 Objetivo
 
 Botão **🤖 Assistente AquiResolve**: o cliente descreve em linguagem natural o que aconteceu
