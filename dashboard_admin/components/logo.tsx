@@ -7,8 +7,8 @@ interface LogoProps {
   showText?: boolean
 }
 
-/** Caminho da logo. Salve a imagem da marca em public/ com este nome. */
-const LOGO_SRC = "/logo-aquiresolve.png"
+/** Caminho da logo (arquivo em public/). Usa o SVG que existe no repo; cai no SVG inline se faltar. */
+const LOGO_SRC = "/logo-aquiresolve.svg"
 
 export function Logo({ className = "h-8", showText = true }: LogoProps) {
   const [imgError, setImgError] = useState(false)

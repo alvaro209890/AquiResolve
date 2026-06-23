@@ -1,38 +1,77 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminFirestore } from '@/lib/firebase-admin'
-import * as admin from 'firebase-admin'
 
 // GET /api/client-chats?status=active|archived&unreadOnly=true&limit=100
-// Lista os chats com paginação simples (ordenados por lastMessageAt desc).
+// Lista os chats Base↔Cliente, ordenados por lastMessageAt desc.
+//
+// IMPORTANTE: filtramos e ordenamos EM MEMÓRIA (mesmo padrão dos banners/combos/parceiros) em vez
+// de combinar where('archived') + orderBy('lastMessageAt') na query — essa combinação exigiria um
+// índice composto no Firestore (e estava causando 500 em produção). Em memória também ficamos
+// robustos a docs antigos sem o campo `archived` (tratados como ativos).
+
+/** Extrai milissegundos de um campo de data que pode ser Timestamp, número, string ISO ou ausente. */
+function toMillis(value: unknown): number {
+  if (!value) return 0
+  if (typeof value === 'number') return value
+  if (typeof value === 'string') {
+    const t = Date.parse(value)
+    return Number.isNaN(t) ? 0 : t
+  }
+  if (typeof value === 'object') {
+    const v = value as { toMillis?: () => number; _seconds?: number; seconds?: number }
+    if (typeof v.toMillis === 'function') return v.toMillis()
+    if (typeof v._seconds === 'number') return v._seconds * 1000
+    if (typeof v.seconds === 'number') return v.seconds * 1000
+  }
+  return 0
+}
+
 export async function GET(request: NextRequest) {
   try {
     const db = getAdminFirestore()
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') ?? 'active'
     const unreadOnly = searchParams.get('unreadOnly') === 'true'
-    const limit = Math.min(parseInt(searchParams.get('limit') ?? '100', 10), 500)
+    const limit = Math.min(parseInt(searchParams.get('limit') ?? '100', 10) || 100, 500)
 
-    let query = db
-      .collection('client_chats')
-      .orderBy('lastMessageAt', 'desc')
-      .limit(limit) as admin.firestore.Query
+    // Sem filtros na query → não precisa de índice composto. client_chats tem 1 doc por cliente.
+    const snap = await db.collection('client_chats').get()
+
+    let chats = snap.docs.map((d) => {
+      const data = d.data() as Record<string, unknown>
+      return {
+        id: d.id,
+        ...data,
+        // Normalizações defensivas (docs antigos podem não ter os campos).
+        archived: Boolean(data.archived),
+        unreadByAdmin: Number(data.unreadByAdmin ?? 0),
+        _lastMessageMillis: toMillis(data.lastMessageAt),
+      }
+    })
 
     if (status === 'archived') {
-      query = query.where('archived', '==', true)
+      chats = chats.filter((c) => c.archived)
     } else if (status === 'active') {
-      query = query.where('archived', '==', false)
+      chats = chats.filter((c) => !c.archived)
     }
 
     if (unreadOnly) {
-      query = query.where('unreadByAdmin', '>', 0)
+      chats = chats.filter((c) => c.unreadByAdmin > 0)
     }
 
-    const snap = await query.get()
-    const chats = snap.docs.map((d) => ({ id: d.id, ...d.data() }))
+    chats.sort((a, b) => b._lastMessageMillis - a._lastMessageMillis)
 
-    return NextResponse.json({ success: true, chats })
+    const result = chats.slice(0, limit).map((c) => {
+      // Não vaza o campo auxiliar de ordenação para o cliente.
+      const { _lastMessageMillis, ...rest } = c
+      void _lastMessageMillis
+      return rest
+    })
+
+    return NextResponse.json({ success: true, chats: result })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
+    console.error('Erro ao listar client-chats:', message)
     return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
 }
