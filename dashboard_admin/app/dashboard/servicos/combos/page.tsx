@@ -127,6 +127,7 @@ export default function CombosPage() {
   const [form, setForm] = useState<Combo>(EMPTY)
   const [showForm, setShowForm] = useState(false)
   const [serviceSearch, setServiceSearch] = useState("")
+  const [showServices, setShowServices] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const load = useCallback(async () => {
@@ -161,18 +162,21 @@ export default function CombosPage() {
   const startNew = () => {
     setForm({ ...EMPTY, displayOrder: combos.length })
     setServiceSearch("")
+    setShowServices(false)
     setShowForm(true)
   }
 
   const startEdit = (c: Combo) => {
     setForm({ ...c })
     setServiceSearch("")
+    setShowServices(false)
     setShowForm(true)
   }
 
   const cancelForm = () => {
     setShowForm(false)
     setForm(EMPTY)
+    setShowServices(false)
   }
 
   const isSelected = (svc: CatalogServiceRow) => form.items.some((it) => it.serviceId === svc.id)
@@ -399,42 +403,78 @@ export default function CombosPage() {
 
             {/* Itens do combo */}
             <div>
-              <label className="text-sm font-medium">
-                Serviços do combo ({form.items.length} selecionado{form.items.length === 1 ? "" : "s"})
-              </label>
-              <Input
-                className="mt-1"
-                placeholder="Buscar serviço ou nicho…"
-                value={serviceSearch}
-                onChange={(e) => setServiceSearch(e.target.value)}
-              />
-              <div className="mt-2 max-h-56 overflow-y-auto rounded-lg border">
-                {filteredServices.length === 0 ? (
-                  <p className="p-3 text-sm text-muted-foreground">Nenhum serviço encontrado.</p>
-                ) : (
-                  filteredServices.map((svc) => {
-                    const selected = isSelected(svc)
-                    return (
-                      <button
-                        type="button"
-                        key={svc.id}
-                        onClick={() => toggleItem(svc)}
-                        className={`flex w-full items-center justify-between gap-2 border-b px-3 py-2 text-left text-sm last:border-b-0 hover:bg-muted ${
-                          selected ? "bg-orange-50" : ""
-                        }`}
-                      >
-                        <span className="min-w-0">
-                          <span className="block truncate font-medium">{svc.name}</span>
-                          <span className="block truncate text-xs text-muted-foreground">
-                            {svc.niche} · {money(svc.estimatedPrice)}
-                          </span>
-                        </span>
-                        {selected && <Check className="h-4 w-4 shrink-0 text-orange-600" />}
-                      </button>
-                    )
-                  })
-                )}
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-sm font-medium">
+                  Serviços do combo ({form.items.length} selecionado{form.items.length === 1 ? "" : "s"})
+                </label>
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => setShowServices(!showServices)}
+                >
+                  {showServices ? "Fechar seletor" : "Selecionar serviços"}
+                </Button>
               </div>
+
+              {form.items.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {form.items.map(it => (
+                    <div key={it.serviceId} className="flex items-center gap-1 bg-orange-100 text-orange-800 px-2 py-1 rounded-md text-xs">
+                      <span>{it.serviceName}</span>
+                      <button 
+                        type="button" 
+                        onClick={() => setForm(f => ({ ...f, items: f.items.filter(x => x.serviceId !== it.serviceId) }))}
+                        className="text-orange-600 hover:text-orange-900"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {showServices && (
+                <div className="rounded-lg border p-3 bg-muted/20">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <Input
+                      placeholder="Buscar serviço ou nicho…"
+                      value={serviceSearch}
+                      onChange={(e) => setServiceSearch(e.target.value)}
+                    />
+                    <Button type="button" variant="ghost" size="icon" onClick={() => setShowServices(false)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <div className="max-h-56 overflow-y-auto rounded-lg border bg-background">
+                    {filteredServices.length === 0 ? (
+                      <p className="p-3 text-sm text-muted-foreground">Nenhum serviço encontrado.</p>
+                    ) : (
+                      filteredServices.map((svc) => {
+                        const selected = isSelected(svc)
+                        return (
+                          <button
+                            type="button"
+                            key={svc.id}
+                            onClick={() => toggleItem(svc)}
+                            className={`flex w-full items-center justify-between gap-2 border-b px-3 py-2 text-left text-sm last:border-b-0 hover:bg-muted ${
+                              selected ? "bg-orange-50" : ""
+                            }`}
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate font-medium">{svc.name}</span>
+                              <span className="block truncate text-xs text-muted-foreground">
+                                {svc.niche} · {money(svc.estimatedPrice)}
+                              </span>
+                            </span>
+                            {selected && <Check className="h-4 w-4 shrink-0 text-orange-600" />}
+                          </button>
+                        )
+                      })
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* % e ordem */}
