@@ -34,6 +34,7 @@ import {
   Flame,
   Handshake,
   BookOpen,
+  Wrench,
 } from "lucide-react"
 
 const navigation = [
@@ -62,6 +63,7 @@ const navigation = [
       { name: "Monitoramento de Chat", href: "/dashboard/controle/chat", icon: MessageSquare },
       { name: "Central Operacional", href: "/dashboard/controle/chat-operacional", icon: Radio },
       { name: "Chat com Clientes", href: "/dashboard/controle/chat-clientes", icon: Megaphone },
+      { name: "Chat com Prestadores", href: "/dashboard/controle/chat-prestadores", icon: Wrench },
       { name: "Aceitação de Prestadores", href: "/dashboard/controle/aceitacao-prestadores", icon: BadgeCheck },
       { name: "Especialidades", href: "/dashboard/controle/especialidades", icon: Layers },
     ],

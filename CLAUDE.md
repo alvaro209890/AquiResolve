@@ -102,6 +102,9 @@ Activity → Manager → Firebase/Retrofit
 | `client_chats/{clientId}` | Chat Base ↔ Cliente — metadata (lastMessage, unreadByClient, unreadByAdmin). Cliente lê; escrita só Admin SDK |
 | `client_chats/{clientId}/messages/{id}` | Mensagens do chat. Cliente cria as próprias (senderType='client'); admin envia via Admin SDK |
 | `client_chat_broadcasts/{id}` | Histórico de cada disparo em massa do admin (auditoria). Só Admin SDK |
+| `provider_chats/{providerId}` | Chat Base ↔ Prestador — metadata (lastMessage, unreadByProvider, unreadByAdmin). Prestador lê; escrita só Admin SDK |
+| `provider_chats/{providerId}/messages/{id}` | Mensagens do chat com prestador. Admin envia via Admin SDK; prestador pode criar as próprias (senderType='provider') |
+| `provider_chat_broadcasts/{id}` | Histórico de cada disparo em massa para prestadores. Só Admin SDK |
 | `home_banners/{id}` | Banners do carrossel da Home do cliente. App lê (`BannerRepository`); escrita só Admin SDK (painel) |
 | `home_combos/{id}` | Combos promocionais (vitrine) da Home. App lê (`ComboRepository`); escrita só Admin SDK (painel). Preço é exibição — desconto real vem do `PromotionManager` no carrinho |
 | `partners/{id}` | Parceiros patrocinadores (vitrine) da Home. App lê (`PartnerRepository`); escrita só Admin SDK (painel). Benefício: discount/cashback/coupon/link |
@@ -283,6 +286,13 @@ Coleção: `client_chats/{clientId}` (metadata) + subcoleção `messages/*`.
 - A página do painel usa polling (8s lista, 5s mensagens) em vez de snapshot listener — admin não tem custom claim por padrão, então client SDK não passa pelas rules; API routes (Admin SDK) cobrem leitura.
 - FCM é best-effort — se o token estiver expirado, a mensagem ainda fica no Firestore e aparece quando o app abrir.
 
+### Chat Base ↔ Prestador (painel)
+Espelha o Chat com Clientes, para prestadores. Página `/dashboard/controle/chat-prestadores` (logo abaixo de "Chat com Clientes" na sidebar). Coleção `provider_chats/{providerId}` + subcoleção `messages/*` + histórico `provider_chat_broadcasts/{id}`.
+- **Rotas (Admin SDK):** `GET /api/provider-chats` (lista, filtro/sort em memória — sem índice composto), `PATCH /api/provider-chats/[id]` (pin/archive), `GET/POST /api/provider-chats/[id]/messages` (envia + FCM type `provider_message` + sino), `PATCH /api/provider-chats/[id]/read?role=admin|provider`, `POST /api/provider-chats/broadcast` (audiência da coleção `providers`), `GET /api/provider-chats/directory` (lista prestadores p/ **iniciar** conversa nova).
+- **Diferença do chat de clientes:** como o app do prestador ainda não tem a tela de chat, o painel tem **"Nova conversa"** (seletor de prestador via `directory`) — o doc nasce na 1ª mensagem. Nome resolvido em `providers` (fallback `users`); tokens em `userTokens/{uid}.fcmToken`; contadores `unreadByProvider`/`unreadByAdmin`.
+- **Regras:** `provider_chats` = `read: isOwner(providerId)` / `write: false` (Admin SDK); prestador pode criar a própria mensagem (`senderType='provider'`). `provider_chat_broadcasts` = só Admin SDK. (Já preparado para quando o app do prestador ganhar a tela de chat.)
+- O admin já recebe/envia 100% pelo painel; o prestador recebe **push FCM + notificação no sino** hoje. A tela in-app de resposta do prestador exige trabalho no app + novo APK (futuro).
+
 ### Backend de Pagamentos (Pagar.me)
 - URL: `https://aquiresolve.onrender.com/api/payments/`
 - Configurada em `app/build.gradle` como `PAYMENTS_API_BASE_URL`
@@ -396,6 +406,12 @@ Todas as rotas estão em `dashboard_admin/app/api/`:
 | `/api/client-chats/[clientId]/messages` | POST | Admin envia mensagem (Admin SDK + atualiza metadata + FCM) |
 | `/api/client-chats/[clientId]/read` | PATCH | Zera contador unread (`?role=admin\|client`) |
 | `/api/client-chats/broadcast` | POST | Envia em massa (audience: all\|active\|specific) |
+| `/api/provider-chats` | GET | Lista chats Base↔Prestador (`?status=active\|archived&unreadOnly=true`); filtra/ordena em memória |
+| `/api/provider-chats/[providerId]` | PATCH | Pin/archive do chat do prestador (`{ pinned?, archived? }`) |
+| `/api/provider-chats/[providerId]/messages` | GET/POST | Mensagens; POST envia (Admin SDK + metadata + FCM `provider_message` + sino) |
+| `/api/provider-chats/[providerId]/read` | PATCH | Zera unread (`?role=admin\|provider`) |
+| `/api/provider-chats/broadcast` | POST | Envia em massa a prestadores (audience: all\|active\|specific) |
+| `/api/provider-chats/directory` | GET | Lista prestadores (`?search=`) para iniciar conversa nova |
 | `/api/specialty-requests` | GET | Lista solicitações de especialidades (`?status=pending\|approved\|rejected\|all`) |
 | `/api/specialty-requests` | POST | Aprova ou rejeita uma solicitação. Body `{ requestId, action: 'approve'\|'reject', rejectionReason? }`. Aprovação atualiza `providers/{id}.services` e envia notificação FCM ao prestador |
 | `/api/assistant` | POST | Copiloto IA do painel (plano 08): responde "como faço X?" fundamentado no Manual (`manualAsPromptContext()`). Chave `GROQ_API_KEY` só no servidor (Vercel) |
@@ -419,6 +435,7 @@ Todas as rotas estão em `dashboard_admin/app/api/`:
 | Rastreamento | `/dashboard/controle/autem-mobile/rastreamento` | Mapa ao vivo com pinos de prestadores + lista GPS com link Google Maps |
 | Aprovação de Especialidades | `/dashboard/controle/especialidades` | Fila de solicitações de alteração de especialidades dos prestadores — aprovar/rejeitar com motivo opcional; aprovação atualiza `providers/{id}.services` via Admin SDK e notifica o prestador |
 | Chat com Clientes | `/dashboard/controle/chat-clientes` | Chat Base↔Cliente — lista de clientes (busca/filtros/unread badge), painel da conversa (polling 5s), modal de broadcast (audience all/active) |
+| Chat com Prestadores | `/dashboard/controle/chat-prestadores` | Chat Base↔Prestador (espelha o de clientes) + botão "Nova conversa" (seletor de prestador, pois o doc nasce na 1ª mensagem) + broadcast a prestadores |
 | Cashback (AquiCash) | `/dashboard/configuracoes/aquicash` | Configura fases, tiers, combos e salva em `app_config/cashback` via Admin SDK |
 | Banners da Home | `/dashboard/configuracoes/banners` | CRUD do carrossel da Home: upload da imagem (Storage `banner_images/`) ou URL, título/subtítulo, ação (niche/service/cashback/url/combos/partners/none), cor de fundo, ordem, ativo. Escreve em `home_banners` via `/api/banners` (Admin SDK) |
 | Combos Promocionais | `/dashboard/servicos/combos` | CRUD de combos: multi-select de `catalog_services` + cálculo automático de preços + aviso de coerência de desconto. Escreve em `home_combos` via `/api/combos` (Admin SDK) |
