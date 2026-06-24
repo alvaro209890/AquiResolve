@@ -71,7 +71,6 @@ export function Breadcrumbs({ items, className }: BreadcrumbsProps) {
         'checklists': 'Checklists',
         'checklist-viatura': 'Checklist Viatura',
         'clientes-fornecedores': 'Clientes e Fornecedores',
-        'equipes': 'Equipes',
         'exportador': 'Exportador',
         'filiais': 'Filiais',
         'manutencao': 'Manutenção',

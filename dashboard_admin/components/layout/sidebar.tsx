@@ -114,7 +114,6 @@ const navigation = [
       { name: "Geral", href: "/dashboard/configuracoes", icon: Settings, permission: "configuracoes" },
       { name: "Banners da Home", href: "/dashboard/configuracoes/banners", icon: ImageIcon, permission: "visualizarBanners" },
       { name: "Parceiros AquiResolve", href: "/dashboard/configuracoes/parceiros", icon: Handshake, permission: "gerenciarParceiros" },
-      { name: "Equipes", href: "/dashboard/configuracoes/equipes", icon: UserCheck, permission: "configuracoes" },
     ],
   },
   {
