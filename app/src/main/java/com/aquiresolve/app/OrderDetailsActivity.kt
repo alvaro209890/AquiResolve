@@ -507,7 +507,7 @@ class OrderDetailsActivity : AppCompatActivity() {
                     val checklist = osChecklist
                     when {
                         checklist == null -> "Iniciar OS" to "Chat"
-                        checklist.status == OsChecklistData.STATUS_COMPLETED -> "Ver OS" to "Chat"
+                        checklist.status == OsChecklistData.STATUS_COMPLETED -> "Finalizar com código" to "Chat"
                         else -> "Continuar OS" to "Chat"
                     }
                 }
@@ -641,7 +641,7 @@ class OrderDetailsActivity : AppCompatActivity() {
                         val checklist = osChecklist
                         when {
                             checklist == null -> startOsFlow(order)
-                            checklist.status == OsChecklistData.STATUS_COMPLETED -> viewOsHistory(order)
+                            checklist.status == OsChecklistData.STATUS_COMPLETED -> finishServiceWithCode(order)
                             else -> continueOs(checklist)
                         }
                     }

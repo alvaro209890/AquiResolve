@@ -177,19 +177,9 @@ class DigitalSignatureActivity : AppCompatActivity() {
                         ?: Exception("Falha ao salvar assinatura do cliente")
                 }
 
-                // Complete the order (ambas as partes assinaram)
-                val orderManager = FirebaseOrderManager()
-                val providerCompletionResult = orderManager.confirmCompletion(orderId!!, "provider")
-                if (providerCompletionResult.isFailure) {
-                    throw providerCompletionResult.exceptionOrNull()
-                        ?: Exception("Falha ao confirmar conclusão do prestador")
-                }
-                val clientCompletionResult = orderManager.confirmCompletion(orderId!!, "client")
-                if (clientCompletionResult.isFailure) {
-                    throw clientCompletionResult.exceptionOrNull()
-                        ?: Exception("Falha ao confirmar conclusão do cliente")
-                }
-
+                // A OS apenas DOCUMENTA o serviço (checklist + fotos + assinaturas).
+                // O encerramento do pedido é feito pelo prestador na tela de detalhes,
+                // informando o código de verificação do cliente ("Finalizar com código").
                 showSuccessAndFinish()
             } catch (e: Exception) {
                 Toast.makeText(this@DigitalSignatureActivity, "Erro: ${e.message}", Toast.LENGTH_LONG).show()
@@ -225,8 +215,8 @@ class DigitalSignatureActivity : AppCompatActivity() {
 
     private fun showSuccessAndFinish() {
         AlertDialog.Builder(this)
-            .setTitle("✅ Serviço Concluído")
-            .setMessage("O checklist, fotos e assinaturas foram salvos com sucesso!")
+            .setTitle("✅ OS Registrada")
+            .setMessage("Checklist, fotos e assinaturas salvos com sucesso!\n\nPara CONCLUIR o pedido, toque em \"Finalizar com código\" e informe o código de verificação do cliente.")
             .setPositiveButton("OK") { _, _ ->
                 val intent = Intent(this@DigitalSignatureActivity, ProviderHomeActivity::class.java)
                 intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
