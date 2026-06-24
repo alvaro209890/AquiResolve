@@ -253,8 +253,8 @@ class ClientHomeActivity : AppCompatActivity() {
         }
 
         binding.cardAssistant.setOnClickListener {
-            // Assistente IA (plano 06): descreve o problema → IA sugere o nicho.
-            startActivity(Intent(this, AssistantActivity::class.java))
+            // Assistente IA (plano 06 v2): chat multi-turno com streaming.
+            startActivity(Intent(this, AssistantChatActivity::class.java))
         }
 
         binding.bottomNavigation.setOnItemSelectedListener { menuItem ->
@@ -639,9 +639,9 @@ class ClientHomeActivity : AppCompatActivity() {
             // Gancho do plano 06: sem resultado textual → leva ao Assistente IA com a busca já
             // preenchida (que por sua vez tem fallback "ver todos os serviços").
             startActivity(
-                Intent(this, AssistantActivity::class.java).apply {
+                Intent(this, AssistantChatActivity::class.java).apply {
                     if (lastSearchQuery.isNotBlank()) {
-                        putExtra(AssistantActivity.EXTRA_PREFILL, lastSearchQuery)
+                        putExtra(AssistantChatActivity.EXTRA_PREFILL, lastSearchQuery)
                     }
                 }
             )
