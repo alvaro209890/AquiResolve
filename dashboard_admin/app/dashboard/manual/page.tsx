@@ -13,7 +13,7 @@ export default function ManualPage() {
     <div className="space-y-6 p-4 md:p-6 max-w-4xl">
       {/* Cabeçalho */}
       <div className="flex items-center gap-3">
-        <div className="rounded-lg bg-indigo-100 p-2 text-indigo-700">
+        <div className="rounded-lg bg-indigo-100 dark:bg-indigo-900/40 p-2 text-indigo-700 dark:text-indigo-300">
           <BookOpen className="h-6 w-6" />
         </div>
         <div>

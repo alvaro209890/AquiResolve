@@ -64,7 +64,7 @@ function renderContent(text: string) {
     if (numbered) {
       elements.push(
         <div key={i} className="flex gap-2 text-sm leading-relaxed">
-          <span className="shrink-0 font-semibold text-indigo-700">{numbered[1]}.</span>
+          <span className="shrink-0 font-semibold text-indigo-700 dark:text-indigo-300">{numbered[1]}.</span>
           <span>{applyInline(numbered[2])}</span>
         </div>
       )
@@ -76,7 +76,7 @@ function renderContent(text: string) {
     if (bullet) {
       elements.push(
         <div key={i} className="flex gap-2 text-sm leading-relaxed">
-          <span className="shrink-0 text-indigo-500">•</span>
+          <span className="shrink-0 text-indigo-500 dark:text-indigo-400">•</span>
           <span>{applyInline(bullet[1])}</span>
         </div>
       )
@@ -113,7 +113,7 @@ function applyInline(text: string): React.ReactNode {
     // Caminho de menu: "A → B → C" em destaque
     if (part.includes("→")) {
       return (
-        <span key={i} className="font-medium text-indigo-700 bg-indigo-50 px-1 rounded text-xs">
+        <span key={i} className="font-medium text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/40 px-1 rounded text-xs">
           {part}
         </span>
       )
@@ -205,11 +205,11 @@ export function AssistantChat() {
   const hasMessages = messages.length > 0
 
   return (
-    <Card className="border-indigo-200 bg-indigo-50/40">
+    <Card className="border-indigo-200 dark:border-indigo-800 bg-indigo-50/40 dark:bg-indigo-950/30">
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="rounded-md bg-indigo-100 p-1.5 text-indigo-700">
+            <span className="rounded-md bg-indigo-100 dark:bg-indigo-900/60 p-1.5 text-indigo-700 dark:text-indigo-300">
               <Bot className="h-5 w-5" />
             </span>
             <CardTitle className="text-lg">Copiloto do Painel</CardTitle>
@@ -225,7 +225,7 @@ export function AssistantChat() {
                 title={confirmClear ? "Clique novamente para confirmar" : "Limpar conversa"}
                 className={
                   confirmClear
-                    ? "text-red-600 hover:text-red-700 hover:bg-red-50"
+                    ? "text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/40"
                     : "text-muted-foreground hover:text-foreground"
                 }
               >
@@ -264,15 +264,15 @@ export function AssistantChat() {
         {hasMessages && (
           <div
             ref={listRef}
-            className="max-h-[420px] space-y-4 overflow-y-auto rounded-lg border bg-white p-3 scroll-smooth"
+            className="max-h-[420px] space-y-4 overflow-y-auto rounded-lg border bg-white dark:bg-card border-border p-3 scroll-smooth"
           >
             {messages.map((m, i) => (
               <div key={i} className="flex gap-3">
                 <div
                   className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
                     m.role === "user"
-                      ? "bg-muted text-foreground"
-                      : "bg-indigo-100 text-indigo-700"
+                      ? "bg-muted text-foreground dark:bg-muted dark:text-muted-foreground"
+                      : "bg-indigo-100 dark:bg-indigo-900/60 text-indigo-700 dark:text-indigo-300"
                   }`}
                 >
                   {m.role === "user" ? <User className="h-4 w-4" /> : <Bot className="h-4 w-4" />}
@@ -280,8 +280,8 @@ export function AssistantChat() {
                 <div
                   className={`flex-1 rounded-lg px-3 py-2 text-sm ${
                     m.role === "user"
-                      ? "bg-muted/60"
-                      : "bg-indigo-50/60 border border-indigo-100"
+                      ? "bg-muted/60 dark:bg-muted/40"
+                      : "bg-indigo-50/60 dark:bg-indigo-950/40 border border-indigo-100 dark:border-indigo-800/50"
                   }`}
                 >
                   {m.role === "assistant" ? renderContent(m.content) : (
@@ -308,7 +308,7 @@ export function AssistantChat() {
                 key={ex}
                 type="button"
                 onClick={() => ask(ex)}
-                className="rounded-full border border-indigo-200 bg-white px-3 py-1 text-xs text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-50"
+                className="rounded-full border border-indigo-200 dark:border-indigo-700 bg-white dark:bg-card px-3 py-1 text-xs text-indigo-700 dark:text-indigo-300 transition hover:bg-indigo-100 dark:hover:bg-indigo-900/40 disabled:opacity-50"
               >
                 {ex}
               </button>
@@ -330,7 +330,7 @@ export function AssistantChat() {
             placeholder="Pergunte como fazer algo no painel… (Enter envia, Shift+Enter quebra linha)"
             rows={2}
             disabled={loading}
-            className="resize-none bg-white"
+            className="resize-none bg-white dark:bg-input/30"
           />
           <Button
             type="button"
