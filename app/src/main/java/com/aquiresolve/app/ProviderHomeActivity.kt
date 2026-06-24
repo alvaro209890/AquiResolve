@@ -234,13 +234,16 @@ class ProviderHomeActivity : AppCompatActivity() {
                         ?: 0.0
 
                     // Contar pedidos ativos (assigned ou in_progress)
+                    // SEM whereIn no Firestore para evitar FAILED_PRECONDITION (índice composto)
                     val activeOrdersSnap = db.collection("orders")
                         .whereEqualTo("assignedProvider", currentUser.uid)
-                        .whereIn("status", listOf(OrderData.STATUS_ASSIGNED, OrderData.STATUS_IN_PROGRESS))
                         .get()
                         .await()
 
-                    val activeOrders = activeOrdersSnap.size()
+                    val activeOrders = activeOrdersSnap.documents.count { doc ->
+                        val status = doc.getString("status") ?: ""
+                        status == OrderData.STATUS_ASSIGNED || status == OrderData.STATUS_IN_PROGRESS
+                    }
 
                     // Carregar nota media
                     val rating = providerDoc.getDouble("rating") ?: 0.0
