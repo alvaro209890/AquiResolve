@@ -92,30 +92,30 @@ export function ConversationsList({
   const getPriorityColor = (priority: LegacyChatConversation["priority"]) => {
     switch (priority) {
       case "urgent":
-        return "bg-red-100 text-red-800"
+        return "bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-300"
       case "high":
-        return "bg-orange-100 text-orange-800"
+        return "bg-orange-100 dark:bg-orange-950/60 text-orange-800 dark:text-orange-300"
       case "medium":
-        return "bg-yellow-100 text-yellow-800"
+        return "bg-yellow-100 dark:bg-yellow-950/60 text-yellow-800 dark:text-yellow-300"
       case "low":
-        return "bg-green-100 text-green-800"
+        return "bg-green-100 dark:bg-green-950/60 text-green-800 dark:text-green-300"
       default:
-        return "bg-muted text-muted-foreground"
+        return "bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground"
     }
   }
 
   const getStatusColor = (status: LegacyChatConversation["status"]) => {
     switch (status) {
       case "active":
-        return "bg-emerald-100 text-emerald-800"
+        return "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300"
       case "closed":
-        return "bg-muted text-muted-foreground"
+        return "bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground"
       case "archived":
-        return "bg-blue-100 text-blue-800"
+        return "bg-blue-100 dark:bg-blue-950/60 text-blue-800 dark:text-blue-300"
       case "blocked":
-        return "bg-red-100 text-red-800"
+        return "bg-red-100 dark:bg-red-950/60 text-red-800 dark:text-red-300"
       default:
-        return "bg-muted text-muted-foreground"
+        return "bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground"
     }
   }
 

@@ -136,10 +136,10 @@ export function ChatOperationsDashboard() {
 
   return (
     <div className="space-y-6">
-      <Card className="overflow-hidden border-border/60 bg-[radial-gradient(circle_at_top_left,_rgba(249,115,22,0.14),_transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.98),rgba(255,247,237,0.95))]">
+      <Card className="overflow-hidden border-border/60 bg-[radial-gradient(circle_at_top_left,_rgba(249,115,22,0.14),_transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.98),rgba(255,247,237,0.95))] dark:bg-[radial-gradient(circle_at_top_left,_rgba(251,146,60,0.08),_transparent_28%),linear-gradient(135deg,rgba(24,26,30,0.98),rgba(31,18,8,0.95))]">
         <CardContent className="flex flex-col gap-6 p-5 sm:p-6 xl:flex-row xl:items-end xl:justify-between">
           <div className="space-y-4">
-            <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 bg-white/80 px-3 py-1 text-xs font-medium text-orange-800 shadow-sm">
+            <div className="inline-flex items-center gap-2 rounded-full border border-orange-200 dark:border-orange-800 bg-white/80 dark:bg-card/70 px-3 py-1 text-xs font-medium text-orange-800 dark:text-orange-300 shadow-sm">
               <Sparkles className="h-3.5 w-3.5" />
               Operação em tempo real
             </div>
@@ -150,31 +150,31 @@ export function ChatOperationsDashboard() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Badge variant="outline" className="bg-white/70">Fila operacional</Badge>
-              <Badge variant="outline" className="bg-white/70">{pendingUnread} não lidas</Badge>
-              <Badge variant="outline" className="bg-white/70">{openCount} alertas abertos</Badge>
+              <Badge variant="outline" className="bg-card/70 dark:bg-card/70">Fila operacional</Badge>
+              <Badge variant="outline" className="bg-card/70 dark:bg-card/70">{pendingUnread} não lidas</Badge>
+              <Badge variant="outline" className="bg-card/70 dark:bg-card/70">{openCount} alertas abertos</Badge>
             </div>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2 xl:min-w-[420px]">
-            <div className="rounded-2xl border border-red-200 bg-red-50/80 p-4 shadow-sm">
+            <div className="rounded-2xl border border-red-200 dark:border-red-900/60 bg-red-50/80 dark:bg-red-950/30 p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-red-700">Prioridade máxima</p>
-                  <p className="mt-2 text-3xl font-bold text-red-600">{urgentActive}</p>
-                  <p className="mt-1 text-sm text-red-700">conversas urgentes em andamento</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-red-700 dark:text-red-400">Prioridade máxima</p>
+                  <p className="mt-2 text-3xl font-bold text-red-600 dark:text-red-400">{urgentActive}</p>
+                  <p className="mt-1 text-sm text-red-700 dark:text-red-400/70">conversas urgentes em andamento</p>
                 </div>
-                <Siren className="h-5 w-5 text-red-500" />
+                <Siren className="h-5 w-5 text-red-500 dark:text-red-400" />
               </div>
             </div>
-            <div className="rounded-2xl border border-blue-200 bg-blue-50/80 p-4 shadow-sm">
+            <div className="rounded-2xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/80 dark:bg-blue-950/30 p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-xs font-medium uppercase tracking-wide text-blue-700">Equipe</p>
-                  <p className="mt-2 text-3xl font-bold text-blue-600">{stats?.activeConversations ?? "—"}</p>
-                  <p className="mt-1 text-sm text-blue-700">threads ativos monitorados</p>
+                  <p className="text-xs font-medium uppercase tracking-wide text-blue-700 dark:text-blue-400">Equipe</p>
+                  <p className="mt-2 text-3xl font-bold text-blue-600 dark:text-blue-400">{stats?.activeConversations ?? "—"}</p>
+                  <p className="mt-1 text-sm text-blue-700 dark:text-blue-400/70">threads ativos monitorados</p>
                 </div>
-                <Headphones className="h-5 w-5 text-blue-500" />
+                <Headphones className="h-5 w-5 text-blue-500 dark:text-blue-400" />
               </div>
             </div>
           </div>
@@ -248,7 +248,7 @@ export function ChatOperationsDashboard() {
               Críticos abertos
             </CardTitle>
           </CardHeader>
-          <CardContent className="text-2xl font-bold text-red-700">{alertsLoading ? "…" : criticalOpen}</CardContent>
+          <CardContent className="text-2xl font-bold text-red-700 dark:text-red-400">{alertsLoading ? "…" : criticalOpen}</CardContent>
         </Card>
       </div>
 

@@ -298,7 +298,7 @@ export function ChatMessages({ conversation }: ChatMessagesProps) {
           <div className="min-w-0">
             <CardTitle className="text-lg text-foreground">{conversation.clientName}</CardTitle>
             <div className="mt-1 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-              <div className="flex items-center font-medium text-amber-900">
+              <div className="flex items-center font-medium text-amber-900 dark:text-amber-300">
                 <Phone className="mr-1 h-3 w-3" />
                 {conversation.clientPhone || "Sem telefone — cadastre para contato proativo"}
               </div>
@@ -312,10 +312,10 @@ export function ChatMessages({ conversation }: ChatMessagesProps) {
             </div>
             {conversation.providerName ? (
               <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                <UserCheck className="h-3 w-3 text-emerald-600" />
+                <UserCheck className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
                 <span className="font-medium text-foreground">{conversation.providerName}</span>
                 {conversation.providerPhone ? (
-                  <span className="flex items-center gap-1 font-medium text-amber-900">
+                  <span className="flex items-center gap-1 font-medium text-amber-900 dark:text-amber-300">
                     <Phone className="h-3 w-3" />
                     {conversation.providerPhone}
                   </span>

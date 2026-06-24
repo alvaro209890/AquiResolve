@@ -77,47 +77,47 @@ export function AdminActionsPanel({ conversation, onUpdate }: AdminActionsPanelP
   const getStatusColor = (status: LegacyChatConversation["status"]) => {
     switch (status) {
       case "active":
-        return "bg-green-100 text-green-800 border-green-200"
+        return "bg-green-100 dark:bg-green-950/50 text-green-800 dark:text-green-300 border-green-200 dark:border-green-900/50"
       case "closed":
-        return "bg-muted text-muted-foreground border-border"
+        return "bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground border-border dark:border-border"
       case "archived":
-        return "bg-blue-100 text-blue-800 border-blue-200"
+        return "bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 border-blue-200 dark:border-blue-900/50"
       case "blocked":
-        return "bg-red-100 text-red-800 border-red-200"
+        return "bg-red-100 dark:bg-red-950/50 text-red-800 dark:text-red-300 border-red-200 dark:border-red-900/50"
       default:
-        return "bg-muted text-muted-foreground border-border"
+        return "bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground border-border dark:border-border"
     }
   }
 
   const getPriorityColor = (value: LegacyChatConversation["priority"]) => {
     switch (value) {
       case "low":
-        return "bg-muted text-muted-foreground border-border"
+        return "bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground border-border dark:border-border"
       case "medium":
-        return "bg-yellow-100 text-yellow-800 border-yellow-200"
+        return "bg-yellow-100 dark:bg-yellow-950/50 text-yellow-800 dark:text-yellow-300 border-yellow-200 dark:border-yellow-900/50"
       case "high":
-        return "bg-orange-100 text-orange-800 border-orange-200"
+        return "bg-orange-100 dark:bg-orange-950/50 text-orange-800 dark:text-orange-300 border-orange-200 dark:border-orange-900/50"
       case "urgent":
-        return "bg-red-100 text-red-800 border-red-200"
+        return "bg-red-100 dark:bg-red-950/50 text-red-800 dark:text-red-300 border-red-200 dark:border-red-900/50"
       default:
-        return "bg-muted text-muted-foreground border-border"
+        return "bg-muted dark:bg-muted text-muted-foreground dark:text-muted-foreground border-border dark:border-border"
     }
   }
 
   return (
-    <Card className="h-full overflow-hidden border-border/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(249,250,251,0.96))] shadow-sm">
-      <CardHeader className="border-b bg-muted/20">
+    <Card className="h-full overflow-hidden border-border/70 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(249,250,251,0.96))] dark:bg-[linear-gradient(180deg,rgba(24,26,30,0.98),rgba(18,20,24,0.96))] shadow-sm">
+      <CardHeader className="border-b bg-muted/20 dark:bg-muted/10">
         <CardTitle className="flex items-center justify-between gap-3 text-foreground">
           <span className="flex items-center">
-            <Shield className="mr-2 h-5 w-5 text-orange-500" />
+            <Shield className="mr-2 h-5 w-5 text-orange-500 dark:text-orange-400" />
             Monitoramento administrativo
           </span>
-          <Sparkles className="h-4 w-4 text-orange-400" />
+          <Sparkles className="h-4 w-4 text-orange-400 dark:text-orange-500" />
         </CardTitle>
       </CardHeader>
 
       <CardContent className="space-y-5 pt-5">
-        <div className="rounded-xl border bg-muted/40 p-4">
+        <div className="rounded-xl border bg-muted/40 dark:bg-muted/20 p-4">
           <h4 className="mb-3 text-sm font-semibold text-foreground">Estado atual</h4>
           <div className="flex flex-wrap gap-2">
             <Badge className={getStatusColor(conversation.status)}>{conversation.status}</Badge>
@@ -178,7 +178,7 @@ export function AdminActionsPanel({ conversation, onUpdate }: AdminActionsPanelP
         <div className="space-y-2">
           <h4 className="text-sm font-semibold text-foreground">Notas internas</h4>
           {conversation.notes ? (
-            <div className="max-h-32 overflow-y-auto rounded-xl border bg-muted/40 p-3 text-sm whitespace-pre-wrap">
+            <div className="max-h-32 overflow-y-auto rounded-xl border bg-muted/40 dark:bg-muted/20 p-3 text-sm whitespace-pre-wrap">
               {conversation.notes}
             </div>
           ) : (
@@ -192,12 +192,12 @@ export function AdminActionsPanel({ conversation, onUpdate }: AdminActionsPanelP
         </div>
 
         {conversation.priority === "urgent" ? (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+          <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/25 p-3">
             <div className="flex items-center gap-2">
-              <AlertTriangle className="h-5 w-5 text-red-500" />
-              <span className="font-medium text-red-800">Conversa urgente</span>
+              <AlertTriangle className="h-5 w-5 text-red-500 dark:text-red-400" />
+              <span className="font-medium text-red-800 dark:text-red-300">Conversa urgente</span>
             </div>
-            <p className="mt-1 text-sm text-red-700">Este atendimento esta marcado com prioridade maxima.</p>
+            <p className="mt-1 text-sm text-red-700 dark:text-red-400/70">Este atendimento esta marcado com prioridade maxima.</p>
           </div>
         ) : null}
       </CardContent>

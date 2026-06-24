@@ -75,7 +75,7 @@ export function ChatStatsCards() {
             <CardTitle className="text-sm font-medium text-muted-foreground">
               {title}
             </CardTitle>
-            <div className="rounded-full border bg-white/80 p-2">
+            <div className="rounded-full border bg-white/80 dark:bg-card/60 p-2">
               <Icon className={`h-4 w-4 ${iconClass}`} />
             </div>
           </CardHeader>
