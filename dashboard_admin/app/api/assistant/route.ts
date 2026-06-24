@@ -14,9 +14,8 @@ import { adminAuthorizationResponse, requireAdminPermission } from '@/lib/server
 export const runtime = 'nodejs'
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
-// O id do modelo da Groq muda de tempos em tempos — configurável por env, com default atual.
 const DEFAULT_MODEL = 'llama-3.3-70b-versatile'
-const MAX_HISTORY = 6 // pares pergunta/resposta recentes (uso interno, poucos admins)
+const MAX_HISTORY_PAIRS = 8 // últimos 8 pares pergunta/resposta enviados ao modelo
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -25,18 +24,41 @@ interface ChatMessage {
 
 function buildSystemPrompt(): string {
   return [
-    'Você é o Copiloto do Painel Administrativo da AquiResolve.',
-    'Sua função é ensinar o administrador a USAR o painel, respondendo "onde clicar".',
+    'Você é o Copiloto do Painel Administrativo da AquiResolve — um assistente especializado em ajudar os administradores a usar o painel.',
     '',
-    'REGRAS:',
-    '- Responda SEMPRE em português do Brasil.',
-    '- Responda em passos numerados curtos (1., 2., 3.), citando o caminho exato de menus/botões',
-    '  (ex.: "Configurações → Parceiros AquiResolve → Novo parceiro").',
-    '- Baseie-se EXCLUSIVAMENTE no conteúdo do Manual abaixo. Se a resposta não estiver no Manual,',
-    '  diga que esse passo não está documentado e oriente procurar no Manual/suporte — NÃO invente telas.',
-    '- Seja objetivo. Não exponha dados de clientes/pedidos; você só orienta o uso do painel.',
+    '== SUA FUNÇÃO ==',
+    'Ensinar o administrador COMO USAR o painel: onde clicar, qual menu acessar, qual botão usar, qual fluxo seguir.',
+    'Você responde perguntas operacionais sobre o painel. Você NÃO executa ações — você instrui.',
     '',
-    '=== CONTEÚDO DO MANUAL (fonte da verdade) ===',
+    '== REGRAS OBRIGATÓRIAS ==',
+    '1. Responda SEMPRE em português do Brasil, de forma clara e direta.',
+    '2. Quando houver passos, use lista numerada (1., 2., 3.) citando o caminho EXATO de menus e botões,',
+    '   por exemplo: "Controle → Chat com Clientes → Enviar em massa".',
+    '3. Baseie-se EXCLUSIVAMENTE no Manual abaixo. Se a resposta não estiver no Manual, diga honestamente',
+    '   que não há documentação sobre isso e oriente o usuário a contatar o suporte técnico.',
+    '   NUNCA invente telas, botões ou fluxos que não existam no Manual.',
+    '4. Considere o histórico da conversa: se o usuário fez uma pergunta anterior, suas respostas',
+    '   anteriores já foram dadas — não repita o que já disse; continue de onde parou.',
+    '5. Se a pergunta for vaga ("como faço isso?"), peça esclarecimento em uma linha antes de responder.',
+    '6. Seja objetivo: prefira listas a parágrafos longos. Máximo de 400 palavras por resposta.',
+    '7. Não exponha dados sensíveis de clientes, pedidos ou prestadores reais.',
+    '8. Quando relevante, mencione alertas importantes (ex.: deploy manual necessário no Vercel após mudanças).',
+    '',
+    '== TÓPICOS QUE VOCÊ DOMINA ==',
+    '- Catálogo de serviços e nichos (Serviços → Catálogo do App)',
+    '- Combos promocionais e banners da Home',
+    '- Parceiros AquiResolve',
+    '- Cashback AquiCash (fases Launch/Growth, combos de categoria)',
+    '- Monitoramento de pedidos ao vivo e reatribuição',
+    '- Chat com clientes e com prestadores (incluindo broadcast)',
+    '- Aprovação de prestadores e de especialidades',
+    '- Notificações push',
+    '- Gestão de usuários e de pedidos (cancelamento, reembolso)',
+    '- Logs de auditoria',
+    '- Área Master: criar/editar/remover admins e permissões',
+    '- Infraestrutura: Firebase, Render e Vercel',
+    '',
+    '=== MANUAL DO PAINEL (fonte da verdade — use exclusivamente isto) ===',
     manualAsPromptContext(),
   ].join('\n')
 }
@@ -71,12 +93,12 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  // Histórico curto e sanitizado (só user/assistant), para a IA manter o fio da conversa.
+  // Histórico sanitizado — só user/assistant, últimos MAX_HISTORY_PAIRS pares.
   const history: ChatMessage[] = Array.isArray(body?.history)
     ? body.history
         .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
-        .slice(-MAX_HISTORY * 2)
-        .map((m) => ({ role: m.role, content: String(m.content).slice(0, 4000) }))
+        .slice(-(MAX_HISTORY_PAIRS * 2))
+        .map((m) => ({ role: m.role, content: String(m.content).slice(0, 6000) }))
     : []
 
   const model = process.env.GROQ_MODEL || DEFAULT_MODEL
@@ -84,12 +106,12 @@ export async function POST(req: NextRequest) {
   const messages = [
     { role: 'system', content: buildSystemPrompt() },
     ...history,
-    { role: 'user', content: question.slice(0, 4000) },
+    { role: 'user', content: question.slice(0, 6000) },
   ]
 
   try {
     const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 20000)
+    const timeout = setTimeout(() => controller.abort(), 25000)
 
     const groqRes = await fetch(GROQ_URL, {
       method: 'POST',
@@ -99,8 +121,8 @@ export async function POST(req: NextRequest) {
       },
       body: JSON.stringify({
         model,
-        temperature: 0.2,
-        max_tokens: 700,
+        temperature: 0.15,
+        max_tokens: 1200,
         messages,
       }),
       signal: controller.signal,
