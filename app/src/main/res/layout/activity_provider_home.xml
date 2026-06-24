@@ -139,7 +139,7 @@
                 android:visibility="gone"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="0dp"
-                app:cardBackgroundColor="#FFF8E1"
+                app:cardBackgroundColor="@color/surface_warning"
                 app:strokeWidth="1dp"
                 app:strokeColor="#FFC107">
 
@@ -418,7 +418,7 @@
                             android:layout_marginTop="12dp"
                             app:cardCornerRadius="8dp"
                             app:cardElevation="0dp"
-                            app:cardBackgroundColor="#F0F8FF"
+                            app:cardBackgroundColor="@color/surface_info"
                             app:strokeWidth="1dp"
                             app:strokeColor="@color/primary_color">
 

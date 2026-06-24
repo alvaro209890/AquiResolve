@@ -63,6 +63,16 @@
     <color name="surface_color">#FFFFFF</color>
     <!-- Fundo de cards (usado nos layouts do Chat Central); restaurado por estar ausente -->
     <color name="card_background">#FFFFFF</color>
+
+    <!-- Superfícies tonalizadas para cards de status/info (theme-aware).
+         No claro são pastéis; têm variante escura em values-night/colors.xml para
+         não virarem manchas brilhantes no modo escuro. -->
+    <color name="surface_success">#E8F5E9</color>
+    <color name="surface_warning">#FFF8E1</color>
+    <color name="surface_info">#F0F8FF</color>
+    <color name="surface_highlight">#FFF3E6</color>
+    <!-- Texto âmbar sobre surface_warning (escurece no claro, clareia no escuro) -->
+    <color name="warning_text">#E65100</color>
     
     <!-- Divider and Border -->
     <color name="divider_color">#E2E8F0</color>

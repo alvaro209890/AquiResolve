@@ -548,7 +548,7 @@
                         android:layout_marginTop="16dp"
                         app:cardCornerRadius="8dp"
                         app:cardElevation="2dp"
-                        app:cardBackgroundColor="#B3FFFFFF">
+                        app:cardBackgroundColor="@color/surface_highlight">
 
                         <TextView
                             android:layout_width="match_parent"
@@ -628,7 +628,7 @@
                         android:layout_marginTop="8dp"
                         app:cardCornerRadius="8dp"
                         app:cardElevation="0dp"
-                        app:cardBackgroundColor="#E8F5E9"
+                        app:cardBackgroundColor="@color/surface_success"
                         app:strokeWidth="1dp"
                         app:strokeColor="@color/success_color"
                         android:visibility="gone">

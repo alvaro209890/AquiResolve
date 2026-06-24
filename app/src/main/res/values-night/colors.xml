@@ -46,4 +46,14 @@
     <color name="light_gray">#1C212B</color>
     <color name="light_blue">#16243A</color>
 
+    <!-- ===== Superfícies tonalizadas de status/info — versão escura =====
+         Base escura com leve matiz da cor de status, para que o texto claro
+         (@color/text_primary) e as cores de status (success/primary) fiquem legíveis. -->
+    <color name="surface_success">#16271C</color>
+    <color name="surface_warning">#2A2510</color>
+    <color name="surface_info">#16243A</color>
+    <color name="surface_highlight">#2A2417</color>
+    <!-- Âmbar mais claro para contrastar sobre surface_warning escuro -->
+    <color name="warning_text">#FFB74D</color>
+
 </resources>

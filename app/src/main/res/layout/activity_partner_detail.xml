@@ -96,9 +96,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
-                android:background="#FFF8E1"
+                android:background="@color/surface_warning"
                 android:padding="12dp"
-                android:textColor="#E65100"
+                android:textColor="@color/warning_text"
                 android:textSize="13sp"
                 android:lineSpacingExtra="2dp"
                 android:visibility="gone" />
