@@ -86,6 +86,23 @@
                 android:lineSpacingExtra="3dp"
                 tools:text="Materiais de construção e reforma com desconto para clientes AquiResolve." />
 
+            <!--
+              Aviso exibido apenas quando o benefício é discount ou cashback. Esses tipos são
+              concedidos pelo parceiro, não pelo app — sem este aviso o usuário pode achar que
+              recebe o benefício automaticamente ao contratar via AquiResolve.
+            -->
+            <TextView
+                android:id="@+id/tvBenefitExplanation"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="#FFF8E1"
+                android:padding="12dp"
+                android:textColor="#E65100"
+                android:textSize="13sp"
+                android:lineSpacingExtra="2dp"
+                android:visibility="gone" />
+
             <!-- Cupom (pill + copiar) -->
             <LinearLayout
                 android:id="@+id/sectionCoupon"

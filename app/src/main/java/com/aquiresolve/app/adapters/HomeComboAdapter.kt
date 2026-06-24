@@ -7,8 +7,11 @@ import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import com.aquiresolve.app.CatalogServiceRepository
 import com.aquiresolve.app.R
 import com.aquiresolve.app.models.HomeCombo
+import com.aquiresolve.app.models.HomeComboItem
+import com.aquiresolve.app.models.ServicePricing
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.google.android.material.card.MaterialCardView
@@ -19,7 +22,11 @@ import java.util.Locale
  *
  * Cada card mostra foto (Glide, com fallback na cor primária), nome, descrição, preço cheio
  * riscado, preço promocional em destaque e o badge de economia. O clique dispara [onComboClick]
- * para abrir o detalhe do combo. Preços aqui são exibição — a cobrança real vem do carrinho/backend.
+ * para abrir o detalhe do combo.
+ *
+ * Preços são calculados ao vivo do [CatalogServiceRepository] (já em cache pelo AppApplication),
+ * nunca dos campos estáticos fullPrice/promoPrice/savings do combo — esses podem estar
+ * desatualizados se o admin tiver alterado preços no catálogo após criar o combo.
  */
 class HomeComboAdapter(
     private var combos: List<HomeCombo>,
@@ -56,25 +63,31 @@ class HomeComboAdapter(
             holder.description.visibility = View.GONE
         }
 
-        // Preço cheio riscado (só quando há economia real a mostrar).
-        if (combo.fullPrice > 0 && combo.fullPrice > combo.promoPrice) {
-            holder.fullPrice.text = formatMoney(combo.fullPrice)
+        // Preços calculados ao vivo do catálogo em cache — nunca dos campos estáticos do combo.
+        val liveFullPrice = combo.items.sumOf { resolveItemPrice(it) }
+        val livePromoPrice = if (combo.discountPercent > 0)
+            Math.round(liveFullPrice * (1.0 - combo.discountPercent / 100.0) * 100) / 100.0
+        else liveFullPrice
+        val liveSavings = Math.round((liveFullPrice - livePromoPrice) * 100) / 100.0
+
+        if (liveFullPrice > 0 && liveFullPrice > livePromoPrice) {
+            holder.fullPrice.text = formatMoney(liveFullPrice)
             holder.fullPrice.paintFlags = holder.fullPrice.paintFlags or Paint.STRIKE_THRU_TEXT_FLAG
             holder.fullPrice.visibility = View.VISIBLE
         } else {
             holder.fullPrice.visibility = View.GONE
         }
 
-        val promo = if (combo.promoPrice > 0) combo.promoPrice else combo.fullPrice
-        if (promo > 0) {
-            holder.promoPrice.text = formatMoney(promo)
+        val displayPromo = if (livePromoPrice > 0) livePromoPrice else liveFullPrice
+        if (displayPromo > 0) {
+            holder.promoPrice.text = formatMoney(displayPromo)
             holder.promoPrice.visibility = View.VISIBLE
         } else {
             holder.promoPrice.visibility = View.GONE
         }
 
-        if (combo.savings > 0) {
-            holder.savings.text = "Economize ${formatMoney(combo.savings)}"
+        if (liveSavings > 0) {
+            holder.savings.text = "Economize ${formatMoney(liveSavings)}"
             holder.savings.visibility = View.VISIBLE
         } else {
             holder.savings.visibility = View.GONE
@@ -98,6 +111,14 @@ class HomeComboAdapter(
     fun updateItems(newItems: List<HomeCombo>) {
         combos = newItems
         notifyDataSetChanged()
+    }
+
+    /** Resolve o preço do item pelo catálogo dinâmico em cache; fallback na tabela estática. */
+    private fun resolveItemPrice(item: HomeComboItem): Double {
+        val fromCatalog = CatalogServiceRepository.findService(item.niche, item.serviceName)?.estimatedPrice
+        if (fromCatalog != null && fromCatalog > 0) return fromCatalog
+        return ServicePricing.getPrice(item.niche, item.serviceName)
+            ?: ServicePricing.getDefaultPrice(item.niche)
     }
 
     private fun formatMoney(value: Double): String =

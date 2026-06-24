@@ -81,6 +81,15 @@ class PartnerDetailActivity : AppCompatActivity() {
             binding.tvPartnerDescription.visibility = View.GONE
         }
 
+        // Aviso para benefícios concedidos pelo parceiro (não pelo app).
+        val explanation = partnerSideBenefitExplanation(partner.benefitType)
+        if (explanation != null) {
+            binding.tvBenefitExplanation.text = explanation
+            binding.tvBenefitExplanation.visibility = View.VISIBLE
+        } else {
+            binding.tvBenefitExplanation.visibility = View.GONE
+        }
+
         // Cupom copiável.
         if (partner.hasCoupon()) {
             binding.sectionCoupon.visibility = View.VISIBLE
@@ -121,6 +130,19 @@ class PartnerDetailActivity : AppCompatActivity() {
         } catch (_: Exception) {
             Toast.makeText(this, "Não foi possível abrir o site", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    /**
+     * Retorna o texto explicativo para benefícios concedidos pelo parceiro (discount/cashback),
+     * que não têm suporte mecânico no app — apenas informativo/vitrine.
+     * Retorna null para cupom e link (esses têm ação concreta: copiar/abrir site).
+     */
+    private fun partnerSideBenefitExplanation(benefitType: String): String? = when {
+        benefitType.equals(Partner.TYPE_DISCOUNT, ignoreCase = true) ->
+            "ℹ️  Este desconto é concedido diretamente pelo parceiro. Para aproveitá-lo, apresente-se como cliente AquiResolve ao contratar o serviço ou acesse o site do parceiro."
+        benefitType.equals(Partner.TYPE_CASHBACK, ignoreCase = true) ->
+            "ℹ️  Este cashback é concedido diretamente pelo parceiro. Para aproveitá-lo, apresente-se como cliente AquiResolve ao contratar o serviço ou acesse o site do parceiro."
+        else -> null
     }
 
     private fun logEvent(name: String, partner: Partner) {

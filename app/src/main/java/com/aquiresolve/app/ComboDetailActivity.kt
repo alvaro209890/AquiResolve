@@ -125,14 +125,12 @@ class ComboDetailActivity : AppCompatActivity() {
      * preços resolvidos e do `discountPercent` (mantendo coerência com o que o carrinho aplicará).
      */
     private fun renderSummary(combo: HomeCombo, rows: List<ComboServiceItemAdapter.Row>) {
-        val sumItems = rows.sumOf { it.price }
-        val full = if (combo.fullPrice > 0) combo.fullPrice else sumItems
-        val promo = when {
-            combo.promoPrice > 0 -> combo.promoPrice
-            combo.discountPercent > 0 -> round2(full * (1.0 - combo.discountPercent / 100.0))
-            else -> full
-        }
-        val savings = if (combo.savings > 0) combo.savings else round2(full - promo)
+        // Preços sempre calculados ao vivo do catálogo — os campos armazenados no combo
+        // (fullPrice/promoPrice/savings) podem divergir se o admin alterar preços no catálogo
+        // após a criação do combo, gerando expectativa diferente do valor realmente cobrado.
+        val full = rows.sumOf { it.price }
+        val promo = if (combo.discountPercent > 0) round2(full * (1.0 - combo.discountPercent / 100.0)) else full
+        val savings = round2(full - promo)
 
         binding.tvSummaryFull.text = money(full)
         binding.tvSummaryPromo.text = money(promo)
