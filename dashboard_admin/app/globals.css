@@ -25,7 +25,7 @@ body {
   --popover: #ffffff;
   --popover-foreground: #111827;
 
-  /* Brand — Orange */
+  /* Brand — Laranja */
   --primary: #f97316;
   --primary-hover: #ea580c;
   --primary-light: #fff7ed;
@@ -84,50 +84,50 @@ body {
 }
 
 .dark {
-  --background: #0c0e10;
-  --surface: #111315;
-  --foreground: #f9fafb;
-  --card: #1a1d20;
-  --card-foreground: #f9fafb;
-  --popover: #1a1d20;
-  --popover-foreground: #f9fafb;
+  --background: #0a0b0d;
+  --surface: #121418;
+  --foreground: #e5e7eb;
+  --card: #181a1e;
+  --card-foreground: #e5e7eb;
+  --popover: #1e2025;
+  --popover-foreground: #e5e7eb;
   --primary: #fb923c;
   --primary-hover: #f97316;
   --primary-light: #1f1208;
   --primary-foreground: #ffffff;
   --secondary: #1f2226;
-  --secondary-foreground: #e5e7eb;
-  --muted: #1f2226;
-  --muted-foreground: #6b7280;
+  --secondary-foreground: #d1d5db;
+  --muted: #1a1d21;
+  --muted-foreground: #9ca3af;
   --accent: #1f1208;
   --accent-foreground: #fb923c;
-  --destructive: #dc2626;
+  --destructive: #ef4444;
   --destructive-foreground: #f9fafb;
-  --success: #10b981;
+  --success: #34d399;
   --success-bg: #0a1f15;
   --success-foreground: #6ee7b7;
-  --warning: #f59e0b;
+  --warning: #fbbf24;
   --warning-bg: #1a1203;
-  --warning-foreground: #fcd34d;
+  --warning-foreground: #fde68a;
   --info: #60a5fa;
   --info-bg: #0c1525;
   --info-foreground: #93c5fd;
-  --border: #2a2d32;
-  --border-strong: #383c42;
-  --input: #2a2d32;
+  --border: #2a2d33;
+  --border-strong: #383c44;
+  --input: #2a2d33;
   --ring: #fb923c;
   --chart-1: #fb923c;
   --chart-2: #fbbf24;
   --chart-3: #34d399;
   --chart-4: #60a5fa;
   --chart-5: #a78bfa;
-  --sidebar-bg: #111315;
-  --sidebar-foreground: #e5e7eb;
+  --sidebar-bg: #0e1013;
+  --sidebar-foreground: #d1d5db;
   --sidebar-primary: #fb923c;
   --sidebar-primary-foreground: #ffffff;
   --sidebar-accent: #1f1208;
   --sidebar-accent-foreground: #fb923c;
-  --sidebar-border: #2a2d32;
+  --sidebar-border: #2a2d33;
   --sidebar-ring: #fb923c;
 }
 
@@ -225,7 +225,7 @@ a {
   -webkit-backdrop-filter: blur(12px);
 }
 .dark .glass {
-  background: rgb(26 29 32 / 0.85);
+  background: rgb(18 20 24 / 0.88);
 }
 
 .gradient-text {
@@ -240,7 +240,249 @@ a {
   background: var(--sidebar-bg);
 }
 
-/* ─── Print ─────────────────────────────────────────────────────── */
+/* ═════════════════════════════════════════════════════════════════
+   TEMA ESCURO — Correções de contraste, visibilidade e usabilidade
+   ═════════════════════════════════════════════════════════════════ */
+
+/* ── Inputs, Textareas, Selects ────────────────────────────────── */
+.dark input:not([type="checkbox"]):not([type="radio"]),
+.dark textarea,
+.dark [data-slot="input"] {
+  background-color: rgb(255 255 255 / 0.04);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: var(--muted-foreground);
+  opacity: 0.65;
+}
+.dark input:focus,
+.dark textarea:focus,
+.dark [data-slot="input"]:focus {
+  border-color: var(--ring);
+  background-color: rgb(255 255 255 / 0.06);
+}
+
+/* ── Select (Radix — renderiza em portal, precisa de !important) ── */
+.dark [data-slot="select-content"],
+.dark [data-radix-popper-content-wrapper] [role="listbox"] {
+  background-color: var(--popover) !important;
+  color: var(--popover-foreground) !important;
+  border-color: var(--border) !important;
+}
+.dark [data-slot="select-trigger"] {
+  background-color: rgb(255 255 255 / 0.04);
+  color: var(--foreground);
+}
+.dark [data-highlighted] {
+  background-color: var(--accent) !important;
+  color: var(--accent-foreground) !important;
+}
+
+/* ── Dialog / Sheet / Modal Overlays ────────────────────────────── */
+.dark [data-slot="dialog-overlay"],
+.dark [data-slot="sheet-overlay"] {
+  background-color: rgb(0 0 0 / 0.65);
+  backdrop-filter: blur(4px);
+}
+.dark [data-slot="dialog-content"],
+.dark [data-slot="sheet-content"],
+.dark [data-slot="drawer-content"] {
+  background-color: var(--card);
+  color: var(--card-foreground);
+  border-color: var(--border);
+}
+
+/* ── Dropdown Menu / Context Menu / Popover ─────────────────────── */
+.dark [data-slot="dropdown-menu-content"],
+.dark [data-slot="context-menu-content"],
+.dark [data-slot="popover-content"] {
+  background-color: var(--popover) !important;
+  color: var(--popover-foreground) !important;
+  border-color: var(--border) !important;
+}
+.dark [data-slot="dropdown-menu-item"]:hover,
+.dark [data-slot="dropdown-menu-item"][data-highlighted],
+.dark [data-slot="context-menu-item"]:hover {
+  background-color: var(--accent) !important;
+  color: var(--accent-foreground) !important;
+}
+.dark [data-slot="dropdown-menu-separator"],
+.dark [data-slot="context-menu-separator"] {
+  background-color: var(--border);
+}
+
+/* ── Command / Search Palette ──────────────────────────────────── */
+.dark [cmdk-root] {
+  background-color: var(--popover);
+  border-color: var(--border);
+}
+.dark [cmdk-input] {
+  background-color: transparent;
+  color: var(--foreground);
+}
+.dark [cmdk-item][data-selected="true"],
+.dark [cmdk-item][aria-selected="true"] {
+  background-color: var(--accent);
+  color: var(--accent-foreground);
+}
+.dark [cmdk-empty] {
+  color: var(--muted-foreground);
+}
+
+/* ── Table ──────────────────────────────────────────────────────── */
+.dark table {
+  color: var(--foreground);
+}
+.dark thead tr {
+  background-color: var(--muted);
+  border-bottom-color: var(--border-strong);
+}
+.dark thead th {
+  color: var(--muted-foreground);
+  font-weight: 600;
+}
+.dark tbody tr {
+  border-bottom-color: var(--border);
+}
+.dark tbody tr:hover {
+  background-color: rgb(255 255 255 / 0.025);
+}
+.dark tbody tr:nth-child(even) {
+  background-color: rgb(255 255 255 / 0.012);
+}
+.dark tbody tr:nth-child(even):hover {
+  background-color: rgb(255 255 255 / 0.035);
+}
+
+/* ── Cards ──────────────────────────────────────────────────────── */
+.dark [data-slot="card"] {
+  border-color: var(--border);
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+}
+
+/* ── Tabs ───────────────────────────────────────────────────────── */
+.dark [data-slot="tabs-list"] {
+  background-color: var(--muted);
+}
+.dark [data-slot="tabs-trigger"][data-state="active"] {
+  background-color: var(--card);
+  color: var(--foreground);
+}
+.dark [data-slot="tabs-trigger"][data-state="inactive"] {
+  color: var(--muted-foreground);
+}
+.dark [data-slot="tabs-trigger"]:hover:not([data-state="active"]) {
+  color: var(--foreground);
+}
+
+/* ── Badge ──────────────────────────────────────────────────────── */
+.dark [data-slot="badge"][data-variant="outline"] {
+  border-color: var(--border-strong);
+  color: var(--foreground);
+}
+
+/* ── Skeleton ───────────────────────────────────────────────────── */
+.dark [data-slot="skeleton"] {
+  background-color: rgb(255 255 255 / 0.06);
+}
+
+/* ── Calendar / DatePicker ──────────────────────────────────────── */
+.dark [data-slot="calendar"] {
+  background-color: var(--card);
+  color: var(--foreground);
+  border-color: var(--border);
+}
+.dark .rdp-day:hover:not(.rdp-day_selected):not(.rdp-day_disabled) {
+  background-color: var(--accent);
+  color: var(--accent-foreground);
+}
+.dark .rdp-day_today:not(.rdp-day_selected) {
+  background-color: var(--muted);
+  color: var(--foreground);
+  font-weight: 600;
+}
+.dark .rdp-day_selected {
+  background-color: var(--primary);
+  color: var(--primary-foreground);
+}
+.dark .rdp-day_disabled {
+  color: var(--muted-foreground);
+  opacity: 0.35;
+}
+.dark .rdp-head_cell {
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+
+/* ── Button ─────────────────────────────────────────────────────── */
+.dark button[data-variant="ghost"]:hover {
+  background-color: rgb(255 255 255 / 0.06);
+}
+.dark button[data-variant="outline"] {
+  border-color: var(--border-strong);
+  color: var(--foreground);
+}
+.dark button[data-variant="outline"]:hover {
+  background-color: rgb(255 255 255 / 0.05);
+  border-color: var(--foreground);
+}
+
+/* ── Toast / Sonner ─────────────────────────────────────────────── */
+.dark [data-sonner-toast] {
+  background-color: var(--card) !important;
+  color: var(--card-foreground) !important;
+  border-color: var(--border) !important;
+}
+
+/* ── Checkbox & Radio ───────────────────────────────────────────── */
+.dark [data-slot="checkbox"]:not([data-state="checked"]) {
+  border-color: var(--border-strong);
+  background-color: transparent;
+}
+
+/* ── Switch ─────────────────────────────────────────────────────── */
+.dark [data-slot="switch"][data-state="unchecked"] {
+  background-color: var(--border-strong);
+}
+
+/* ── Progress Bar ───────────────────────────────────────────────── */
+.dark [data-slot="progress"] {
+  background-color: var(--muted);
+}
+
+/* ── Separator ──────────────────────────────────────────────────── */
+.dark [data-slot="separator"] {
+  background-color: var(--border);
+}
+
+/* ── Tooltip ────────────────────────────────────────────────────── */
+.dark [data-slot="tooltip-content"] {
+  background-color: var(--popover);
+  color: var(--popover-foreground);
+  border-color: var(--border);
+}
+
+/* ── Form Label ─────────────────────────────────────────────────── */
+.dark label[data-slot="form-label"],
+.dark label {
+  color: var(--foreground);
+}
+.dark .text-muted-foreground {
+  color: var(--muted-foreground) !important;
+}
+
+/* ── Hover states globais ───────────────────────────────────────── */
+.dark .hover\:bg-muted\/60:hover {
+  background-color: rgb(255 255 255 / 0.06);
+}
+
+/* ── Cores de texto forçadas (evita texto invisível) ──────────── */
+.dark .text-foreground { color: var(--foreground) !important; }
+.dark .text-card-foreground { color: var(--card-foreground) !important; }
+
+/* ── Print ─────────────────────────────────────────────────────── */
 @media print {
   .no-print {
     display: none !important;
