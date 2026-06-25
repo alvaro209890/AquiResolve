@@ -15,6 +15,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { NotificationBell } from "@/components/layout/notification-bell"
 import { LogOut, User, Settings, Search, Menu, Moon, Sun } from "lucide-react"
 
 interface HeaderProps {
@@ -70,6 +71,9 @@ export function Header({ onMenuClick }: HeaderProps) {
           >
             <Search className="h-4 w-4" />
           </Button>
+
+          {/* Notification bell */}
+          <NotificationBell />
 
           {/* Dark mode toggle */}
           <Button
