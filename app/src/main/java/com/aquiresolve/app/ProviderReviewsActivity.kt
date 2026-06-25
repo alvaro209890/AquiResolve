@@ -190,6 +190,14 @@ class ProviderReviewsActivity : AppCompatActivity() {
                     b.layoutDetailedRatings.visibility = View.GONE
                 }
 
+                // Tags
+                if (review.tags.isNotEmpty()) {
+                    b.tvTags.text = review.tags.joinToString("  ") { "#$it" }
+                    b.tvTags.visibility = View.VISIBLE
+                } else {
+                    b.tvTags.visibility = View.GONE
+                }
+
                 // Date
                 val dateFormat = SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR"))
                 dateFormat.timeZone = TimeZone.getTimeZone("America/Sao_Paulo")

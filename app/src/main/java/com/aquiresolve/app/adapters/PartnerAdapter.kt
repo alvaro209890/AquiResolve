@@ -14,9 +14,9 @@ import com.bumptech.glide.load.engine.DiskCacheStrategy
 /**
  * Adapter da seção horizontal "Parceiros AquiResolve" da Home.
  *
- * Cada card mostra o logo do parceiro (Glide, fitCenter em fundo branco p/ não distorcer),
- * o nome e o rótulo de benefício em pill verde. O clique dispara [onPartnerClick] para abrir
- * o detalhe do parceiro.
+ * Cada card mostra a imagem do parceiro (banner, com fallback no logo) numa área do mesmo
+ * tamanho do card de combo (centerCrop), o nome e o rótulo de benefício em pill verde.
+ * O clique dispara [onPartnerClick] para abrir o detalhe do parceiro.
  */
 class PartnerAdapter(
     private var partners: List<Partner>,
@@ -49,11 +49,14 @@ class PartnerAdapter(
             holder.benefit.visibility = View.GONE
         }
 
-        if (partner.logoUrl.isNotBlank()) {
+        // Imagem do parceiro: prefere o banner largo, cai no logo. centerCrop p/ ficar do mesmo
+        // tamanho/recorte do card de combo.
+        val image = partner.bannerImage()
+        if (image.isNotBlank()) {
             Glide.with(holder.logo.context)
-                .load(partner.logoUrl)
+                .load(image)
                 .diskCacheStrategy(DiskCacheStrategy.ALL)
-                .fitCenter()
+                .centerCrop()
                 .into(holder.logo)
         } else {
             holder.logo.setImageResource(R.mipmap.ic_launcher)

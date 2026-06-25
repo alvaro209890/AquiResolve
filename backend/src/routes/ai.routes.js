@@ -15,7 +15,7 @@ router.use(authenticateRequest);
 /**
  * POST /api/ai/classify
  * Body: { description: string, niches: string[] }
- * Retorna: { ok, niche: string|null, confidence: number, message: string }
+ * Retorna: { ok, niche: string|null, serviceType: string|null, confidence: number, message: string }
  *
  * Classifica a descrição do problema do cliente em UM nicho da lista enviada (catálogo do app).
  * A IA nunca decide preço nem cria pedido — só sugere o nicho para o app rotear.
@@ -39,6 +39,7 @@ router.post('/classify', async (req, res, next) => {
     return res.status(200).json({
       ok: true,
       niche: result.niche,
+      serviceType: result.serviceType ?? null,
       confidence: result.confidence,
       message: result.message
     });

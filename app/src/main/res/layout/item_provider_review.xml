@@ -98,6 +98,18 @@
                 android:textColor="@color/gray_500" />
         </LinearLayout>
 
+        <!-- Tags -->
+        <TextView
+            android:id="@+id/tvTags"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text=""
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="@color/orange_500"
+            android:layout_marginBottom="6dp"
+            android:visibility="gone" />
+
         <!-- Date -->
         <TextView
             android:id="@+id/tvDate"

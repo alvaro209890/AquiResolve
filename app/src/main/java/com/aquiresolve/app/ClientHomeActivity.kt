@@ -26,17 +26,15 @@ import com.bumptech.glide.request.RequestOptions
 import com.aquiresolve.app.adapters.BannerAdapter
 import com.aquiresolve.app.adapters.HomeCategoryAdapter
 import com.aquiresolve.app.adapters.HomeComboAdapter
-import com.aquiresolve.app.adapters.PartnerAdapter
+import com.aquiresolve.app.adapters.PartnerBannerAdapter
 import com.aquiresolve.app.adapters.SearchSuggestionAdapter
 import com.aquiresolve.app.databinding.ActivityClientHomeBinding
 import com.aquiresolve.app.models.HomeBanner
 import com.aquiresolve.app.models.HomeCombo
 import com.aquiresolve.app.models.Partner
-import com.aquiresolve.app.models.OrderData
 import com.aquiresolve.app.models.SearchSuggestion
 import com.aquiresolve.app.utils.ServiceSearchHelper
 import com.aquiresolve.app.utils.NotificationBadgeHelper
-import com.aquiresolve.app.utils.PriceFormatter
 import com.aquiresolve.app.utils.ServiceNicheCatalog
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -62,8 +60,12 @@ class ClientHomeActivity : AppCompatActivity() {
     // Vitrine de Combos Promocionais
     private var comboAdapter: HomeComboAdapter? = null
 
-    // Vitrine de Parceiros AquiResolve
-    private var partnerAdapter: PartnerAdapter? = null
+    // Carrossel de banners de Parceiros (rotação por item + limite diário de clientes)
+    private var partnerBannerAdapter: PartnerBannerAdapter? = null
+    private val partnerHandler = Handler(Looper.getMainLooper())
+    private var partnerAutoScroll: Runnable? = null
+    private var partnerBanners: List<Partner> = emptyList()
+    private val registeredImpressions = HashSet<String>()
 
     // Busca Inteligente
     private var suggestionAdapter: SearchSuggestionAdapter? = null
@@ -97,7 +99,6 @@ class ClientHomeActivity : AppCompatActivity() {
         setupPartners()
         setupSearchSuggestions()
         loadProfileImage()
-        loadRecentOrders()
     }
 
     /**
@@ -112,7 +113,6 @@ class ClientHomeActivity : AppCompatActivity() {
             setupBannerCarousel()
             setupCombos()
             setupPartners()
-            loadRecentOrders()
             loadCashbackBalance()
             binding.swipeRefresh.isRefreshing = false
         }
@@ -122,7 +122,6 @@ class ClientHomeActivity : AppCompatActivity() {
         super.onResume()
         ProviderNewOrderAlertManager.refreshMonitoring()
         loadProfileImage()
-        loadRecentOrders()
         loadCashbackBalance()
 
         // Iniciar monitoramento de notificações para mostrar badge
@@ -133,6 +132,7 @@ class ClientHomeActivity : AppCompatActivity() {
 
         startCentralBadgeListener()
         startBannerAutoScroll()
+        startPartnerAutoScroll()
     }
 
     override fun onPause() {
@@ -142,12 +142,14 @@ class ClientHomeActivity : AppCompatActivity() {
         centralUnreadListener?.remove()
         centralUnreadListener = null
         stopBannerAutoScroll()
+        stopPartnerAutoScroll()
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        // Garante que o loop do carrossel não vaze (mesmo cuidado dos listeners)
+        // Garante que o loop dos carrosséis não vaze (mesmo cuidado dos listeners)
         stopBannerAutoScroll()
+        stopPartnerAutoScroll()
         searchRunnable?.let { searchHandler.removeCallbacks(it) }
     }
 
@@ -173,7 +175,6 @@ class ClientHomeActivity : AppCompatActivity() {
         binding.tvWelcome.text =
             if (firstName.isNotEmpty()) "Olá, $firstName! O que você precisa hoje?"
             else "Olá! O que você precisa hoje?"
-        binding.tvRecentOrders.text = "Seus Pedidos Recentes"
     }
 
     private fun setupWindowInsets() {
@@ -464,7 +465,7 @@ class ClientHomeActivity : AppCompatActivity() {
             // Combos (plano 03) e Parceiros (plano 04): rola até a seção na própria Home se ela
             // estiver visível; se não houver itens (seção GONE), cai na lista de serviços.
             HomeBanner.ACTION_COMBOS -> scrollToSectionOrFallback(binding.sectionCombos)
-            HomeBanner.ACTION_PARTNERS -> scrollToSectionOrFallback(binding.sectionPartners)
+            HomeBanner.ACTION_PARTNERS -> scrollToSectionOrFallback(binding.sectionPartnerBanners)
 
             else -> {
                 // none / tipo desconhecido → banner apenas informativo, sem ação.
@@ -568,35 +569,115 @@ class ClientHomeActivity : AppCompatActivity() {
     // ───────────────────────────── Parceiros AquiResolve ─────────────────────────────
 
     /**
-     * Monta a seção horizontal de Parceiros AquiResolve (plano 04). Fonte: [PartnerRepository]
-     * (coleção `partners`, gerida pelo painel). Sem parceiros ativos, a seção fica `GONE`.
-     * Tocar num parceiro abre [PartnerDetailActivity] (descrição + cupom/copiar + visitar site).
+     * Monta o **carrossel de banners de Parceiros** (logo abaixo do banner do topo). Fonte:
+     * [PartnerRepository] (coleção `partners`, gerida pelo painel), filtrado por
+     * [PartnerImpressionManager.availablePartners] (limite diário de clientes + janela da campanha).
+     * Cada banner roda por `rotationSeconds`; ao virar página, registra a impressão. Sem parceiros
+     * disponíveis, a seção fica `GONE`. Tocar abre [PartnerDetailActivity] (WhatsApp/Instagram/Site).
      */
     private fun setupPartners() {
-        partnerAdapter = PartnerAdapter(emptyList()) { partner -> onPartnerClicked(partner) }
-        binding.rvPartners.layoutManager =
-            LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        binding.rvPartners.adapter = partnerAdapter
+        partnerBannerAdapter = PartnerBannerAdapter(emptyList()) { partner -> onPartnerClicked(partner) }
+        binding.partnerPager.adapter = partnerBannerAdapter
 
-        // Primeiro o cache (instantâneo), depois recarrega do Firestore.
-        applyPartners(PartnerRepository.cachedPartners())
+        binding.partnerPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                updatePartnerDots(position)
+                // Reinicia o timer com o tempo do banner atual e conta a impressão (1ª vez/sessão).
+                restartPartnerAutoScroll()
+                registerImpressionForPosition(position)
+            }
+        })
+
         lifecycleScope.launch {
-            val partners = try {
+            val all = try {
                 PartnerRepository.load()
             } catch (_: Exception) {
                 PartnerRepository.cachedPartners()
             }
-            applyPartners(partners)
+            val uid = auth.currentUser?.uid.orEmpty()
+            val available = try {
+                PartnerImpressionManager.availablePartners(all, uid)
+            } catch (_: Exception) {
+                all
+            }
+            applyPartnerBanners(available)
         }
     }
 
-    private fun applyPartners(partners: List<Partner>) {
+    private fun applyPartnerBanners(partners: List<Partner>) {
+        partnerBanners = partners
         if (partners.isEmpty()) {
-            binding.sectionPartners.visibility = View.GONE
+            binding.sectionPartnerBanners.visibility = View.GONE
+            stopPartnerAutoScroll()
             return
         }
-        binding.sectionPartners.visibility = View.VISIBLE
-        partnerAdapter?.updateItems(partners)
+        binding.sectionPartnerBanners.visibility = View.VISIBLE
+        partnerBannerAdapter?.updateItems(partners)
+        buildPartnerDots(partners.size)
+        val current = binding.partnerPager.currentItem.coerceIn(0, partners.size - 1)
+        updatePartnerDots(current)
+        // onPageSelected não dispara de forma confiável para a posição inicial — conta aqui.
+        registerImpressionForPosition(current)
+        startPartnerAutoScroll()
+    }
+
+    /** Conta a impressão do parceiro na posição dada (1ª vez por parceiro nesta sessão). */
+    private fun registerImpressionForPosition(position: Int) {
+        val partner = partnerBanners.getOrNull(position) ?: return
+        if (!registeredImpressions.add(partner.id)) return
+        val uid = auth.currentUser?.uid.orEmpty()
+        if (uid.isBlank()) return
+        lifecycleScope.launch {
+            PartnerImpressionManager.registerImpression(partner, uid)
+        }
+    }
+
+    private fun buildPartnerDots(count: Int) {
+        binding.partnerDots.removeAllViews()
+        val size = dpToPx(8)
+        val margin = dpToPx(3)
+        repeat(count) {
+            val dot = View(this)
+            val lp = LinearLayout.LayoutParams(size, size)
+            lp.marginStart = margin
+            lp.marginEnd = margin
+            dot.layoutParams = lp
+            dot.setBackgroundResource(R.drawable.banner_dot_inactive)
+            binding.partnerDots.addView(dot)
+        }
+        binding.partnerDots.visibility = if (count > 1) View.VISIBLE else View.GONE
+    }
+
+    private fun updatePartnerDots(active: Int) {
+        for (i in 0 until binding.partnerDots.childCount) {
+            binding.partnerDots.getChildAt(i).setBackgroundResource(
+                if (i == active) R.drawable.banner_dot_active else R.drawable.banner_dot_inactive
+            )
+        }
+    }
+
+    private fun startPartnerAutoScroll() {
+        if (partnerBanners.size <= 1) return
+        stopPartnerAutoScroll()
+        // Cada parceiro fica X segundos (config do painel) antes de rodar para o próximo.
+        val current = binding.partnerPager.currentItem
+        val seconds = partnerBanners.getOrNull(current)?.rotationSeconds ?: Partner.DEFAULT_ROTATION_SECONDS
+        val runnable = Runnable {
+            if (partnerBanners.size <= 1) return@Runnable
+            val next = (binding.partnerPager.currentItem + 1) % partnerBanners.size
+            binding.partnerPager.setCurrentItem(next, true)
+        }
+        partnerAutoScroll = runnable
+        partnerHandler.postDelayed(runnable, seconds * 1000L)
+    }
+
+    private fun restartPartnerAutoScroll() {
+        stopPartnerAutoScroll()
+        startPartnerAutoScroll()
+    }
+
+    private fun stopPartnerAutoScroll() {
+        partnerAutoScroll?.let { partnerHandler.removeCallbacks(it) }
     }
 
     private fun onPartnerClicked(partner: Partner) {
@@ -733,74 +814,6 @@ class ClientHomeActivity : AppCompatActivity() {
                 android.os.Bundle().apply { putString("query", query) }
             )
         } catch (_: Exception) {
-        }
-    }
-
-    private fun loadRecentOrders() {
-        val currentUser = auth.currentUser ?: return
-
-        lifecycleScope.launch {
-            try {
-                val snapshot = db.collection("orders")
-                    .whereEqualTo("clientId", currentUser.uid)
-                    .get()
-                    .await()
-
-                val orders = snapshot.documents.mapNotNull { doc ->
-                    try {
-                        doc.toObject(OrderData::class.java)?.copy(id = doc.id)
-                    } catch (e: Exception) {
-                        null
-                    }
-                }.sortedByDescending { it.createdAt.toDate().time }
-                    .take(3)
-
-                binding.containerRecentOrders.removeAllViews()
-
-                if (orders.isEmpty()) {
-                    binding.tvEmptyOrders.visibility = View.VISIBLE
-                    binding.containerRecentOrders.visibility = View.GONE
-                } else {
-                    binding.tvEmptyOrders.visibility = View.GONE
-                    binding.containerRecentOrders.visibility = View.VISIBLE
-
-                    for (order in orders) {
-                        val card = LayoutInflater.from(this@ClientHomeActivity)
-                            .inflate(R.layout.item_recent_order, binding.containerRecentOrders, false)
-
-                        card.findViewById<TextView>(R.id.tvOrderService).text =
-                            order.serviceType.ifEmpty { order.serviceName.ifEmpty { "Serviço" } }
-                        card.findViewById<TextView>(R.id.tvOrderStatus).text =
-                            getStatusText(order.status)
-                        card.findViewById<TextView>(R.id.tvOrderPrice).text =
-                            PriceFormatter.formatOrderPrice(order)
-
-                        card.setOnClickListener {
-                            val intent = Intent(this@ClientHomeActivity, OrderDetailsActivity::class.java)
-                            intent.putExtra("order_id", order.id)
-                            startActivity(intent)
-                        }
-
-                        binding.containerRecentOrders.addView(card)
-                    }
-                }
-            } catch (e: Exception) {
-                binding.tvEmptyOrders.visibility = View.VISIBLE
-                binding.containerRecentOrders.visibility = View.GONE
-            }
-        }
-    }
-
-    private fun getStatusText(status: String): String {
-        return when (status) {
-            OrderData.STATUS_AWAITING_PAYMENT -> "Aguardando Pagamento"
-            OrderData.STATUS_PENDING -> "Pendente"
-            OrderData.STATUS_DISTRIBUTING -> "Em Distribuição"
-            OrderData.STATUS_ASSIGNED -> "Atribuído"
-            OrderData.STATUS_IN_PROGRESS -> "Em Andamento"
-            OrderData.STATUS_COMPLETED -> "Concluído"
-            OrderData.STATUS_CANCELLED -> "Cancelado"
-            else -> status
         }
     }
 

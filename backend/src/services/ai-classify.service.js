@@ -16,19 +16,26 @@ const DEFAULT_MODEL = 'llama-3.3-70b-versatile';
 function buildSystemPrompt(niches) {
   const list = niches.map((n) => `- ${n}`).join('\n');
   return [
-    'Você é o assistente da AquiResolve, um marketplace de serviços domésticos e profissionais.',
-    'Dada a descrição do problema do cliente, escolha EXATAMENTE UM nicho da lista abaixo que melhor resolve o caso.',
+    'Você é o assistente virtual da AquiResolve, um marketplace de serviços domésticos e profissionais no Brasil.',
+    'Um cliente vai descrever, com as próprias palavras — muitas vezes FALANDO por voz, com gírias regionais, erros de português ou frases indiretas — um problema ou uma necessidade.',
+    'Sua tarefa: entender a INTENÇÃO REAL do cliente e escolher EXATAMENTE UM nicho da lista abaixo que melhor resolve o caso.',
     '',
-    'NICHOS DISPONÍVEIS (escolha só destes; não invente):',
+    'NICHOS DISPONÍVEIS (escolha só destes; nunca invente):',
     list,
     '',
-    'Responda SOMENTE com um JSON válido, sem texto fora dele, no formato:',
-    '{"niche": <um nicho EXATAMENTE como na lista, ou null>, "confidence": <número de 0 a 1>, "message": <frase curta e amigável em português do Brasil>}',
+    'Como interpretar:',
+    '- Considere sinônimos, fala coloquial e descrições indiretas. Exemplos: "tá pingando água do teto"/"a pia entupiu" = hidráulica; "a tomada soltou faísca"/"acabou a luz só na minha casa" = elétrica; "preciso dar uma geral na casa" = limpeza/faxina; "o portão não abre" = automação/serralheria.',
+    '- Se houver mais de um problema, escolha o PRINCIPAL ou o mais urgente.',
+    '- Se for claramente uma emergência (vazamento forte, cheiro de gás, curto), deixe a "message" tranquilizadora e ágil.',
+    '',
+    'Responda SOMENTE com um JSON válido, sem nenhum texto fora dele, no formato:',
+    '{"niche": <um nicho EXATAMENTE como na lista, ou null>, "serviceType": <nome curto do serviço específico mais provável em pt-BR, ou null>, "confidence": <número de 0 a 1>, "message": <frase curta e calorosa em pt-BR>}',
     '',
     'Regras:',
-    '- Se nada na lista se encaixar, use "niche": null e explique gentilmente na "message".',
-    '- "message" deve ser curta, calorosa e em pt-BR (ex.: "Parece um problema hidráulico. Posso te levar para Encanador?").',
-    '- Nunca escolha um nicho que não esteja na lista.'
+    '- "niche" precisa ser IDÊNTICO a um item da lista (mesma grafia). Se nada se encaixar, use null e explique gentilmente na "message".',
+    '- "serviceType" é um PALPITE do serviço específico dentro do nicho (ex.: "Desentupimento de pia", "Instalação de tomada"). Se não tiver certeza, use null. Nunca invente um nicho aqui.',
+    '- "message" deve ser curta (1 a 2 frases), acolhedora e em pt-BR (ex.: "Parece um problema hidráulico — posso te levar para Encanador?").',
+    '- "confidence" reflete o quão certo você está do nicho (1 = certeza total).'
   ].join('\n');
 }
 
@@ -90,6 +97,14 @@ async function classifyNiche({ description, niches }) {
   confidence = Math.max(0, Math.min(1, confidence));
   if (!niche) confidence = 0;
 
+  // Serviço específico é só um PALPITE (o app o casa contra o catálogo real; se não casar, é ignorado).
+  // Só faz sentido quando há nicho.
+  let serviceType = null;
+  if (niche && typeof parsed?.serviceType === 'string') {
+    const t = parsed.serviceType.trim();
+    if (t && t.toLowerCase() !== 'null') serviceType = t.slice(0, 80);
+  }
+
   const message =
     typeof parsed?.message === 'string' && parsed.message.trim()
       ? parsed.message.trim()
@@ -97,7 +112,7 @@ async function classifyNiche({ description, niches }) {
         ? `Acho que é um caso de ${niche}. Posso te direcionar?`
         : 'Não consegui identificar o serviço. Quer ver todos os serviços?';
 
-  return { niche, confidence, message };
+  return { niche, serviceType, confidence, message };
 }
 
 module.exports = {

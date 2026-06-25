@@ -1,9 +1,13 @@
 package com.aquiresolve.app
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
 import android.view.View
 import android.view.inputmethod.InputMethodManager
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -20,6 +24,14 @@ class AssistantActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityAssistantBinding
     private var lastDescription = ""
+    private var voiceManager: VoiceInputManager? = null
+
+    // Permissão do microfone: se concedida, já começa a ouvir; senão, avisa de forma amigável.
+    private val micPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) startVoice()
+            else toast("Permita o microfone para falar com o assistente.")
+        }
 
     companion object {
         /** Extra opcional: pré-preenche a descrição (ex.: vindo da busca sem resultado). */
@@ -42,6 +54,8 @@ class AssistantActivity : AppCompatActivity() {
         binding.btnBack.setOnClickListener { finish() }
         binding.btnAsk.setOnClickListener { ask() }
         binding.btnSeeAll.setOnClickListener { openServices() }
+        binding.btnVoice.setOnClickListener { onMicClick() }
+        setupVoice()
 
         // Garante o catálogo de nichos em cache (a IA classifica DENTRO dessa lista).
         lifecycleScope.launch {
@@ -81,7 +95,7 @@ class AssistantActivity : AppCompatActivity() {
 
             if (niches.isEmpty()) {
                 showLoading(false)
-                showResult(message = "Não consegui carregar os serviços agora. Veja todos os serviços disponíveis.", niche = null)
+                showResult(message = "Não consegui carregar os serviços agora. Veja todos os serviços disponíveis.", niche = null, serviceType = null)
                 return@launch
             }
 
@@ -94,16 +108,16 @@ class AssistantActivity : AppCompatActivity() {
                         putString("niche", s.niche ?: "null")
                         putDouble("confidence", s.confidence)
                     })
-                    showResult(message = s.message, niche = s.niche, confidence = s.confidence)
+                    showResult(message = s.message, niche = s.niche, serviceType = s.serviceType, confidence = s.confidence)
                 }
                 is AssistantClient.Result.Error -> {
-                    showResult(message = result.message, niche = null)
+                    showResult(message = result.message, niche = null, serviceType = null)
                 }
             }
         }
     }
 
-    private fun showResult(message: String, niche: String?, confidence: Double = 0.0) {
+    private fun showResult(message: String, niche: String?, serviceType: String?, confidence: Double = 0.0) {
         binding.resultCard.visibility = View.VISIBLE
         binding.tvResultMessage.text = message
 
@@ -115,15 +129,79 @@ class AssistantActivity : AppCompatActivity() {
             binding.btnContinue.text = cta
             binding.btnContinue.setOnClickListener {
                 logEvent("ia_sugestao_aceita", Bundle().apply { putString("niche", niche) })
-                startActivity(
-                    Intent(this, CreateOrderActivity::class.java)
-                        .putExtra("service_category_name", niche)
-                )
+                val intent = Intent(this, CreateOrderActivity::class.java)
+                    .putExtra("service_category_name", niche)
+                // Palpite da IA do serviço específico → o CreateOrderActivity casa contra o catálogo
+                // real e pré-seleciona (se não casar, é ignorado sem prejuízo).
+                if (!serviceType.isNullOrBlank()) intent.putExtra("preselect_service", serviceType)
+                startActivity(intent)
             }
         } else {
             binding.tvNicheChip.visibility = View.GONE
             binding.btnContinue.visibility = View.GONE
         }
+    }
+
+    // ---- Entrada por voz (fala → texto) -------------------------------------------------
+
+    private fun setupVoice() {
+        voiceManager = VoiceInputManager(
+            context = this,
+            onReadyForSpeech = { setVoiceListening(true) },
+            onPartial = { text ->
+                binding.etDescription.setText(text)
+                binding.etDescription.setSelection(text.length)
+            },
+            onResult = { text ->
+                binding.etDescription.setText(text)
+                binding.etDescription.setSelection(text.length)
+                logEvent("ia_voz_reconhecida", Bundle().apply { putInt("len", text.length) })
+                ask()
+            },
+            onError = { msg -> if (msg.isNotBlank()) toast(msg) },
+            onEnd = { setVoiceListening(false) }
+        )
+        // Sem reconhecedor no aparelho → esconde o botão (o cliente ainda digita normalmente).
+        if (voiceManager?.isAvailable() != true) {
+            binding.btnVoice.visibility = View.GONE
+        }
+    }
+
+    private fun onMicClick() {
+        val vm = voiceManager ?: return
+        if (vm.isListening) {
+            vm.stop()
+            return
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            == PackageManager.PERMISSION_GRANTED
+        ) {
+            startVoice()
+        } else {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun startVoice() {
+        hideKeyboard()
+        binding.etDescription.setText("")
+        logEvent("ia_voz_iniciada", null)
+        voiceManager?.start()
+    }
+
+    private fun setVoiceListening(listening: Boolean) {
+        binding.tvVoiceStatus.visibility = if (listening) View.VISIBLE else View.GONE
+        binding.btnVoice.text = if (listening) "Ouvindo… toque para parar" else "Falar com o assistente"
+    }
+
+    private fun toast(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onDestroy() {
+        voiceManager?.destroy()
+        voiceManager = null
+        super.onDestroy()
     }
 
     private fun openServices() {

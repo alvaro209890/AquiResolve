@@ -152,12 +152,52 @@
                 </LinearLayout>
             </LinearLayout>
 
+            <!-- Contato do parceiro -->
+            <TextView
+                android:id="@+id/tvContactTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:text="Fale com o parceiro"
+                android:textColor="@color/text_primary"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:visibility="gone" />
+
+            <!-- WhatsApp -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnWhatsapp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="WhatsApp"
+                android:textSize="16sp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp"
+                app:backgroundTint="@color/secondary_color"
+                app:cornerRadius="12dp"
+                android:visibility="gone" />
+
+            <!-- Instagram -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnInstagram"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Instagram"
+                android:textSize="16sp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp"
+                app:cornerRadius="12dp"
+                android:visibility="gone" />
+
             <!-- Visitar site -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnVisitSite"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="24dp"
+                android:layout_marginTop="12dp"
                 android:text="Visitar site do parceiro"
                 android:textSize="16sp"
                 android:paddingTop="12dp"

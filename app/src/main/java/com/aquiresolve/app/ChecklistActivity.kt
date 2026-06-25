@@ -38,7 +38,105 @@ class ChecklistActivity : AppCompatActivity() {
         checklistManager = FirebaseChecklistManager()
 
         setupClickListeners()
+        setupPendingSummaryWatchers()
+        loadOrderContext()
         loadExistingChecklist()
+        updatePendingSummary()
+    }
+
+    /**
+     * Carrega o pedido para exibir um cartão de contexto (serviço, cliente, endereço)
+     * como referência para o prestador preencher a OS. Falha silenciosa.
+     */
+    private fun loadOrderContext() {
+        val id = orderId ?: return
+        lifecycleScope.launch {
+            try {
+                val order = FirebaseOrderManager().getOrderById(id).getOrNull() ?: return@launch
+
+                val service = buildString {
+                    if (order.serviceName.isNotBlank()) append(order.serviceName)
+                    if (order.serviceType.isNotBlank() && order.serviceType != order.serviceName) {
+                        if (isNotEmpty()) append(" · ")
+                        append(order.serviceType)
+                    }
+                }.ifBlank { "Serviço" }
+                binding.tvContextService.text = service
+
+                if (order.clientName.isNotBlank()) {
+                    binding.tvContextClient.text = "👤 ${order.clientName}"
+                    binding.tvContextClient.visibility = android.view.View.VISIBLE
+                }
+
+                val address = buildString {
+                    if (order.address.isNotBlank()) append(order.address)
+                    val cityState = listOf(order.city, order.state).filter { it.isNotBlank() }.joinToString(" - ")
+                    if (cityState.isNotBlank()) {
+                        if (isNotEmpty()) append(", ")
+                        append(cityState)
+                    }
+                }
+                if (address.isNotBlank()) {
+                    binding.tvContextAddress.text = "📍 $address"
+                    binding.tvContextAddress.visibility = android.view.View.VISIBLE
+                }
+
+                binding.cardOrderContext.visibility = android.view.View.VISIBLE
+            } catch (_: Exception) {
+                // contexto é opcional — ignora falhas
+            }
+        }
+    }
+
+    /**
+     * Liga ouvintes em todos os campos obrigatórios para atualizar, em tempo real,
+     * o resumo do que ainda falta preencher antes de avançar.
+     */
+    private fun setupPendingSummaryWatchers() {
+        val serviceBoxes = listOf(
+            binding.cbServiceElectric, binding.cbServicePlumber, binding.cbServiceClog,
+            binding.cbServiceCheckup, binding.cbServiceWaterTankCleaning,
+            binding.cbServiceGutterCleaning, binding.cbServiceGreaseTrapCleaning,
+            binding.cbServiceLocksmith, binding.cbServiceFanInstallation
+        )
+        serviceBoxes.forEach { it.setOnCheckedChangeListener { _, _ -> updatePendingSummary() } }
+        binding.cbDeclarationAccepted.setOnCheckedChangeListener { _, _ -> updatePendingSummary() }
+        binding.rgProblemResolution.setOnCheckedChangeListener { _, _ -> updatePendingSummary() }
+        binding.etExecutionDescription.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) { updatePendingSummary() }
+        })
+    }
+
+    /**
+     * Recalcula e exibe os itens obrigatórios ainda pendentes (mesmas regras de
+     * validateStep1). Quando tudo está ok, mostra confirmação verde.
+     */
+    private fun updatePendingSummary() {
+        val pending = mutableListOf<String>()
+        if (collectServiceDescriptions().isEmpty()) pending.add("• Descrição do serviço (marque ao menos uma)")
+        if (binding.etExecutionDescription.text?.toString()?.trim().isNullOrEmpty()) {
+            pending.add("• Descrição detalhada do serviço realizado")
+        }
+        if (binding.rgProblemResolution.checkedRadioButtonId == -1) pending.add("• Indicar se o problema foi solucionado")
+        if (!binding.cbDeclarationAccepted.isChecked) pending.add("• Aceitar a declaração de veracidade")
+
+        if (pending.isEmpty()) {
+            binding.cardPendingSummary.visibility = android.view.View.VISIBLE
+            binding.cardPendingSummary.setCardBackgroundColor(
+                ContextCompat.getColor(this, R.color.surface_color)
+            )
+            binding.cardPendingSummary.setStrokeColor(ContextCompat.getColor(this, R.color.secondary_color))
+            binding.tvPendingSummary.text = "✅ Tudo preenchido! Você já pode avançar para as fotos."
+        } else {
+            binding.cardPendingSummary.visibility = android.view.View.VISIBLE
+            binding.cardPendingSummary.setCardBackgroundColor(
+                ContextCompat.getColor(this, R.color.orange_50)
+            )
+            binding.cardPendingSummary.strokeColor = ContextCompat.getColor(this, R.color.primary_color)
+            binding.tvPendingSummary.text = "Antes de avançar, falta:\n" + pending.joinToString("\n")
+        }
     }
 
     private fun loadExistingChecklist() {

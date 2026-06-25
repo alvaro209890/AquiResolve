@@ -98,6 +98,34 @@
 
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- Falar com o assistente (fala → texto, reconhecimento nativo em pt-BR) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnVoice"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:text="Falar com o assistente"
+                android:textSize="16sp"
+                android:paddingVertical="14dp"
+                app:cornerRadius="24dp"
+                app:strokeColor="@color/primary_color"
+                android:textColor="@color/primary_color"
+                app:icon="@drawable/ic_mic"
+                app:iconGravity="textStart"
+                app:iconTint="@color/primary_color" />
+
+            <TextView
+                android:id="@+id/tvVoiceStatus"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:text="🎙️ Ouvindo… pode falar"
+                android:textColor="@color/primary_color"
+                android:textSize="14sp"
+                android:visibility="gone" />
+
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnAsk"
                 android:layout_width="match_parent"

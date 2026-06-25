@@ -24,6 +24,7 @@ object AssistantClient {
 
     data class Suggestion(
         val niche: String?,
+        val serviceType: String?,
         val confidence: Double,
         val message: String
     )
@@ -80,11 +81,12 @@ object AssistantClient {
                     return@withContext Result.Error("Assistente indisponível agora. Tente a busca.")
                 }
                 val niche = json.optString("niche").takeIf { it.isNotBlank() && it != "null" }
+                val serviceType = json.optString("serviceType").takeIf { it.isNotBlank() && it != "null" }
                 val confidence = json.optDouble("confidence", 0.0)
                 val message = json.optString("message").ifBlank {
                     if (niche != null) "Acho que é um caso de $niche." else "Não consegui identificar o serviço."
                 }
-                Result.Ok(Suggestion(niche = niche, confidence = confidence, message = message))
+                Result.Ok(Suggestion(niche = niche, serviceType = serviceType, confidence = confidence, message = message))
             }
         } catch (_: Exception) {
             Result.Error("Sem conexão com o assistente. Tente a busca.")

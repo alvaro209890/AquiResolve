@@ -38,6 +38,13 @@ interface Partner {
   benefitLabel: string
   couponCode: string
   url: string
+  whatsapp: string
+  instagram: string
+  rotationSeconds: number
+  dailyImpressionCap: number
+  startDate: string
+  campaignDays: number
+  campaignValue: number
   active: boolean
   displayOrder: number
 }
@@ -52,9 +59,20 @@ const EMPTY: Partner = {
   benefitLabel: "",
   couponCode: "",
   url: "",
+  whatsapp: "",
+  instagram: "",
+  rotationSeconds: 6,
+  dailyImpressionCap: 10,
+  startDate: "",
+  campaignDays: 30,
+  campaignValue: 0,
   active: true,
   displayOrder: 0,
 }
+
+// Formata um número em R$ pt-BR para exibir na lista.
+const formatBRL = (value: number) =>
+  (Number.isFinite(value) ? value : 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })
 
 // Tipos de benefício (precisam casar com o app: PartnerRepository/Partner).
 const BENEFIT_TYPES: { value: string; label: string; hint: string }[] = [
@@ -245,9 +263,9 @@ export default function ParceirosConfigPage() {
               <Input value={form.name} onChange={(e) => set({ name: e.target.value })} placeholder="Leroy Merlin" />
             </div>
 
-            {/* Logo */}
+            {/* Foto/logo */}
             <div>
-              <label className="text-sm font-medium">Logo (fundo branco, ~300×300)</label>
+              <label className="text-sm font-medium">Foto ou logo do parceiro (fundo branco, ~300×300)</label>
               <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start">
                 <div className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-white">
                   {form.logoUrl ? (
@@ -277,10 +295,10 @@ export default function ParceirosConfigPage() {
                     onClick={() => logoInputRef.current?.click()}
                   >
                     {uploadingLogo ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                    {uploadingLogo ? "Enviando…" : "Enviar logo"}
+                    {uploadingLogo ? "Enviando…" : "Enviar foto/logo"}
                   </Button>
                   <Input
-                    placeholder="ou cole a URL do logo (https://...)"
+                    placeholder="ou cole o link da foto/logo (https://...)"
                     value={form.logoUrl}
                     onChange={(e) => set({ logoUrl: e.target.value })}
                   />
@@ -288,9 +306,9 @@ export default function ParceirosConfigPage() {
               </div>
             </div>
 
-            {/* Banner opcional */}
+            {/* Banner/foto do carrossel (imagem larga exibida na Home) */}
             <div>
-              <label className="text-sm font-medium">Banner do detalhe (opcional, ~1200×500)</label>
+              <label className="text-sm font-medium">Banner/foto do parceiro (carrossel da Home, ~1200×500)</label>
               <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start">
                 <div className="relative h-24 w-full overflow-hidden rounded-lg border bg-muted sm:w-44">
                   {form.bannerUrl ? (
@@ -322,10 +340,10 @@ export default function ParceirosConfigPage() {
                     onClick={() => bannerInputRef.current?.click()}
                   >
                     {uploadingBanner ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-                    {uploadingBanner ? "Enviando…" : "Enviar banner"}
+                    {uploadingBanner ? "Enviando…" : "Enviar banner/foto"}
                   </Button>
                   <Input
-                    placeholder="ou cole a URL do banner (https://...)"
+                    placeholder="ou cole o link do banner/foto (https://...)"
                     value={form.bannerUrl}
                     onChange={(e) => set({ bannerUrl: e.target.value })}
                   />
@@ -384,7 +402,7 @@ export default function ParceirosConfigPage() {
                 </div>
               )}
               <div>
-                <label className="text-sm font-medium">Site do parceiro (opcional)</label>
+                <label className="text-sm font-medium">Link do site do parceiro (opcional)</label>
                 <Input
                   value={form.url}
                   onChange={(e) => set({ url: e.target.value })}
@@ -393,15 +411,98 @@ export default function ParceirosConfigPage() {
               </div>
             </div>
 
-            {/* Ordem */}
+            {/* Contato exibido ao tocar no banner */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
               <div>
-                <label className="text-sm font-medium">Ordem de exibição</label>
+                <label className="text-sm font-medium">Link ou número do WhatsApp</label>
                 <Input
-                  type="number"
-                  value={form.displayOrder}
-                  onChange={(e) => set({ displayOrder: Number(e.target.value) })}
+                  value={form.whatsapp}
+                  onChange={(e) => set({ whatsapp: e.target.value })}
+                  placeholder="65999998888 ou https://wa.me/5565999998888"
+                  inputMode="tel"
                 />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Pode colar o link do WhatsApp ou informar só números com DDD. O DDI 55 é adicionado automaticamente.
+                </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Link ou @ do Instagram</label>
+                <Input
+                  value={form.instagram}
+                  onChange={(e) => set({ instagram: e.target.value })}
+                  placeholder="@leroymerlinbrasil ou https://instagram.com/leroymerlinbrasil"
+                />
+              </div>
+            </div>
+
+            {/* Regras de exibição do banner na Home */}
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-3">
+              <p className="mb-3 text-sm font-semibold text-emerald-800">Exibição na Home</p>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div>
+                  <label className="text-sm font-medium">Segundos por banner</label>
+                  <Input
+                    type="number"
+                    min={3}
+                    max={20}
+                    value={form.rotationSeconds}
+                    onChange={(e) => set({ rotationSeconds: Number(e.target.value) })}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">Tempo na tela antes de rodar (3–20s).</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Clientes por dia</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    value={form.dailyImpressionCap}
+                    onChange={(e) => set({ dailyImpressionCap: Number(e.target.value) })}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">Some após aparecer p/ N clientes no dia.</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Dias de campanha</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.campaignDays}
+                    onChange={(e) => set({ campaignDays: Number(e.target.value) })}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">Por quantos dias exibir (0 = sem fim).</p>
+                </div>
+              </div>
+              <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div>
+                  <label className="text-sm font-medium">Início da campanha (opcional)</label>
+                  <Input
+                    type="date"
+                    value={form.startDate}
+                    onChange={(e) => set({ startDate: e.target.value })}
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">Vazio = começa hoje.</p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Valor pago pela campanha (R$)</label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.campaignValue || ""}
+                    onChange={(e) => set({ campaignValue: Number(e.target.value) })}
+                    placeholder="0,00"
+                  />
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Quanto o parceiro paga pelos {form.campaignDays > 0 ? `${form.campaignDays} dias` : "dias"} de exibição.
+                  </p>
+                </div>
+                <div>
+                  <label className="text-sm font-medium">Ordem de exibição</label>
+                  <Input
+                    type="number"
+                    value={form.displayOrder}
+                    onChange={(e) => set({ displayOrder: Number(e.target.value) })}
+                  />
+                </div>
               </div>
             </div>
 
@@ -451,6 +552,11 @@ export default function ParceirosConfigPage() {
                     Ordem {p.displayOrder} ·{" "}
                     {BENEFIT_TYPES.find((b) => b.value === p.benefitType)?.label ?? p.benefitType}
                     {p.benefitType === "coupon" && p.couponCode ? ` → ${p.couponCode}` : ""}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    🕒 {p.rotationSeconds || 6}s · 👥 {p.dailyImpressionCap || 10}/dia ·{" "}
+                    📅 {p.campaignDays > 0 ? `${p.campaignDays} dias` : "sem fim"}
+                    {p.campaignValue > 0 ? ` · 💵 ${formatBRL(p.campaignValue)}` : ""}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">

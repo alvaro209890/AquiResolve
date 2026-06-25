@@ -1,13 +1,18 @@
 package com.aquiresolve.app
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Bundle
+import android.view.MotionEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.LinearLayout
 import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
@@ -36,6 +41,18 @@ class AssistantChatActivity : AppCompatActivity() {
     private val adapter = ChatAdapter()
     private var isStreaming = false
     private var niches: List<String> = emptyList()
+    private var voiceManager: VoiceInputManager? = null
+    private var pendingVoiceStart = false
+
+    private val microphonePermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted && pendingVoiceStart) {
+                startVoiceInput()
+            } else if (!granted) {
+                toast("Permita o microfone para falar com o assistente.")
+            }
+            pendingVoiceStart = false
+        }
 
     companion object {
         /** Extra opcional: pré-preenche a descrição (ex.: vindo da busca sem resultado). */
@@ -64,6 +81,7 @@ class AssistantChatActivity : AppCompatActivity() {
 
         setupRecyclerView()
         setupSuggestions()
+        setupVoice()
         setupListeners()
 
         // Carrega catálogo de nichos (enviado no prompt para a IA classificar)
@@ -124,6 +142,24 @@ class AssistantChatActivity : AppCompatActivity() {
     private fun setupListeners() {
         binding.btnBack.setOnClickListener { finish() }
         binding.btnSend.setOnClickListener { sendMessage() }
+        binding.fabVoice.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    if (!isStreaming) requestVoiceInput()
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    voiceManager?.stop()
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    voiceManager?.cancel()
+                    setVoiceListening(false)
+                    true
+                }
+                else -> true
+            }
+        }
     }
 
     private fun sendMessage() {
@@ -206,7 +242,60 @@ class AssistantChatActivity : AppCompatActivity() {
 
     private fun showTyping(show: Boolean) {
         binding.tvTypingIndicator.visibility = if (show) View.VISIBLE else View.GONE
-        binding.tvTypingIndicator.text = if (show) "✍️ digitando…" else ""
+        binding.tvTypingIndicator.text = if (show) "Digitando..." else ""
+    }
+
+    private fun setupVoice() {
+        voiceManager = VoiceInputManager(
+            context = this,
+            onReadyForSpeech = { setVoiceListening(true) },
+            onPartial = { text -> fillInputWithVoiceText(text) },
+            onResult = { text -> fillInputWithVoiceText(text) },
+            onError = { message ->
+                if (message.isNotBlank()) toast(message)
+            },
+            onEnd = { setVoiceListening(false) }
+        )
+
+        if (voiceManager?.isAvailable() != true) {
+            binding.fabVoice.visibility = View.GONE
+            binding.tvVoiceStatus.visibility = View.GONE
+        }
+    }
+
+    private fun requestVoiceInput() {
+        val vm = voiceManager ?: return
+        if (!vm.isAvailable()) {
+            toast("Reconhecimento de voz indisponível neste aparelho.")
+            return
+        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            startVoiceInput()
+        } else {
+            pendingVoiceStart = true
+            microphonePermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun startVoiceInput() {
+        hideKeyboard()
+        binding.etInput.hint = "Fale agora..."
+        voiceManager?.start()
+    }
+
+    private fun fillInputWithVoiceText(text: String) {
+        val clean = text.trim()
+        if (clean.isEmpty()) return
+        binding.etInput.setText(clean)
+        binding.etInput.setSelection(clean.length)
+    }
+
+    private fun setVoiceListening(listening: Boolean) {
+        binding.tvVoiceStatus.visibility = if (listening) View.VISIBLE else View.GONE
+        binding.fabVoice.alpha = if (listening) 0.72f else 1f
+        binding.etInput.hint = if (listening) "Fale agora..." else "Digite sua mensagem..."
     }
 
     private fun hideKeyboard() {
@@ -222,6 +311,16 @@ class AssistantChatActivity : AppCompatActivity() {
             FirebaseConfig.getAnalytics()?.logEvent(name, params)
         } catch (_: Exception) {
         }
+    }
+
+    private fun toast(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onDestroy() {
+        voiceManager?.destroy()
+        voiceManager = null
+        super.onDestroy()
     }
 }
 

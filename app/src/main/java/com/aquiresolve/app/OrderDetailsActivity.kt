@@ -128,6 +128,13 @@ class OrderDetailsActivity : AppCompatActivity() {
         }
     }
 
+    // Após avaliar (ou pular a avaliação do) cliente, o prestador volta à Home.
+    private val clientRatingResultLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        goToProviderHome()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Configuration.getInstance().userAgentValue = packageName
@@ -690,17 +697,13 @@ class OrderDetailsActivity : AppCompatActivity() {
                         
                         if (result.isSuccess) {
                             showSuccessMessage("✅ Serviço finalizado com sucesso!")
-                            
-                            // Navegar de volta para a tela inicial do prestador após finalizar
+
                             if (isProviderView) {
                                 // Aguardar um pouco para mostrar a mensagem de sucesso
                                 delay(1000)
-                                
-                                // Criar intent para voltar à tela inicial do prestador
-                                val intent = Intent(this@OrderDetailsActivity, ProviderHomeActivity::class.java)
-                                intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-                                startActivity(intent)
-                                finish() // Finalizar esta activity
+                                // Convida o prestador a avaliar o cliente; ao concluir
+                                // (ou pular), o launcher leva de volta à Home do prestador.
+                                launchClientRating(order)
                             } else {
                                 loadOrderDetails()
                             }
@@ -721,6 +724,29 @@ class OrderDetailsActivity : AppCompatActivity() {
                 // Usuário cancelou
             }
         )
+    }
+
+    /**
+     * Abre a tela de avaliação do cliente pelo prestador (mão inversa).
+     */
+    private fun launchClientRating(order: OrderData) {
+        val intent = Intent(this, ClientRatingActivity::class.java).apply {
+            putExtra("order_id", order.id)
+            putExtra("client_name", order.clientName)
+            putExtra("service_type", order.serviceType)
+            putExtra("service_name", order.serviceName)
+        }
+        clientRatingResultLauncher.launch(intent)
+    }
+
+    /**
+     * Volta para a tela inicial do prestador, limpando a pilha.
+     */
+    private fun goToProviderHome() {
+        val intent = Intent(this, ProviderHomeActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+        startActivity(intent)
+        finish()
     }
 
     /**

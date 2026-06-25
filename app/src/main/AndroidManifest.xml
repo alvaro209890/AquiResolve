@@ -11,12 +11,21 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    
+    <!-- Entrada por voz no Assistente IA (fala → texto) -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
     <!-- Permissões de Localização -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
+    <!-- Necessário no Android 11+ (API 30) para enxergar o serviço de reconhecimento de voz -->
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
 
     <application
         android:name=".AppApplication"
@@ -152,6 +161,10 @@
             android:theme="@style/Theme.LoginApp" />
         <activity
             android:name=".ProviderReviewsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LoginApp" />
+        <activity
+            android:name=".ClientRatingActivity"
             android:exported="false"
             android:theme="@style/Theme.LoginApp" />
         <activity

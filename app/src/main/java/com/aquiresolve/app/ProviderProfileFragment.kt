@@ -163,7 +163,7 @@ class ProviderProfileFragment : Fragment() {
         // Ver avaliações do prestador
         binding.btnViewReviews.setOnClickListener {
             val userId = getCurrentUserId() ?: return@setOnClickListener
-            val name = binding.etNome.text.toString().ifBlank { "Prestador" }
+            val name = binding.etFullName.text.toString().ifBlank { "Prestador" }
             val intent = android.content.Intent(requireContext(), ProviderReviewsActivity::class.java)
             intent.putExtra("provider_id", userId)
             intent.putExtra("provider_name", name)

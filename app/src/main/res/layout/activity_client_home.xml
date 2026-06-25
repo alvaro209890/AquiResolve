@@ -251,6 +251,32 @@
 
             </LinearLayout>
 
+            <!-- Carrossel de banners de PARCEIROS (logo abaixo do banner do topo). Cada parceiro é
+                 um banner que roda a cada N segundos; limite diário de clientes em PartnerImpressionManager.
+                 GONE até haver parceiros disponíveis. -->
+            <LinearLayout
+                android:id="@+id/sectionPartnerBanners"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                android:layout_marginBottom="20dp">
+
+                <androidx.viewpager2.widget.ViewPager2
+                    android:id="@+id/partnerPager"
+                    android:layout_width="match_parent"
+                    android:layout_height="160dp" />
+
+                <LinearLayout
+                    android:id="@+id/partnerDots"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="10dp" />
+
+            </LinearLayout>
+
             <!-- Saudação enxuta (1 linha) — o acesso ao serviço vem pela busca/categorias/banner -->
             <TextView
                 android:id="@+id/tvWelcome"
@@ -385,75 +411,6 @@
                     android:overScrollMode="never"
                     tools:listitem="@layout/item_home_combo"
                     tools:orientation="horizontal" />
-
-            </LinearLayout>
-
-            <!-- Parceiros AquiResolve (vitrine — plano 04). GONE até haver parceiros ativos. -->
-            <LinearLayout
-                android:id="@+id/sectionPartners"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:visibility="gone"
-                android:layout_marginBottom="24dp">
-
-                <TextView
-                    android:id="@+id/tvPartnersTitle"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="🤝 Parceiros AquiResolve"
-                    android:textSize="20sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/text_primary"
-                    android:layout_marginBottom="12dp" />
-
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/rvPartners"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:clipToPadding="false"
-                    android:nestedScrollingEnabled="false"
-                    android:overScrollMode="never"
-                    tools:listitem="@layout/item_partner"
-                    tools:orientation="horizontal" />
-
-            </LinearLayout>
-
-            <!-- Seção de pedidos recentes -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:layout_marginBottom="24dp">
-
-                <TextView
-                    android:id="@+id/tvRecentOrders"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Seus Pedidos Recentes"
-                    android:textSize="20sp"
-                    android:textColor="@color/text_primary"
-                    android:textStyle="bold"
-                    android:layout_marginBottom="16dp" />
-
-                <!-- Container dinâmico para pedidos recentes -->
-                <LinearLayout
-                    android:id="@+id/containerRecentOrders"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="vertical" />
-
-                <!-- Estado vazio (sem pedidos) -->
-                <TextView
-                    android:id="@+id/tvEmptyOrders"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Nenhum pedido ainda. Acesse a aba Serviços para solicitar um pedido."
-                    android:textSize="14sp"
-                    android:textColor="@color/text_secondary"
-                    android:gravity="center"
-                    android:padding="24dp"
-                    android:visibility="visible" />
 
             </LinearLayout>
 

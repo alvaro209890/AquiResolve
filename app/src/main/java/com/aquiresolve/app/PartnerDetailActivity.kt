@@ -99,12 +99,57 @@ class PartnerDetailActivity : AppCompatActivity() {
             binding.sectionCoupon.visibility = View.GONE
         }
 
-        // Link externo.
+        // Contatos: WhatsApp, Instagram e Site (cada um só aparece se preenchido).
+        if (partner.hasWhatsapp()) {
+            binding.btnWhatsapp.visibility = View.VISIBLE
+            binding.btnWhatsapp.setOnClickListener { openWhatsapp(partner) }
+        } else {
+            binding.btnWhatsapp.visibility = View.GONE
+        }
+
+        if (partner.hasInstagram()) {
+            binding.btnInstagram.visibility = View.VISIBLE
+            binding.btnInstagram.setOnClickListener { openInstagram(partner) }
+        } else {
+            binding.btnInstagram.visibility = View.GONE
+        }
+
         if (partner.hasUrl()) {
             binding.btnVisitSite.visibility = View.VISIBLE
             binding.btnVisitSite.setOnClickListener { openSite(partner) }
         } else {
             binding.btnVisitSite.visibility = View.GONE
+        }
+
+        // Título "Fale com o parceiro" só quando há ao menos um contato.
+        val hasAnyContact = partner.hasWhatsapp() || partner.hasInstagram() || partner.hasUrl()
+        binding.tvContactTitle.visibility = if (hasAnyContact) View.VISIBLE else View.GONE
+    }
+
+    private fun openWhatsapp(partner: Partner) {
+        try {
+            val digits = partner.whatsapp.filter { it.isDigit() }
+            // Garante DDI Brasil quando vier sem (10–11 dígitos = DDD + número).
+            val phone = if (digits.length <= 11) "55$digits" else digits
+            val text = Uri.encode("Olá! Vim pelo AquiResolve e quero saber mais sobre os benefícios.")
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$phone?text=$text")))
+            logEvent("parceiro_whatsapp_aberto", partner)
+        } catch (_: Exception) {
+            Toast.makeText(this, "Não foi possível abrir o WhatsApp", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun openInstagram(partner: Partner) {
+        try {
+            val raw = partner.instagram.trim()
+            val url = when {
+                raw.startsWith("http://", true) || raw.startsWith("https://", true) -> raw
+                else -> "https://instagram.com/${raw.removePrefix("@")}"
+            }
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+            logEvent("parceiro_instagram_aberto", partner)
+        } catch (_: Exception) {
+            Toast.makeText(this, "Não foi possível abrir o Instagram", Toast.LENGTH_SHORT).show()
         }
     }
 

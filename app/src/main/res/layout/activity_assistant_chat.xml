@@ -1,13 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/rootLayout"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
     android:background="@color/background_color"
     tools:context=".AssistantChatActivity">
+
+<LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/background_color">
 
     <!-- App bar -->
     <LinearLayout
@@ -40,7 +45,7 @@
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="🤖 Assistente AquiResolve"
+                android:text="Hello AquiResolve"
                 android:textColor="@color/white"
                 android:textSize="18sp"
                 android:textStyle="bold" />
@@ -111,7 +116,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="@null"
-                android:hint="Digite sua mensagem…"
+                android:hint="Digite sua mensagem..."
                 android:inputType="textMultiLine|textCapSentences"
                 android:maxLines="4"
                 android:minHeight="44dp"
@@ -136,3 +141,34 @@
     </LinearLayout>
 
 </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvVoiceStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="16dp"
+        android:layout_marginBottom="142dp"
+        android:background="@drawable/bg_send_button"
+        android:elevation="8dp"
+        android:paddingHorizontal="14dp"
+        android:paddingVertical="8dp"
+        android:text="Ouvindo... pode falar"
+        android:textColor="@color/white"
+        android:textSize="13sp"
+        android:visibility="gone" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/fabVoice"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="16dp"
+        android:layout_marginBottom="82dp"
+        android:contentDescription="Segure para falar"
+        app:backgroundTint="@color/primary_color"
+        app:fabSize="normal"
+        app:srcCompat="@drawable/ic_mic"
+        app:tint="@color/white" />
+
+</FrameLayout>

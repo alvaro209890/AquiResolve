@@ -1,6 +1,5 @@
-﻿package com.aquiresolve.app
+package com.aquiresolve.app
 
-import android.content.Intent
 import android.os.Bundle
 import android.text.Editable
 import android.text.TextWatcher
@@ -9,35 +8,36 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import com.aquiresolve.app.databinding.ActivityRatingBinding
+import com.aquiresolve.app.databinding.ActivityClientRatingBinding
 import com.google.android.material.chip.Chip
 import kotlinx.coroutines.launch
 
 /**
- * RatingActivity - Tela de avaliação de prestadores (v2)
+ * ClientRatingActivity - Tela de avaliação do CLIENTE pelo PRESTADOR (mão inversa).
  *
- * Melhorias:
- * - Emoji reactions conforme a nota
- * - Tags rápidas (ChipGroup): "Pontual", "Preço justo", "Profissional", etc.
- * - Info do serviço realizado
- * - Contador de caracteres no comentário
- * - Feedback visual ao enviar
+ * Espelha a RatingActivity (cliente→prestador), mas:
+ * - Tema verde (secondary_color) para diferenciar visualmente.
+ * - Dimensões voltadas ao cliente: Comunicação, Cordialidade, Clareza do pedido,
+ *   Ambiente/acesso ao local.
+ * - Persiste em client_reviews via FirebaseOrderManager.submitClientRating.
+ *
+ * É acionada logo após o prestador finalizar o serviço com o código do cliente.
  */
-class RatingActivity : AppCompatActivity() {
+class ClientRatingActivity : AppCompatActivity() {
 
-    private lateinit var binding: ActivityRatingBinding
+    private lateinit var binding: ActivityClientRatingBinding
 
     private var isLoading = false
     private var currentRating = 0
     private var orderId: String? = null
-    private var providerName: String? = null
+    private var clientName: String? = null
     private var serviceType: String? = null
     private var serviceName: String? = null
 
-    private var qualityRating = 0
-    private var punctualityRating = 0
     private var communicationRating = 0
-    private var cleanlinessRating = 0
+    private var cordialityRating = 0
+    private var clarityRating = 0
+    private var environmentRating = 0
 
     private val selectedTags = mutableSetOf<String>()
 
@@ -45,8 +45,8 @@ class RatingActivity : AppCompatActivity() {
         private const val MAX_COMMENT_LENGTH = 500
 
         private val TAG_OPTIONS = listOf(
-            "Pontual", "Preço justo", "Profissional", "Serviço rápido",
-            "Bem avaliado", "Atencioso", "Organizado", "Recomendo"
+            "Cordial", "Comunicativo", "Objetivo", "Local organizado",
+            "Pontual", "Paciente", "Acesso fácil", "Recomendo"
         )
 
         private val EMOJI_BY_RATING = mapOf(
@@ -60,21 +60,21 @@ class RatingActivity : AppCompatActivity() {
 
         private val LABEL_BY_RATING = mapOf(
             0 to "Toque nas estrelas para avaliar",
-            1 to "Precisa melhorar muito",
+            1 to "Atendimento muito difícil",
             2 to "Deixou a desejar",
             3 to "Foi razoável",
-            4 to "Muito bom!",
-            5 to "Excelente! Adorei!"
+            4 to "Cliente tranquilo!",
+            5 to "Ótimo cliente!"
         )
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        binding = ActivityRatingBinding.inflate(layoutInflater)
+        binding = ActivityClientRatingBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         orderId = intent.getStringExtra("order_id")
-        providerName = intent.getStringExtra("provider_name")
+        clientName = intent.getStringExtra("client_name")
         serviceType = intent.getStringExtra("service_type")
         serviceName = intent.getStringExtra("service_name")
 
@@ -93,12 +93,8 @@ class RatingActivity : AppCompatActivity() {
             window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
         }
 
-        // Nome do prestador
-        providerName?.let { name ->
-            binding.tvProviderName.text = name
-        }
+        binding.tvClientName.text = clientName?.takeIf { it.isNotBlank() } ?: "Cliente"
 
-        // Info do serviço
         val serviceInfo = buildString {
             if (!serviceName.isNullOrBlank()) append(serviceName)
             if (!serviceType.isNullOrBlank()) {
@@ -113,12 +109,14 @@ class RatingActivity : AppCompatActivity() {
     }
 
     private fun setupClickListeners() {
-        binding.btnBack.setOnClickListener { finish() }
+        binding.btnBack.setOnClickListener { skip() }
         binding.btnSubmitRating.setOnClickListener { submitRating() }
-        binding.btnSkip.setOnClickListener {
-            setResult(RESULT_CANCELED)
-            finish()
-        }
+        binding.btnSkip.setOnClickListener { skip() }
+    }
+
+    private fun skip() {
+        setResult(RESULT_CANCELED)
+        finish()
     }
 
     private fun setupTagChips() {
@@ -130,13 +128,9 @@ class RatingActivity : AppCompatActivity() {
                 text = tag
                 isCheckable = true
                 isCheckedIconVisible = true
-                chipBackgroundColor = ContextCompat.getColorStateList(
-                    this@RatingActivity,
-                    android.R.color.transparent
-                )?.let { null } // usamos o estilo padrão
-                setChipBackgroundColorResource(R.color.orange_50)
-                setTextColor(ContextCompat.getColor(this@RatingActivity, R.color.text_primary))
-                setOnCheckedChangeListener { button, isChecked ->
+                setChipBackgroundColorResource(R.color.gray_100)
+                setTextColor(ContextCompat.getColor(this@ClientRatingActivity, R.color.text_primary))
+                setOnCheckedChangeListener { _, isChecked ->
                     if (isChecked) selectedTags.add(tag) else selectedTags.remove(tag)
                 }
             }
@@ -153,27 +147,25 @@ class RatingActivity : AppCompatActivity() {
                 val length = s?.length ?: 0
                 binding.tvCharCount.text = "$length/$MAX_COMMENT_LENGTH"
                 if (length > MAX_COMMENT_LENGTH) {
-                    binding.tvCharCount.setTextColor(ContextCompat.getColor(this@RatingActivity, R.color.error_color))
+                    binding.tvCharCount.setTextColor(ContextCompat.getColor(this@ClientRatingActivity, R.color.error_color))
                 } else {
-                    binding.tvCharCount.setTextColor(ContextCompat.getColor(this@RatingActivity, R.color.gray_400))
+                    binding.tvCharCount.setTextColor(ContextCompat.getColor(this@ClientRatingActivity, R.color.gray_400))
                 }
             }
         })
     }
 
     private fun setupStarRatings() {
-        // Rating geral
         setupStarRating(binding.ratingBar) { rating ->
             currentRating = rating
             updateEmojiAndLabel(rating)
-            // Mostrar/esconder detalhadas
             binding.cardDetailedRatings.visibility = if (rating > 0) View.VISIBLE else View.GONE
         }
 
-        setupStarRating(binding.ratingBarQuality) { qualityRating = it }
-        setupStarRating(binding.ratingBarPunctuality) { punctualityRating = it }
         setupStarRating(binding.ratingBarCommunication) { communicationRating = it }
-        setupStarRating(binding.ratingBarCleanliness) { cleanlinessRating = it }
+        setupStarRating(binding.ratingBarCordiality) { cordialityRating = it }
+        setupStarRating(binding.ratingBarClarity) { clarityRating = it }
+        setupStarRating(binding.ratingBarEnvironment) { environmentRating = it }
     }
 
     private fun setupStarRating(
@@ -206,7 +198,6 @@ class RatingActivity : AppCompatActivity() {
             return
         }
 
-        // As tags são persistidas em um campo estruturado (ratingTags), não no texto.
         val reviewComment = comment.takeIf { it.isNotBlank() }
         val tagsToSubmit = selectedTags.toList()
 
@@ -224,15 +215,15 @@ class RatingActivity : AppCompatActivity() {
 
                 val orderManager = FirebaseOrderManager()
 
-                val rateResult = orderManager.submitOrderRating(
+                val rateResult = orderManager.submitClientRating(
                     orderId = selectedOrderId,
                     rating = currentRating,
                     review = reviewComment,
-                    detailedRatings = FirebaseOrderManager.DetailedRatings(
-                        qualityRating = qualityRating.takeIf { it > 0 },
-                        punctualityRating = punctualityRating.takeIf { it > 0 },
+                    detailedRatings = FirebaseOrderManager.ClientDetailedRatings(
                         communicationRating = communicationRating.takeIf { it > 0 },
-                        cleanlinessRating = cleanlinessRating.takeIf { it > 0 }
+                        cordialityRating = cordialityRating.takeIf { it > 0 },
+                        clarityRating = clarityRating.takeIf { it > 0 },
+                        environmentRating = environmentRating.takeIf { it > 0 }
                     ),
                     tags = tagsToSubmit
                 )

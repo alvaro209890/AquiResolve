@@ -127,7 +127,9 @@ service cloud.firestore {
             'settlementStatus', 'settlementRequestedAt', 'updatedAt'
           ])
           || request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'rating', 'review', 'detailedRatings', 'ratedAt', 'updatedAt'
+            'rating', 'review', 'reviewedAt', 'ratedAt',
+            'qualityRating', 'punctualityRating', 'communicationRating',
+            'cleanlinessRating', 'ratingTags', 'updatedAt'
           ])
         );
     }
@@ -212,6 +214,24 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Impressões diárias dos banners de parceiros (limite de N clientes/dia por parceiro).
+    // Doc id = `{partnerId}_{yyyy-MM-dd}` com { partnerId, date, count, clientIds[] }.
+    // O cliente só pode somar o PRÓPRIO uid e manter count == clientIds.size() (ver
+    // PartnerImpressionManager). Tradeoff aceito: é contador de vitrine/anúncio, não financeiro.
+    match /partner_impressions/{docId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.auth.uid in request.resource.data.clientIds
+        && request.resource.data.count == request.resource.data.clientIds.size()
+        && request.resource.data.clientIds.size() <= 100000;
+      allow update: if isSignedIn()
+        && request.auth.uid in request.resource.data.clientIds
+        && request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(['count', 'clientIds', 'updatedAt'])
+        && request.resource.data.count == request.resource.data.clientIds.size();
+      allow delete: if false;
+    }
+
     // ═══════════════════════════════════════════════════════════════════════════
     // Usuários
     // ═══════════════════════════════════════════════════════════════════════════
@@ -221,7 +241,13 @@ service cloud.firestore {
       allow create: if isOwner(userId)
         && request.resource.data.uid == userId;
       allow update: if isAdmin()
-        || (isOwner(userId) && (request.resource.data.uid == userId || resource.data.uid == null));
+        || (isOwner(userId) && (request.resource.data.uid == userId || resource.data.uid == null))
+        // Recálculo da reputação do cliente após o prestador avaliá-lo num pedido
+        // concluído (FirebaseOrderManager.updateClientAverageRatingFromReviews).
+        // Restrito aos campos derivados de nota do cliente.
+        || (isSignedIn()
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['clientRating', 'clientTotalRatings', 'updatedAt']));
       allow delete: if isAdmin() || isOwner(userId);
 
       match /cashback_transactions/{txId} {
@@ -240,7 +266,13 @@ service cloud.firestore {
       allow create: if isAdmin()
         || (isOwner(providerId) && request.resource.data.uid == providerId);
       allow update: if isAdmin()
-        || (isOwner(providerId) && (request.resource.data.uid == providerId || resource.data.uid == null));
+        || (isOwner(providerId) && (request.resource.data.uid == providerId || resource.data.uid == null))
+        // Recálculo da nota pública do prestador após o cliente avaliar um pedido
+        // concluído (FirebaseOrderManager.updateProviderAverageRatingFromOrders).
+        // Restrito aos campos derivados de nota — não permite alterar nada mais.
+        || (isSignedIn()
+            && request.resource.data.diff(resource.data).affectedKeys()
+                 .hasOnly(['rating', 'totalRatings', 'updatedAt']));
       allow delete: if isAdmin() || isOwner(providerId);
     }
 
@@ -504,6 +536,16 @@ service cloud.firestore {
         && request.resource.data.clientId == request.auth.uid;
       allow update, delete: if isSignedIn()
         && resource.data.clientId == request.auth.uid;
+    }
+
+    // Avaliação do prestador sobre o cliente (mão inversa do provider_reviews).
+    // O autor é o prestador; o doc id é o orderId (uma avaliação por pedido).
+    match /client_reviews/{reviewId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.providerId == request.auth.uid;
+      allow update, delete: if isSignedIn()
+        && resource.data.providerId == request.auth.uid;
     }
 
     match /service_quotes/{quoteId} {

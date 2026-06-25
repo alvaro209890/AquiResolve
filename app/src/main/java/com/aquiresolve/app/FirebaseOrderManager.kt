@@ -39,6 +39,7 @@ class FirebaseOrderManager {
         private const val TAG = "FirebaseOrderManager"
         private const val ORDERS_COLLECTION = "orders"
         private const val PROVIDER_REVIEWS_COLLECTION = "provider_reviews"
+        private const val CLIENT_REVIEWS_COLLECTION = "client_reviews"
     }
 
     data class DetailedRatings(
@@ -61,6 +62,39 @@ class FirebaseOrderManager {
         val punctualityRating: Int? = null,
         val communicationRating: Int? = null,
         val cleanlinessRating: Int? = null,
+        val tags: List<String> = emptyList(),
+        val serviceType: String = "",
+        val serviceName: String = "",
+        val createdAt: Timestamp = Timestamp.now()
+    )
+
+    /**
+     * Notas detalhadas do prestador sobre o cliente (mão inversa de DetailedRatings).
+     */
+    data class ClientDetailedRatings(
+        val communicationRating: Int? = null,
+        val cordialityRating: Int? = null,
+        val clarityRating: Int? = null,
+        val environmentRating: Int? = null
+    )
+
+    /**
+     * Avaliação pública de um cliente, feita por prestadores (coleção client_reviews).
+     */
+    data class ClientReview(
+        val id: String = "",
+        val orderId: String = "",
+        val clientId: String = "",
+        val clientName: String = "",
+        val providerId: String = "",
+        val providerName: String = "",
+        val rating: Int = 0,
+        val review: String? = null,
+        val communicationRating: Int? = null,
+        val cordialityRating: Int? = null,
+        val clarityRating: Int? = null,
+        val environmentRating: Int? = null,
+        val tags: List<String> = emptyList(),
         val serviceType: String = "",
         val serviceName: String = "",
         val createdAt: Timestamp = Timestamp.now()
@@ -465,7 +499,8 @@ class FirebaseOrderManager {
         orderId: String,
         rating: Int,
         review: String? = null,
-        detailedRatings: DetailedRatings = DetailedRatings()
+        detailedRatings: DetailedRatings = DetailedRatings(),
+        tags: List<String> = emptyList()
     ): Result<Unit> {
         if (orderId.isBlank()) {
             return Result.failure(IllegalArgumentException("ID do pedido inválido"))
@@ -539,6 +574,11 @@ class FirebaseOrderManager {
                 detailedRatings.communicationRating?.let { updates["communicationRating"] = it }
                 detailedRatings.cleanlinessRating?.let { updates["cleanlinessRating"] = it }
 
+                val normalizedTags = normalizeReviewTags(tags)
+                if (normalizedTags.isNotEmpty()) {
+                    updates["ratingTags"] = normalizedTags
+                }
+
                 transaction.update(orderRef, updates)
             }.await()
 
@@ -570,6 +610,11 @@ class FirebaseOrderManager {
                 detailedRatings.punctualityRating?.let { reviewData["punctualityRating"] = it }
                 detailedRatings.communicationRating?.let { reviewData["communicationRating"] = it }
                 detailedRatings.cleanlinessRating?.let { reviewData["cleanlinessRating"] = it }
+
+                val normalizedTags = normalizeReviewTags(tags)
+                if (normalizedTags.isNotEmpty()) {
+                    reviewData["tags"] = normalizedTags
+                }
 
                 db.collection(PROVIDER_REVIEWS_COLLECTION)
                     .document(orderId)
@@ -628,6 +673,7 @@ class FirebaseOrderManager {
                     punctualityRating = doc.getLong("punctualityRating")?.toInt(),
                     communicationRating = doc.getLong("communicationRating")?.toInt(),
                     cleanlinessRating = doc.getLong("cleanlinessRating")?.toInt(),
+                    tags = (doc.get("tags") as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
                     serviceType = doc.getString("serviceType") ?: "",
                     serviceName = doc.getString("serviceName") ?: "",
                     createdAt = doc.getTimestamp("createdAt") ?: Timestamp.now()
@@ -707,6 +753,262 @@ class FirebaseOrderManager {
                 SetOptions.merge()
             )
             .await()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // Avaliação do PRESTADOR sobre o CLIENTE (mão inversa)
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    /**
+     * O prestador avalia o cliente após concluir o pedido.
+     *
+     * Regras de negócio:
+     * - Apenas o prestador atribuído ao pedido pode avaliar.
+     * - O pedido precisa estar concluído.
+     * - Uma única avaliação por pedido (doc id = orderId em client_reviews).
+     * - Atualiza a reputação pública do cliente (users/{clientId}).
+     */
+    suspend fun submitClientRating(
+        orderId: String,
+        rating: Int,
+        review: String? = null,
+        detailedRatings: ClientDetailedRatings = ClientDetailedRatings(),
+        tags: List<String> = emptyList()
+    ): Result<Unit> {
+        if (orderId.isBlank()) {
+            return Result.failure(IllegalArgumentException("ID do pedido inválido"))
+        }
+        if (rating !in 1..5) {
+            return Result.failure(IllegalArgumentException("A nota geral deve estar entre 1 e 5 estrelas"))
+        }
+
+        val detailedValues = listOf(
+            detailedRatings.communicationRating,
+            detailedRatings.cordialityRating,
+            detailedRatings.clarityRating,
+            detailedRatings.environmentRating
+        )
+        if (detailedValues.any { it != null && it !in 1..5 }) {
+            return Result.failure(IllegalArgumentException("As notas detalhadas devem estar entre 1 e 5 estrelas"))
+        }
+
+        return try {
+            val user = auth.awaitCurrentUser()
+                ?: return Result.failure(IllegalStateException("Usuário não autenticado"))
+
+            val orderDoc = db.collection(ORDERS_COLLECTION).document(orderId).get().await()
+            if (!orderDoc.exists()) {
+                return Result.failure(IllegalStateException("Pedido não encontrado"))
+            }
+
+            val assignedProvider = orderDoc.getString("assignedProvider")
+            if (assignedProvider != user.uid) {
+                return Result.failure(SecurityException("Somente o prestador do pedido pode avaliar o cliente"))
+            }
+
+            val status = orderDoc.getString("status")
+            if (status != OrderData.STATUS_COMPLETED) {
+                return Result.failure(IllegalStateException("Somente pedidos concluídos podem ser avaliados"))
+            }
+
+            val clientId = orderDoc.getString("clientId")
+            if (clientId.isNullOrBlank()) {
+                return Result.failure(IllegalStateException("Cliente do pedido não identificado"))
+            }
+
+            val reviewRef = db.collection(CLIENT_REVIEWS_COLLECTION).document(orderId)
+            val existing = reviewRef.get().await()
+            if (existing.exists()) {
+                return Result.failure(IllegalStateException("Este cliente já foi avaliado neste pedido"))
+            }
+
+            val reviewData = mutableMapOf<String, Any>(
+                "orderId" to orderId,
+                "clientId" to clientId,
+                "clientName" to (orderDoc.getString("clientName") ?: "Cliente"),
+                "providerId" to user.uid,
+                "providerName" to (orderDoc.getString("assignedProviderName") ?: user.displayName ?: "Prestador"),
+                "rating" to rating,
+                "createdAt" to Timestamp.now()
+            )
+
+            val normalizedReview = review?.trim()
+            if (!normalizedReview.isNullOrEmpty()) {
+                reviewData["review"] = normalizedReview
+            }
+
+            orderDoc.getString("serviceType")?.let { reviewData["serviceType"] = it }
+            orderDoc.getString("serviceName")?.let { reviewData["serviceName"] = it }
+            detailedRatings.communicationRating?.let { reviewData["communicationRating"] = it }
+            detailedRatings.cordialityRating?.let { reviewData["cordialityRating"] = it }
+            detailedRatings.clarityRating?.let { reviewData["clarityRating"] = it }
+            detailedRatings.environmentRating?.let { reviewData["environmentRating"] = it }
+
+            val normalizedTags = normalizeReviewTags(tags)
+            if (normalizedTags.isNotEmpty()) {
+                reviewData["tags"] = normalizedTags
+            }
+
+            reviewRef.set(reviewData).await()
+
+            // Recalcula a reputação pública do cliente.
+            updateClientAverageRatingFromReviews(clientId)
+
+            Log.d(TAG, "Cliente avaliado com sucesso: $orderId -> $rating estrelas")
+            Result.success(Unit)
+        } catch (e: SecurityException) {
+            Log.e(TAG, "Avaliação de cliente não autorizada: ${e.message}")
+            Result.failure(e)
+        } catch (e: IllegalStateException) {
+            Log.e(TAG, "Erro de regra ao avaliar cliente: ${e.message}")
+            Result.failure(e)
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao avaliar cliente: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Indica se o pedido já recebeu avaliação do prestador sobre o cliente.
+     * Nunca lança — em caso de erro, retorna false (permite tentar avaliar).
+     */
+    suspend fun hasRatedClient(orderId: String): Boolean {
+        if (orderId.isBlank()) return false
+        return try {
+            db.collection(CLIENT_REVIEWS_COLLECTION).document(orderId).get().await().exists()
+        } catch (e: Exception) {
+            Log.w(TAG, "Erro ao verificar avaliação de cliente: ${e.message}")
+            false
+        }
+    }
+
+    /**
+     * Busca as avaliações públicas de um cliente (coleção client_reviews),
+     * mais recentes primeiro.
+     */
+    suspend fun getClientReviews(clientId: String, limit: Long = 50): List<ClientReview> {
+        if (clientId.isBlank()) return emptyList()
+
+        return try {
+            val snapshot = db.collection(CLIENT_REVIEWS_COLLECTION)
+                .whereEqualTo("clientId", clientId)
+                .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .limit(limit)
+                .get()
+                .await()
+
+            snapshot.documents.map { doc ->
+                ClientReview(
+                    id = doc.id,
+                    orderId = doc.getString("orderId") ?: "",
+                    clientId = doc.getString("clientId") ?: clientId,
+                    clientName = doc.getString("clientName") ?: "Cliente",
+                    providerId = doc.getString("providerId") ?: "",
+                    providerName = doc.getString("providerName") ?: "Prestador",
+                    rating = (doc.getLong("rating") ?: 0L).toInt(),
+                    review = doc.getString("review"),
+                    communicationRating = doc.getLong("communicationRating")?.toInt(),
+                    cordialityRating = doc.getLong("cordialityRating")?.toInt(),
+                    clarityRating = doc.getLong("clarityRating")?.toInt(),
+                    environmentRating = doc.getLong("environmentRating")?.toInt(),
+                    tags = (doc.get("tags") as? List<*>)?.filterIsInstance<String>() ?: emptyList(),
+                    serviceType = doc.getString("serviceType") ?: "",
+                    serviceName = doc.getString("serviceName") ?: "",
+                    createdAt = doc.getTimestamp("createdAt") ?: Timestamp.now()
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao buscar avaliações do cliente $clientId: ${e.message}", e)
+            emptyList()
+        }
+    }
+
+    /**
+     * Estatísticas agregadas das avaliações de um cliente.
+     */
+    suspend fun getClientReviewStats(clientId: String): Map<String, Any> {
+        val empty = mapOf(
+            "averageRating" to 0.0,
+            "totalReviews" to 0,
+            "distribution" to mapOf(1 to 0, 2 to 0, 3 to 0, 4 to 0, 5 to 0)
+        )
+        if (clientId.isBlank()) return empty
+
+        return try {
+            val snapshot = db.collection(CLIENT_REVIEWS_COLLECTION)
+                .whereEqualTo("clientId", clientId)
+                .get()
+                .await()
+
+            var total = 0.0
+            var count = 0
+            val distribution = mutableMapOf(1 to 0, 2 to 0, 3 to 0, 4 to 0, 5 to 0)
+
+            for (doc in snapshot.documents) {
+                val r = (doc.getLong("rating") ?: 0L).toInt()
+                if (r in 1..5) {
+                    total += r
+                    count++
+                    distribution[r] = (distribution[r] ?: 0) + 1
+                }
+            }
+
+            mapOf(
+                "averageRating" to if (count > 0) total / count else 0.0,
+                "totalReviews" to count,
+                "distribution" to distribution
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao buscar estatísticas do cliente $clientId: ${e.message}", e)
+            empty
+        }
+    }
+
+    private suspend fun updateClientAverageRatingFromReviews(clientId: String) {
+        val reviews = db.collection(CLIENT_REVIEWS_COLLECTION)
+            .whereEqualTo("clientId", clientId)
+            .get()
+            .await()
+
+        var totalRating = 0.0
+        var totalRatings = 0
+
+        for (doc in reviews.documents) {
+            val ratingValue = doc.getLong("rating")?.toInt()
+                ?: doc.getDouble("rating")?.toInt()
+                ?: continue
+            if (ratingValue in 1..5) {
+                totalRating += ratingValue
+                totalRatings++
+            }
+        }
+
+        val average = if (totalRatings > 0) totalRating / totalRatings else 0.0
+
+        db.collection("users")
+            .document(clientId)
+            .set(
+                mapOf(
+                    "clientRating" to average,
+                    "clientTotalRatings" to totalRatings,
+                    "updatedAt" to Date()
+                ),
+                SetOptions.merge()
+            )
+            .await()
+    }
+
+    /**
+     * Normaliza tags de avaliação: remove vazias/duplicadas, corta tamanho e limita a 8.
+     */
+    private fun normalizeReviewTags(tags: List<String>): List<String> {
+        return tags.asSequence()
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .map { it.take(40) }
+            .distinct()
+            .take(8)
+            .toList()
     }
 
     private suspend fun settleCompletedOrderOnBackend(orderId: String): Boolean {

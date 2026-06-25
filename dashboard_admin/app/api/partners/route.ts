@@ -22,6 +22,13 @@ interface PartnerInput {
   benefitLabel?: string
   couponCode?: string
   url?: string
+  whatsapp?: string
+  instagram?: string
+  rotationSeconds?: number
+  dailyImpressionCap?: number
+  startDate?: string
+  campaignDays?: number
+  campaignValue?: number
   active?: boolean
   displayOrder?: number
 }
@@ -29,6 +36,30 @@ interface PartnerInput {
 function normalizeBenefitType(value: string | undefined): BenefitType {
   const v = String(value ?? '').trim().toLowerCase()
   return (BENEFIT_TYPES as readonly string[]).includes(v) ? (v as BenefitType) : 'link'
+}
+
+// Segundos por banner: 3–20 (padrão 6). Clientes/dia: ≥1 (padrão 10). Dias de campanha: ≥0 (0 = sem fim).
+function clampInt(value: unknown, min: number, max: number, fallback: number): number {
+  const n = Math.floor(Number(value))
+  if (!Number.isFinite(n)) return fallback
+  return Math.min(Math.max(n, min), max)
+}
+
+// Data de início no formato yyyy-MM-dd (ou vazio).
+function normalizeStartDate(value: string | undefined): string {
+  const v = String(value ?? '').trim()
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : ''
+}
+
+// Valor pago pela campanha (R$). Aceita número ou string com vírgula/ponto; nunca negativo.
+function normalizeMoney(value: unknown): number {
+  if (typeof value === 'number') return Number.isFinite(value) && value > 0 ? Math.round(value * 100) / 100 : 0
+  const raw = String(value ?? '').trim().replace(/[^\d,.-]/g, '')
+  if (!raw) return 0
+  // "1.500,00" -> "1500.00" ; "1500.50" -> "1500.50"
+  const normalized = raw.includes(',') ? raw.replace(/\./g, '').replace(',', '.') : raw
+  const n = Number(normalized)
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : 0
 }
 
 // GET /api/partners — lista todos os parceiros ordenados por displayOrder.
@@ -51,6 +82,13 @@ export async function GET(request: NextRequest) {
           benefitLabel: String(data.benefitLabel ?? data.benefit ?? ''),
           couponCode: String(data.couponCode ?? data.coupon ?? ''),
           url: String(data.url ?? data.link ?? ''),
+          whatsapp: String(data.whatsapp ?? data.whatsApp ?? data.phone ?? ''),
+          instagram: String(data.instagram ?? data.instagramUrl ?? ''),
+          rotationSeconds: Number(data.rotationSeconds ?? data.rotateSeconds ?? 6),
+          dailyImpressionCap: Number(data.dailyImpressionCap ?? data.dailyCap ?? data.impressionCap ?? 10),
+          startDate: String(data.startDate ?? data.startsAt ?? ''),
+          campaignDays: Number(data.campaignDays ?? data.durationDays ?? 0),
+          campaignValue: Number(data.campaignValue ?? data.campaignAmount ?? data.amountPaid ?? 0),
           active: Boolean(data.active ?? data.isActive ?? data.enabled ?? true),
           displayOrder: Number(data.displayOrder ?? data.order ?? data.sortOrder ?? 0),
         }
@@ -93,6 +131,14 @@ export async function POST(request: NextRequest) {
     const active = input.active !== false
     const order = Number.isFinite(Number(input.displayOrder)) ? Number(input.displayOrder) : 0
 
+    // WhatsApp só dígitos; regras de exibição com clamps; data de início validada.
+    const whatsapp = String(input.whatsapp ?? '').replace(/\D/g, '')
+    const rotationSeconds = clampInt(input.rotationSeconds, 3, 20, 6)
+    const dailyImpressionCap = clampInt(input.dailyImpressionCap, 1, 1_000_000, 10)
+    const campaignDays = clampInt(input.campaignDays, 0, 3650, 30)
+    const campaignValue = normalizeMoney(input.campaignValue)
+    const startDate = normalizeStartDate(input.startDate)
+
     const payload = {
       name,
       logoUrl,
@@ -102,6 +148,13 @@ export async function POST(request: NextRequest) {
       benefitLabel: String(input.benefitLabel ?? '').trim(),
       couponCode,
       url: String(input.url ?? '').trim(),
+      whatsapp,
+      instagram: String(input.instagram ?? '').trim(),
+      rotationSeconds,
+      dailyImpressionCap,
+      startDate,
+      campaignDays,
+      campaignValue,
       active,
       isActive: active,
       enabled: active,

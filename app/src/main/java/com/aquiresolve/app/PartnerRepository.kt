@@ -60,6 +60,18 @@ object PartnerRepository {
         return ""
     }
 
+    /** Segundos por banner: clampa em 3–20; valor inválido (0) cai no padrão. */
+    private fun clampRotation(value: Int): Int =
+        if (value <= 0) Partner.DEFAULT_ROTATION_SECONDS else value.coerceIn(3, 20)
+
+    /** Limite diário de clientes: clampa em 1–10000; valor inválido (0) cai no padrão. */
+    private fun clampCap(value: Int): Int =
+        if (value <= 0) Partner.DEFAULT_DAILY_CAP else value.coerceIn(1, 10000)
+
+    /** Dias de campanha: 0 = sem expiração (legado/ilimitado); negativos viram 0; teto de 3650. */
+    private fun clampCampaignDays(value: Int): Int =
+        if (value <= 0) 0 else value.coerceAtMost(3650)
+
     /**
      * Carrega os parceiros do Firestore. Retorna a lista pronta para a seção (filtrada e ordenada).
      * Em caso de falha, mantém o último cache (ou lista vazia) — nunca propaga exceção.
@@ -84,6 +96,12 @@ object PartnerRepository {
                     benefitLabel = readString(data["benefitLabel"], data["benefit"]),
                     couponCode = readString(data["couponCode"], data["coupon"]),
                     url = readString(data["url"], data["link"]),
+                    whatsapp = readString(data["whatsapp"], data["whatsApp"], data["phone"]),
+                    instagram = readString(data["instagram"], data["instagramUrl"]),
+                    rotationSeconds = clampRotation(readInt(data["rotationSeconds"], data["rotateSeconds"])),
+                    dailyImpressionCap = clampCap(readInt(data["dailyImpressionCap"], data["dailyCap"], data["impressionCap"])),
+                    startDate = readString(data["startDate"], data["startsAt"]),
+                    campaignDays = clampCampaignDays(readInt(data["campaignDays"], data["durationDays"])),
                     active = true,
                     displayOrder = readInt(data["displayOrder"], data["order"], data["sortOrder"])
                 )
