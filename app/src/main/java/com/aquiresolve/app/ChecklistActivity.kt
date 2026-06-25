@@ -102,6 +102,19 @@ class ChecklistActivity : AppCompatActivity() {
         serviceBoxes.forEach { it.setOnCheckedChangeListener { _, _ -> updatePendingSummary() } }
         binding.cbDeclarationAccepted.setOnCheckedChangeListener { _, _ -> updatePendingSummary() }
         binding.rgProblemResolution.setOnCheckedChangeListener { _, _ -> updatePendingSummary() }
+        binding.cbMaterialsUsed.setOnCheckedChangeListener { _, checked ->
+            binding.tilMaterialsDescription.visibility = if (checked) android.view.View.VISIBLE else android.view.View.GONE
+            if (!checked) {
+                binding.etMaterialsDescription.text?.clear()
+                binding.tilMaterialsDescription.error = null
+            }
+            updatePendingSummary()
+        }
+        binding.etMaterialsDescription.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
+            override fun afterTextChanged(s: android.text.Editable?) { updatePendingSummary() }
+        })
         binding.etExecutionDescription.addTextChangedListener(object : android.text.TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {}
@@ -120,6 +133,9 @@ class ChecklistActivity : AppCompatActivity() {
             pending.add("• Descrição detalhada do serviço realizado")
         }
         if (binding.rgProblemResolution.checkedRadioButtonId == -1) pending.add("• Indicar se o problema foi solucionado")
+        if (binding.cbMaterialsUsed.isChecked && binding.etMaterialsDescription.text?.toString()?.trim().isNullOrEmpty()) {
+            pending.add("• Descrever os materiais/suprimentos usados")
+        }
         if (!binding.cbDeclarationAccepted.isChecked) pending.add("• Aceitar a declaração de veracidade")
 
         if (pending.isEmpty()) {
@@ -182,6 +198,15 @@ class ChecklistActivity : AppCompatActivity() {
             return false
         }
 
+        if (binding.cbMaterialsUsed.isChecked &&
+            binding.etMaterialsDescription.text?.toString()?.trim().isNullOrEmpty()
+        ) {
+            binding.tilMaterialsDescription.error = "Informe os materiais usados"
+            Toast.makeText(this, "Descreva os materiais/suprimentos usados", Toast.LENGTH_LONG).show()
+            return false
+        }
+        binding.tilMaterialsDescription.error = null
+
         if (!binding.cbDeclarationAccepted.isChecked) {
             Toast.makeText(this, "Confirme a declaração de veracidade das informações", Toast.LENGTH_LONG).show()
             return false
@@ -196,6 +221,7 @@ class ChecklistActivity : AppCompatActivity() {
             "serviceMatches" to binding.cbServiceMatches.isChecked,
             "visibleDamage" to binding.cbVisibleDamage.isChecked,
             "materialAvailable" to binding.cbMaterialAvailable.isChecked,
+            "materialsUsed" to binding.cbMaterialsUsed.isChecked,
             "clientObservations" to binding.cbClientObservations.isChecked,
             "executedAsRequested" to binding.cbExecutedAsRequested.isChecked,
             "additionalService" to binding.cbAdditionalService.isChecked,
@@ -239,6 +265,8 @@ class ChecklistActivity : AppCompatActivity() {
                 val preExistingDamages = binding.etPreExistingDamages.text?.toString()?.trim() ?: ""
                 val observations = binding.etObservations.text?.toString()?.trim() ?: ""
                 val problemResolution = getProblemResolution()
+                val materialsUsed = binding.cbMaterialsUsed.isChecked
+                val materialsDescription = binding.etMaterialsDescription.text?.toString()?.trim().orEmpty()
 
                 val result = checklistManager.saveChecklistAnswers(
                     orderId!!,
@@ -247,7 +275,9 @@ class ChecklistActivity : AppCompatActivity() {
                     serviceDescriptions,
                     preExistingDamages,
                     observations,
-                    problemResolution
+                    problemResolution,
+                    materialsUsed,
+                    materialsDescription
                 )
 
                 if (result.isSuccess) {
@@ -282,6 +312,12 @@ class ChecklistActivity : AppCompatActivity() {
                         serviceMatches = answers["serviceMatches"],
                         visibleDamage = answers["visibleDamage"],
                         materialAvailable = answers["materialAvailable"],
+                        materialsUsed = answers["materialsUsed"],
+                        materialsDescription = if (answers["materialsUsed"] == true) {
+                            binding.etMaterialsDescription.text?.toString()?.trim().orEmpty()
+                        } else {
+                            ""
+                        },
                         clientObservations = answers["clientObservations"],
                         executedAsRequested = answers["executedAsRequested"],
                         additionalService = answers["additionalService"],
@@ -305,6 +341,12 @@ class ChecklistActivity : AppCompatActivity() {
                         serviceMatches = answers["serviceMatches"],
                         visibleDamage = answers["visibleDamage"],
                         materialAvailable = answers["materialAvailable"],
+                        materialsUsed = answers["materialsUsed"],
+                        materialsDescription = if (answers["materialsUsed"] == true) {
+                            binding.etMaterialsDescription.text?.toString()?.trim().orEmpty()
+                        } else {
+                            ""
+                        },
                         clientObservations = answers["clientObservations"],
                         executedAsRequested = answers["executedAsRequested"],
                         additionalService = answers["additionalService"],
@@ -336,6 +378,13 @@ class ChecklistActivity : AppCompatActivity() {
         binding.cbServiceMatches.isChecked = checklist.serviceMatches == true
         binding.cbVisibleDamage.isChecked = checklist.visibleDamage == true
         binding.cbMaterialAvailable.isChecked = checklist.materialAvailable == true
+        binding.cbMaterialsUsed.isChecked = checklist.materialsUsed == true
+        binding.etMaterialsDescription.setText(checklist.materialsDescription)
+        binding.tilMaterialsDescription.visibility = if (checklist.materialsUsed == true) {
+            android.view.View.VISIBLE
+        } else {
+            android.view.View.GONE
+        }
         binding.cbClientObservations.isChecked = checklist.clientObservations == true
         binding.cbExecutedAsRequested.isChecked = checklist.executedAsRequested == true
         binding.cbAdditionalService.isChecked = checklist.additionalService == true

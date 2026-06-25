@@ -28,7 +28,7 @@ router.post('/classify', async (req, res, next) => {
       : [];
 
     if (!description) {
-      throw new HttpError(400, 'Descreva o que aconteceu para o assistente.', { code: 'AI_EMPTY_DESCRIPTION' });
+      throw new HttpError(400, 'Descreva o que aconteceu para o Hello.', { code: 'AI_EMPTY_DESCRIPTION' });
     }
     if (niches.length === 0) {
       throw new HttpError(400, 'Lista de nichos vazia.', { code: 'AI_EMPTY_NICHES' });
@@ -46,14 +46,14 @@ router.post('/classify', async (req, res, next) => {
   } catch (error) {
     if (error.code === 'AI_NOT_CONFIGURED') {
       logger.warn('IA não configurada (GROQ_API_KEY ausente)', { requestId: req.requestId });
-      return next(new HttpError(503, 'Assistente indisponível no momento.', { code: 'AI_NOT_CONFIGURED' }));
+      return next(new HttpError(503, 'Hello indisponível no momento.', { code: 'AI_NOT_CONFIGURED' }));
     }
     if (error instanceof HttpError) {
       return next(error);
     }
     // Falha de rede/Groq → 502 amigável (o app cai no fallback de busca/lista).
     logger.error('Falha ao classificar via IA', { requestId: req.requestId, error: error.message });
-    return next(new HttpError(502, 'Assistente indisponível no momento.', { code: 'AI_UPSTREAM_ERROR' }));
+    return next(new HttpError(502, 'Hello indisponível no momento.', { code: 'AI_UPSTREAM_ERROR' }));
   }
 });
 

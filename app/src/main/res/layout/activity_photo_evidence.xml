@@ -134,14 +134,16 @@
 
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Durante -->
+            <!-- Durante (legado/opcional; o fluxo atual exige chegada e pós-serviço) -->
             <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardDuringPhotos"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 app:cardCornerRadius="12dp"
                 app:cardElevation="4dp"
                 app:cardBackgroundColor="@color/surface_color"
-                android:layout_marginBottom="16dp">
+                android:layout_marginBottom="16dp"
+                android:visibility="gone">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -160,7 +162,7 @@
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
                             android:layout_weight="1"
-                            android:text="📷 Durante o Serviço"
+                            android:text="📷 Durante o Serviço (opcional)"
                             android:textSize="18sp"
                             android:textStyle="bold"
                             android:textColor="@color/text_primary" />
@@ -287,7 +289,7 @@
                 android:id="@+id/btnContinue"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Continuar para Assinaturas"
+                android:text="Enviar fotos e finalizar com código"
                 android:textSize="16sp"
                 app:cornerRadius="8dp"
                 android:backgroundTint="@color/secondary_color"

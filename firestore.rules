@@ -312,14 +312,28 @@ service cloud.firestore {
     }
 
     // Solicitações de alteração de especialidades — prestador cria, admin aprova/rejeita via Admin SDK
+    // Exige justificativa textual + fotos obrigatórias (documento, selfie, comprovantes)
     match /provider_specialty_requests/{requestId} {
       // Prestador lê suas próprias solicitações (para exibir o status no app)
       allow read: if isSignedIn() && resource.data.providerId == request.auth.uid;
-      // Prestador cria a própria solicitação com status inicial pending
+      // Prestador cria a própria solicitação com status inicial pending + campos obrigatórios
       allow create: if isSignedIn()
         && request.resource.data.providerId == request.auth.uid
         && request.resource.data.status == 'pending'
-        && request.resource.data.keys().hasAll(['providerId','providerName','requestedServices','currentServices','status','createdAt']);
+        && request.resource.data.keys().hasAll([
+          'providerId','providerName','requestedServices','currentServices',
+          'justificationText','documentPhotoUrl','selfiePhotoUrl','proofPhotoUrls',
+          'status','createdAt'
+        ])
+        && request.resource.data.justificationText is string
+        && request.resource.data.justificationText.size() >= 20
+        && request.resource.data.documentPhotoUrl is string
+        && request.resource.data.documentPhotoUrl.size() > 0
+        && request.resource.data.selfiePhotoUrl is string
+        && request.resource.data.selfiePhotoUrl.size() > 0
+        && request.resource.data.proofPhotoUrls is list
+        && request.resource.data.proofPhotoUrls.size() >= 1
+        && request.resource.data.proofPhotoUrls.size() <= 3;
       // Updates e deletes exclusivos via Admin SDK (dashboard)
       allow update, delete: if false;
     }

@@ -214,7 +214,7 @@
                         android:id="@+id/tvSearchEmptyCta"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Não encontramos esse serviço. Toque para descrever ao Assistente 🤖 →"
+                        android:text="Não encontramos esse serviço. Toque para descrever ao Hello →"
                         android:textColor="@color/primary_color"
                         android:textSize="14sp"
                         android:background="?android:attr/selectableItemBackground"
@@ -414,7 +414,7 @@
 
             </LinearLayout>
 
-            <!-- CTA do Assistente IA (plano 06) — fecha a Home como conveniência para indecisos -->
+            <!-- CTA do Hello IA (plano 06) — fecha a Home como conveniência para indecisos -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardAssistant"
                 android:layout_width="match_parent"
@@ -460,7 +460,7 @@
                         <TextView
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:text="Descreva o problema e o Assistente AquiResolve encontra para você."
+                            android:text="Descreva o problema e o Hello encontra para você."
                             android:textSize="13sp"
                             android:textColor="@color/text_secondary"
                             android:layout_marginTop="2dp"

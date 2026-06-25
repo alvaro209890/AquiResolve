@@ -79,9 +79,13 @@ class FirebaseChecklistManager {
                 updatedAt = now
             )
 
+            val payload = checklist.toMap().toMutableMap()
+            payload["materialsUsed"] = false
+            payload["materialsDescription"] = ""
+
             db.collection(CHECKLISTS_COLLECTION)
                 .document(orderId)
-                .set(checklist.toMap(), SetOptions.merge())
+                .set(payload, SetOptions.merge())
                 .await()
 
             Log.d(TAG, "Serviço iniciado com checklist para pedido: $orderId")
@@ -99,7 +103,9 @@ class FirebaseChecklistManager {
         serviceDescription: List<String> = emptyList(),
         preExistingDamages: String = "",
         observations: String = "",
-        problemResolution: String = ""
+        problemResolution: String = "",
+        materialsUsed: Boolean = false,
+        materialsDescription: String = ""
     ): Result<Unit> {
         return try {
             val data = mutableMapOf<String, Any?>(
@@ -116,6 +122,8 @@ class FirebaseChecklistManager {
             data["executionDescription"] = executionDescription
             data["preExistingDamages"] = preExistingDamages
             data["observations"] = observations
+            data["materialsUsed"] = materialsUsed
+            data["materialsDescription"] = if (materialsUsed) materialsDescription else ""
             if (problemResolution.isNotEmpty()) data["problemResolution"] = problemResolution
             data["status"] = OsChecklistData.STATUS_PHOTOS_PENDING
 
@@ -152,7 +160,7 @@ class FirebaseChecklistManager {
                 field to photoUrls,
                 timeField to timestamps,
                 "status" to if (category == "after") {
-                    OsChecklistData.STATUS_SIGNATURES_PENDING
+                    OsChecklistData.STATUS_READY_FOR_COMPLETION_CODE
                 } else {
                     OsChecklistData.STATUS_PHOTOS_PENDING
                 },
@@ -230,6 +238,30 @@ class FirebaseChecklistManager {
             Result.success(Unit)
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao salvar assinatura do cliente: ${e.message}")
+            Result.failure(e)
+        }
+    }
+
+    suspend fun markCompletedByClientCode(orderId: String): Result<Unit> {
+        return try {
+            val data = mapOf<String, Any?>(
+                "orderId" to orderId,
+                "status" to OsChecklistData.STATUS_COMPLETED,
+                "completedAt" to Timestamp.now(),
+                "completionMethod" to "client_code",
+                "updatedAt" to Timestamp.now()
+            ).toMutableMap()
+            addProviderMetadata(data)
+
+            db.collection(CHECKLISTS_COLLECTION)
+                .document(orderId)
+                .set(data, SetOptions.merge())
+                .await()
+
+            Log.d(TAG, "Checklist concluído por código do cliente: $orderId")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao concluir checklist por código: ${e.message}")
             Result.failure(e)
         }
     }

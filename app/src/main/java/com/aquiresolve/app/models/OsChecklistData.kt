@@ -28,6 +28,10 @@ data class OsChecklistData(
     val visibleDamage: Boolean? = null,
     @PropertyName("materialAvailable")
     val materialAvailable: Boolean? = null,
+    @PropertyName("materialsUsed")
+    val materialsUsed: Boolean? = null,
+    @PropertyName("materialsDescription")
+    val materialsDescription: String = "",
     @PropertyName("clientObservations")
     val clientObservations: Boolean? = null,
     @PropertyName("executedAsRequested")
@@ -81,7 +85,7 @@ data class OsChecklistData(
     @PropertyName("photoTimestampsAfter")
     val photoTimestampsAfter: List<Timestamp> = emptyList(),
 
-    // Assinatura do prestador
+    // Campos legados de assinatura. Mantidos para leitura de OS antigas; o fluxo novo usa código do cliente.
     @PropertyName("providerSignatureUrl")
     val providerSignatureUrl: String? = null,
     @PropertyName("providerSignatureName")
@@ -110,6 +114,7 @@ data class OsChecklistData(
     companion object {
         const val STATUS_CHECKLIST_PENDING = "checklist_pending"
         const val STATUS_PHOTOS_PENDING = "photos_pending"
+        const val STATUS_READY_FOR_COMPLETION_CODE = "ready_for_completion_code"
         const val STATUS_SIGNATURES_PENDING = "signatures_pending"
         const val STATUS_COMPLETED = "completed"
 
@@ -125,6 +130,8 @@ data class OsChecklistData(
                 serviceMatches = data["serviceMatches"] as? Boolean,
                 visibleDamage = data["visibleDamage"] as? Boolean,
                 materialAvailable = data["materialAvailable"] as? Boolean,
+                materialsUsed = data["materialsUsed"] as? Boolean,
+                materialsDescription = data["materialsDescription"] as? String ?: "",
                 clientObservations = data["clientObservations"] as? Boolean,
                 executedAsRequested = data["executedAsRequested"] as? Boolean,
                 additionalService = data["additionalService"] as? Boolean,
@@ -170,6 +177,8 @@ data class OsChecklistData(
             "serviceMatches" to serviceMatches,
             "visibleDamage" to visibleDamage,
             "materialAvailable" to materialAvailable,
+            "materialsUsed" to materialsUsed,
+            "materialsDescription" to materialsDescription,
             "clientObservations" to clientObservations,
             "executedAsRequested" to executedAsRequested,
             "additionalService" to additionalService,
@@ -217,7 +226,7 @@ data class OsChecklistData(
         get() = checklistStep1Complete && checklistStep2Complete && executionDescription.isNotBlank()
 
     val photosComplete: Boolean
-        get() = photosBefore.isNotEmpty() && photosDuring.isNotEmpty() && photosAfter.isNotEmpty()
+        get() = photosBefore.isNotEmpty() && photosAfter.isNotEmpty()
 
     val providerSignatureComplete: Boolean
         get() = providerSignatureUrl != null && providerSignatureName != null
@@ -226,7 +235,7 @@ data class OsChecklistData(
         get() = clientSignatureUrl != null && clientSignatureName != null
 
     val isComplete: Boolean
-        get() = checklistComplete && photosComplete && providerSignatureComplete && clientSignatureComplete
+        get() = checklistComplete && photosComplete && status == STATUS_COMPLETED
 
     val checklistCompletable: Boolean
         get() = clientPresent != null && serviceMatches != null

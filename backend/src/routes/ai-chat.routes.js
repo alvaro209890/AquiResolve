@@ -65,7 +65,7 @@ router.post('/chat', async (req, res) => {
         code: error.code,
       });
       if (!res.writableEnded) {
-        res.write(`data: ${JSON.stringify({ error: 'Assistente indisponível no momento.' })}\n\n`);
+        res.write(`data: ${JSON.stringify({ error: 'Hello indisponível no momento.' })}\n\n`);
         res.end();
       }
     }

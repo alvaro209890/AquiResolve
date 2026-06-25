@@ -184,11 +184,6 @@
             android:theme="@style/Theme.LoginApp"
             android:screenOrientation="portrait" />
         <activity
-            android:name=".DigitalSignatureActivity"
-            android:exported="false"
-            android:theme="@style/Theme.LoginApp"
-            android:screenOrientation="portrait" />
-        <activity
             android:name=".OsHistoryActivity"
             android:exported="false"
             android:theme="@style/Theme.LoginApp"
@@ -303,6 +298,11 @@
             android:screenOrientation="portrait" />
         <activity
             android:name=".ProviderDashboardActivity"
+            android:exported="false"
+            android:theme="@style/Theme.LoginApp"
+            android:screenOrientation="portrait" />
+        <activity
+            android:name=".ProviderNichesActivity"
             android:exported="false"
             android:theme="@style/Theme.LoginApp"
             android:screenOrientation="portrait" />

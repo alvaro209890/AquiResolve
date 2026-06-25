@@ -25,6 +25,7 @@ import {
   ClipboardList,
   Clock,
   FileSignature,
+  KeyRound,
   MapPin,
   PenLine,
   TriangleAlert,
@@ -60,12 +61,12 @@ const STATUS_CONFIG: Record<
     icon: <PenLine className="h-4 w-4" />,
   },
   aguardando_assinatura_cliente: {
-    label: "Aguardando assinatura do cliente",
+    label: "Aguardando validação do cliente",
     badge: "bg-amber-100 text-amber-800",
     icon: <FileSignature className="h-4 w-4" />,
   },
   aguardando_assinatura_prestador: {
-    label: "Aguardando assinatura do prestador",
+    label: "Aguardando validação do prestador",
     badge: "bg-amber-100 text-amber-800",
     icon: <FileSignature className="h-4 w-4" />,
   },
@@ -104,7 +105,7 @@ export function ServiceChecklistPanel({ orderId }: Props) {
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
-    new Set(["respostas", "avarias", "fotos", "assinaturas"])
+    new Set(["respostas", "avarias", "fotos", "finalizacao"])
   )
 
   useEffect(() => {
@@ -332,23 +333,25 @@ export function ServiceChecklistPanel({ orderId }: Props) {
             </CollapsibleSection>
           )}
 
-          {/* Assinaturas */}
+          {/* Finalização */}
           <CollapsibleSection
-            id="assinaturas"
-            title="Assinaturas digitais"
-            subtitle={
-              selected.assinaturaCliente && selected.assinaturaPrestador
-                ? "Ambas as assinaturas coletadas"
-                : "Aguardando assinaturas"
-            }
-            icon={<FileSignature className="h-4 w-4 text-purple-600" />}
-            expanded={expandedSections.has("assinaturas")}
-            onToggle={() => toggleSection("assinaturas")}
+            id="finalizacao"
+            title="Finalização por código do cliente"
+            subtitle="O checklist não usa mais assinatura desenhada na tela"
+            icon={<KeyRound className="h-4 w-4 text-purple-600" />}
+            expanded={expandedSections.has("finalizacao")}
+            onToggle={() => toggleSection("finalizacao")}
           >
-            <AssinaturasSection
-              cliente={selected.assinaturaCliente}
-              prestador={selected.assinaturaPrestador}
-            />
+            <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+              <p className="font-medium text-foreground">Contrato atual de encerramento</p>
+              <p className="mt-1">
+                Após anexar as fotos de chegada e pós-serviço, o prestador informa o código único
+                exibido apenas para o cliente no aplicativo.
+              </p>
+              <p className="mt-2">
+                Checklist concluído em: <span className="font-medium text-foreground">{fmt(selected.concluidoEm)}</span>
+              </p>
+            </div>
           </CollapsibleSection>
         </div>
       )}
@@ -576,77 +579,6 @@ function FotosSection({ fotos }: { fotos: ServiceChecklist["fotos"] }) {
               </div>
             </div>
           )
-      )}
-    </div>
-  )
-}
-
-// ─── Assinaturas ──────────────────────────────────────────────────────────────
-
-function AssinaturasSection({
-  cliente,
-  prestador,
-}: {
-  cliente?: ServiceChecklist["assinaturaCliente"]
-  prestador?: ServiceChecklist["assinaturaPrestador"]
-}) {
-  return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <AssinaturaCard
-        title="Assinatura do Cliente"
-        sig={cliente}
-        icon={<User className="h-4 w-4" />}
-      />
-      <AssinaturaCard
-        title="Assinatura do Prestador"
-        sig={prestador}
-        icon={<PenLine className="h-4 w-4" />}
-      />
-    </div>
-  )
-}
-
-function AssinaturaCard({
-  title,
-  sig,
-  icon,
-}: {
-  title: string
-  sig?: ServiceChecklist["assinaturaCliente"]
-  icon: React.ReactNode
-}) {
-  return (
-    <div className="rounded-lg border p-4 space-y-3">
-      <div className="flex items-center gap-2">
-        {icon}
-        <p className="text-sm font-semibold">{title}</p>
-        {sig ? (
-          <Badge className="bg-green-100 text-green-700 ml-auto">Coletada</Badge>
-        ) : (
-          <Badge className="bg-muted text-muted-foreground ml-auto">Pendente</Badge>
-        )}
-      </div>
-      {sig ? (
-        <div className="space-y-2">
-          <img
-            src={sig.dataUrl}
-            alt="Assinatura"
-            className="w-full h-24 object-contain border border-border rounded bg-card"
-          />
-          <div className="text-xs text-muted-foreground space-y-0.5">
-            <p>
-              <span className="font-medium text-foreground">Signatário:</span> {sig.signatoryName}
-            </p>
-            <p>
-              <span className="font-medium text-foreground">Data:</span> {fmt(sig.signedAt)}
-            </p>
-            <p className="font-mono text-xs break-all opacity-60">Hash: {sig.hash}</p>
-          </div>
-        </div>
-      ) : (
-        <div className="h-24 flex items-center justify-center border rounded bg-muted/20">
-          <p className="text-xs text-muted-foreground">Aguardando assinatura</p>
-        </div>
       )}
     </div>
   )

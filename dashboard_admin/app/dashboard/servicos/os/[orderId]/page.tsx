@@ -8,8 +8,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import {
-  CheckCircle, XCircle, Clock, MapPin, User, FileText, Camera,
-  PenTool, RefreshCw, ArrowLeft, AlertTriangle, Navigation
+  CheckCircle, XCircle, Clock, MapPin, FileText, Camera,
+  KeyRound, PackageSearch, RefreshCw, ArrowLeft, AlertTriangle, Navigation
 } from "lucide-react"
 import Link from "next/link"
 
@@ -22,6 +22,8 @@ interface ChecklistData {
   clientPresent?: boolean
   executedAsRequested?: boolean
   additionalService?: boolean
+  materialsUsed?: boolean
+  materialsDescription?: string
   serviceCompleted?: boolean
   cleanAfterService?: boolean
   preExistingDamages?: string
@@ -31,8 +33,6 @@ interface ChecklistData {
   photosBefore?: string[]
   photosDuring?: string[]
   photosAfter?: string[]
-  providerSignatureUrl?: string
-  clientSignatureUrl?: string
   providerName?: string
   clientName?: string
   completedAt?: { seconds: number }
@@ -199,6 +199,7 @@ export default function OsDetailPage() {
               <BoolField label="Cliente presente?" value={checklist.clientPresent} />
               <BoolField label="Serviço executado conforme solicitado?" value={checklist.executedAsRequested} />
               <BoolField label="Necessitou material adicional?" value={checklist.additionalService} />
+              <BoolField label="Usou materiais/suprimentos?" value={checklist.materialsUsed} />
               <BoolField label="Serviço concluído?" value={checklist.serviceCompleted} />
               <BoolField label="Local limpo após execução?" value={checklist.cleanAfterService} />
               <div className="flex items-center justify-between py-1">
@@ -224,6 +225,15 @@ export default function OsDetailPage() {
             </Card>
           )}
 
+          {checklist.materialsUsed && (
+            <Card>
+              <CardHeader><CardTitle className="text-base flex items-center gap-2"><PackageSearch className="h-4 w-4" />Materiais usados</CardTitle></CardHeader>
+              <CardContent>
+                <p className="text-sm whitespace-pre-wrap">{checklist.materialsDescription || "Material usado sem descrição registrada."}</p>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Fotos */}
           <Card>
             <CardHeader><CardTitle className="text-base flex items-center gap-2"><Camera className="h-4 w-4" />Evidências Fotográficas</CardTitle></CardHeader>
@@ -236,21 +246,21 @@ export default function OsDetailPage() {
             </CardContent>
           </Card>
 
-          {/* Assinaturas */}
+          {/* Finalização */}
           <Card>
-            <CardHeader><CardTitle className="text-base flex items-center gap-2"><PenTool className="h-4 w-4" />Assinaturas</CardTitle></CardHeader>
-            <CardContent className="grid grid-cols-2 gap-6">
-              <div>
-                <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1"><User className="h-3 w-3" />Prestador</p>
-                {checklist.providerSignatureUrl
-                  ? <img src={checklist.providerSignatureUrl} alt="Assinatura prestador" className="border rounded-lg w-full h-32 object-contain bg-white" />
-                  : <div className="border rounded-lg w-full h-32 flex items-center justify-center text-xs text-muted-foreground">Não assinado</div>}
+            <CardHeader><CardTitle className="text-base flex items-center gap-2"><KeyRound className="h-4 w-4" />Finalização por código</CardTitle></CardHeader>
+            <CardContent className="space-y-2 text-sm text-muted-foreground">
+              <p>
+                O fluxo atual não coleta assinatura desenhada na tela. Após as fotos de chegada e
+                pós-serviço, o prestador informa o código único exibido apenas ao cliente.
+              </p>
+              <div className="flex justify-between">
+                <span>Status do checklist</span>
+                <Badge variant="outline">{checklist.status || "—"}</Badge>
               </div>
-              <div>
-                <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1"><User className="h-3 w-3" />Cliente</p>
-                {checklist.clientSignatureUrl
-                  ? <img src={checklist.clientSignatureUrl} alt="Assinatura cliente" className="border rounded-lg w-full h-32 object-contain bg-white" />
-                  : <div className="border rounded-lg w-full h-32 flex items-center justify-center text-xs text-muted-foreground">Não assinado</div>}
+              <div className="flex justify-between">
+                <span>Concluído em</span>
+                <span>{ts(checklist.completedAt)}</span>
               </div>
             </CardContent>
           </Card>

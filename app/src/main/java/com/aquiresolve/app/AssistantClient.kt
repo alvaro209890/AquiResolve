@@ -13,7 +13,7 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
- * Cliente do Assistente IA (plano 06). Fala SÓ com o nosso backend (`/api/ai/classify`), que
+ * Cliente do Hello IA (plano 06). Fala SÓ com o nosso backend (`/api/ai/classify`), que
  * guarda a chave da Groq — a chave NUNCA fica no APK (mesmo padrão do [RouteClient]/mini-mapa).
  *
  * Envia a descrição do problema do cliente + a lista de nichos do catálogo; o backend devolve
@@ -52,7 +52,7 @@ object AssistantClient {
     suspend fun classify(description: String, niches: List<String>): Result = withContext(Dispatchers.IO) {
         val token = try {
             val user = FirebaseAuth.getInstance().currentUser
-                ?: return@withContext Result.Error("Faça login para usar o assistente.")
+                ?: return@withContext Result.Error("Faça login para usar o Hello.")
             user.getIdToken(false).await().token
         } catch (_: Exception) {
             null
@@ -74,11 +74,11 @@ object AssistantClient {
             client.newCall(request).execute().use { response ->
                 val body = response.body?.string()
                 if (!response.isSuccessful || body == null) {
-                    return@withContext Result.Error("Assistente indisponível agora. Tente a busca.")
+                    return@withContext Result.Error("Hello indisponível agora. Tente a busca.")
                 }
                 val json = JSONObject(body)
                 if (!json.optBoolean("ok", false)) {
-                    return@withContext Result.Error("Assistente indisponível agora. Tente a busca.")
+                    return@withContext Result.Error("Hello indisponível agora. Tente a busca.")
                 }
                 val niche = json.optString("niche").takeIf { it.isNotBlank() && it != "null" }
                 val serviceType = json.optString("serviceType").takeIf { it.isNotBlank() && it != "null" }
@@ -89,7 +89,7 @@ object AssistantClient {
                 Result.Ok(Suggestion(niche = niche, serviceType = serviceType, confidence = confidence, message = message))
             }
         } catch (_: Exception) {
-            Result.Error("Sem conexão com o assistente. Tente a busca.")
+            Result.Error("Sem conexão com o Hello. Tente a busca.")
         }
     }
 }

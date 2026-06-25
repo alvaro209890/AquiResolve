@@ -96,9 +96,10 @@ function timestampMillis(value: unknown): number {
 function mobileStatusToAdminStatus(status: unknown): ServiceChecklistStatus {
   switch (status) {
     case "completed":
+    case "ready_for_completion_code":
       return "concluido"
     case "signatures_pending":
-      return "aguardando_assinatura_cliente"
+      return "em_progresso"
     case "photos_pending":
     case "checklist_pending":
       return "em_progresso"
@@ -142,6 +143,7 @@ const MOBILE_BOOLEAN_RESPONSES: Array<{
   { key: "serviceMatches", title: "Serviço corresponde ao pedido?", fase: "pre_servico" },
   { key: "visibleDamage", title: "Havia danos visíveis no local?", fase: "pre_servico" },
   { key: "materialAvailable", title: "Material disponível para execução?", fase: "pre_servico" },
+  { key: "materialsUsed", title: "Usou material/suprimento específico?", fase: "execucao" },
   { key: "clientObservations", title: "Observações do cliente registradas?", fase: "pre_servico" },
   { key: "executedAsRequested", title: "Executado conforme solicitado?", fase: "execucao" },
   { key: "additionalService", title: "Serviço adicional necessário?", fase: "execucao" },
@@ -201,6 +203,18 @@ function buildMobileResponses(data: Record<string, unknown>): ServiceChecklist["
       tipo: "textarea",
       fase: "conclusao",
       valor: executionDescription,
+      respondidoEm: updatedAt,
+    })
+  }
+
+  const materialsDescription = readString(data, "materialsDescription")
+  if (materialsDescription) {
+    respostas.push({
+      itemId: "materialsDescription",
+      titulo: "Materiais/suprimentos usados",
+      tipo: "textarea",
+      fase: "execucao",
+      valor: materialsDescription,
       respondidoEm: updatedAt,
     })
   }

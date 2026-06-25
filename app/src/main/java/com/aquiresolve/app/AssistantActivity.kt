@@ -15,7 +15,7 @@ import com.aquiresolve.app.databinding.ActivityAssistantBinding
 import kotlinx.coroutines.launch
 
 /**
- * Assistente AquiResolve (plano 06). O cliente descreve o problema em linguagem natural e a IA
+ * Hello AquiResolve (plano 06). O cliente descreve o problema em linguagem natural e a IA
  * (via proxy no backend — [AssistantClient]) identifica o nicho do catálogo e direciona para o
  * fluxo de pedido. A IA é conveniência: qualquer falha cai no fallback "Ver todos os serviços",
  * nunca bloqueando a contratação.
@@ -30,7 +30,7 @@ class AssistantActivity : AppCompatActivity() {
     private val micPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
             if (granted) startVoice()
-            else toast("Permita o microfone para falar com o assistente.")
+            else toast("Permita o microfone para falar com o Hello.")
         }
 
     companion object {
@@ -191,7 +191,7 @@ class AssistantActivity : AppCompatActivity() {
 
     private fun setVoiceListening(listening: Boolean) {
         binding.tvVoiceStatus.visibility = if (listening) View.VISIBLE else View.GONE
-        binding.btnVoice.text = if (listening) "Ouvindo… toque para parar" else "Falar com o assistente"
+        binding.btnVoice.text = if (listening) "Ouvindo… toque para parar" else "Falar com o Hello"
     }
 
     private fun toast(message: String) {

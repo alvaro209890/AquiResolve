@@ -16,6 +16,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
 import com.aquiresolve.app.adapters.OsPhotosAdapter
 import com.aquiresolve.app.databinding.ActivityPhotoEvidenceBinding
+import com.aquiresolve.app.utils.VerificationCodeDialog
 import com.google.firebase.Timestamp
 import kotlinx.coroutines.launch
 import java.io.File
@@ -215,10 +216,6 @@ class PhotoEvidenceActivity : AppCompatActivity() {
             Toast.makeText(this, "Adicione fotos do antes do serviço", Toast.LENGTH_LONG).show()
             return false
         }
-        if (duringPhotos.isEmpty()) {
-            Toast.makeText(this, "Adicione fotos do durante o serviço", Toast.LENGTH_LONG).show()
-            return false
-        }
         if (afterPhotos.isEmpty()) {
             Toast.makeText(this, "Adicione fotos do depois do serviço", Toast.LENGTH_LONG).show()
             return false
@@ -233,21 +230,50 @@ class PhotoEvidenceActivity : AppCompatActivity() {
                 binding.btnContinue.text = "Enviando fotos..."
 
                 uploadCategory("before", beforePhotos)
-                uploadCategory("during", duringPhotos)
+                if (duringPhotos.isNotEmpty()) uploadCategory("during", duringPhotos)
                 uploadCategory("after", afterPhotos)
 
-                val intent = Intent(this@PhotoEvidenceActivity, DigitalSignatureActivity::class.java).apply {
-                    putExtra("order_id", orderId)
-                    putExtra("is_provider_view", isProviderView)
-                }
-                startActivity(intent)
-                finish()
+                requestClientCodeAndComplete()
             } catch (e: Exception) {
                 Toast.makeText(this@PhotoEvidenceActivity, "Erro ao salvar fotos: ${e.message}", Toast.LENGTH_LONG).show()
                 binding.btnContinue.isEnabled = true
-                binding.btnContinue.text = "Continuar para Assinaturas"
+                binding.btnContinue.text = "Enviar fotos e finalizar com código"
             }
         }
+    }
+
+    private fun requestClientCodeAndComplete() {
+        binding.btnContinue.isEnabled = true
+        binding.btnContinue.text = "Finalizar com código"
+        VerificationCodeDialog.showCodeInputDialog(
+            context = this,
+            onCodeEntered = { code ->
+                lifecycleScope.launch {
+                    binding.btnContinue.isEnabled = false
+                    binding.btnContinue.text = "Finalizando..."
+                    val result = FirebaseOrderManager().completeOrderWithVerification(orderId!!, code)
+                    if (result.isSuccess) {
+                        checklistManager.markCompletedByClientCode(orderId!!)
+                        Toast.makeText(this@PhotoEvidenceActivity, "Serviço finalizado com sucesso!", Toast.LENGTH_LONG).show()
+                        val intent = Intent(this@PhotoEvidenceActivity, ProviderHomeActivity::class.java)
+                        intent.flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
+                        startActivity(intent)
+                        finish()
+                    } else {
+                        Toast.makeText(
+                            this@PhotoEvidenceActivity,
+                            result.exceptionOrNull()?.message ?: "Erro ao finalizar serviço",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        binding.btnContinue.isEnabled = true
+                        binding.btnContinue.text = "Finalizar com código"
+                    }
+                }
+            },
+            onCancel = {
+                Toast.makeText(this, "Fotos salvas. Finalize com o código do cliente quando estiver pronto.", Toast.LENGTH_LONG).show()
+            }
+        )
     }
 
     private suspend fun uploadCategory(category: String, uris: List<Uri>) {
@@ -260,7 +286,7 @@ class PhotoEvidenceActivity : AppCompatActivity() {
             val uploadData = FirebaseImageManager.ImageUploadData(
                 uri = uri,
                 fileName = "os_${category}_${System.currentTimeMillis()}.jpg",
-                folder = FirebaseImageManager.FOLDER_ORDER_IMAGES,
+                folder = FirebaseImageManager.FOLDER_CHECKLISTS,
                 orderId = orderId
             )
             when (val result = imageManager.uploadImage(this, uploadData)) {

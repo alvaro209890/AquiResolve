@@ -514,7 +514,8 @@ class OrderDetailsActivity : AppCompatActivity() {
                     val checklist = osChecklist
                     when {
                         checklist == null -> "Iniciar OS" to "Chat"
-                        checklist.status == OsChecklistData.STATUS_COMPLETED -> "Finalizar com código" to "Chat"
+                        checklist.status == OsChecklistData.STATUS_COMPLETED ||
+                            checklist.status == OsChecklistData.STATUS_READY_FOR_COMPLETION_CODE -> "Finalizar com código" to "Chat"
                         else -> "Continuar OS" to "Chat"
                     }
                 }
@@ -648,7 +649,8 @@ class OrderDetailsActivity : AppCompatActivity() {
                         val checklist = osChecklist
                         when {
                             checklist == null -> startOsFlow(order)
-                            checklist.status == OsChecklistData.STATUS_COMPLETED -> finishServiceWithCode(order)
+                            checklist.status == OsChecklistData.STATUS_COMPLETED ||
+                                checklist.status == OsChecklistData.STATUS_READY_FOR_COMPLETION_CODE -> finishServiceWithCode(order)
                             else -> continueOs(checklist)
                         }
                     }
@@ -696,6 +698,7 @@ class OrderDetailsActivity : AppCompatActivity() {
                         val result = orderManager.completeOrderWithVerification(order.id, code)
                         
                         if (result.isSuccess) {
+                            FirebaseChecklistManager().markCompletedByClientCode(order.id)
                             showSuccessMessage("✅ Serviço finalizado com sucesso!")
 
                             if (isProviderView) {
@@ -1852,7 +1855,8 @@ class OrderDetailsActivity : AppCompatActivity() {
         val intent = Intent(this, when (checklist.status) {
             OsChecklistData.STATUS_CHECKLIST_PENDING -> ChecklistActivity::class.java
             OsChecklistData.STATUS_PHOTOS_PENDING -> PhotoEvidenceActivity::class.java
-            OsChecklistData.STATUS_SIGNATURES_PENDING -> DigitalSignatureActivity::class.java
+            OsChecklistData.STATUS_READY_FOR_COMPLETION_CODE -> PhotoEvidenceActivity::class.java
+            OsChecklistData.STATUS_SIGNATURES_PENDING -> PhotoEvidenceActivity::class.java
             else -> OsHistoryActivity::class.java
         }).apply {
             putExtra("order_id", checklist.orderId)

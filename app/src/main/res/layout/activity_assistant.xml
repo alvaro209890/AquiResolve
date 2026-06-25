@@ -35,7 +35,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
-            android:text="🤖 Assistente AquiResolve"
+            android:text="Hello AquiResolve"
             android:textColor="@color/white"
             android:textSize="20sp"
             android:textStyle="bold" />
@@ -65,7 +65,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
-                android:text="Descreva o problema com suas palavras e eu encontro o serviço certo para você."
+                android:text="Descreva o problema com suas palavras e o Hello encontra o serviço certo para você."
                 android:textColor="@color/text_secondary"
                 android:textSize="15sp"
                 android:lineSpacingExtra="3dp" />
@@ -98,14 +98,14 @@
 
             </com.google.android.material.card.MaterialCardView>
 
-            <!-- Falar com o assistente (fala → texto, reconhecimento nativo em pt-BR) -->
+            <!-- Falar com o Hello (fala → texto, reconhecimento nativo em pt-BR) -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnVoice"
                 style="@style/Widget.MaterialComponents.Button.OutlinedButton"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="12dp"
-                android:text="Falar com o assistente"
+                android:text="Falar com o Hello"
                 android:textSize="16sp"
                 android:paddingVertical="14dp"
                 app:cornerRadius="24dp"

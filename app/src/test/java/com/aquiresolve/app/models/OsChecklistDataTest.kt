@@ -82,6 +82,7 @@ class OsChecklistDataTest {
     fun `checklistComplete returns false when description is empty`() {
         val checklist = OsChecklistData(
             orderId = "test",
+            status = OsChecklistData.STATUS_COMPLETED,
             clientPresent = true,
             serviceMatches = true,
             visibleDamage = false,
@@ -105,6 +106,7 @@ class OsChecklistDataTest {
     fun `checklistComplete returns true when all fields are filled`() {
         val checklist = OsChecklistData(
             orderId = "test",
+            status = OsChecklistData.STATUS_COMPLETED,
             clientPresent = true,
             serviceMatches = true,
             visibleDamage = false,
@@ -188,6 +190,7 @@ class OsChecklistDataTest {
     fun `isComplete returns true only when everything is filled`() {
         val checklist = OsChecklistData(
             orderId = "test",
+            status = OsChecklistData.STATUS_COMPLETED,
             clientPresent = true,
             serviceMatches = true,
             visibleDamage = false,
@@ -205,13 +208,7 @@ class OsChecklistDataTest {
             executionDescription = "Done.",
             observations = "Sem observações adicionais.",
             photosBefore = listOf("a"),
-            photosDuring = listOf("b"),
-            photosAfter = listOf("c"),
-            providerSignatureUrl = "url",
-            providerSignatureName = "P",
-            clientSignatureUrl = "url",
-            clientSignatureName = "C",
-            clientSignatureDocument = "doc"
+            photosAfter = listOf("c")
         )
         assertTrue(checklist.isComplete)
     }
@@ -220,6 +217,7 @@ class OsChecklistDataTest {
     fun `isComplete returns false when photos are missing`() {
         val checklist = OsChecklistData(
             orderId = "test",
+            status = OsChecklistData.STATUS_COMPLETED,
             clientPresent = true,
             serviceMatches = true,
             visibleDamage = false,
@@ -234,12 +232,7 @@ class OsChecklistDataTest {
             serviceDescription = listOf("Elétrico"),
             problemResolution = "resolved",
             declarationAccepted = true,
-            executionDescription = "Done.",
-            providerSignatureUrl = "url",
-            providerSignatureName = "P",
-            clientSignatureUrl = "url",
-            clientSignatureName = "C",
-            clientSignatureDocument = "doc"
+            executionDescription = "Done."
         )
         assertFalse(checklist.isComplete)
     }
@@ -262,6 +255,8 @@ class OsChecklistDataTest {
         assertTrue(map.containsKey("orderId"))
         assertTrue(map.containsKey("status"))
         assertTrue(map.containsKey("cleanAfterService"))
+        assertTrue(map.containsKey("materialsUsed"))
+        assertTrue(map.containsKey("materialsDescription"))
         assertTrue(map.containsKey("serviceDescription"))
         assertTrue(map.containsKey("problemResolution"))
         assertTrue(map.containsKey("declarationAccepted"))
@@ -278,6 +273,7 @@ class OsChecklistDataTest {
     fun `status constants are correct`() {
         assertEquals("checklist_pending", OsChecklistData.STATUS_CHECKLIST_PENDING)
         assertEquals("photos_pending", OsChecklistData.STATUS_PHOTOS_PENDING)
+        assertEquals("ready_for_completion_code", OsChecklistData.STATUS_READY_FOR_COMPLETION_CODE)
         assertEquals("signatures_pending", OsChecklistData.STATUS_SIGNATURES_PENDING)
         assertEquals("completed", OsChecklistData.STATUS_COMPLETED)
     }

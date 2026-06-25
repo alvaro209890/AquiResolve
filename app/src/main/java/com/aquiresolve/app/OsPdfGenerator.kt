@@ -17,11 +17,11 @@ import java.text.SimpleDateFormat
 import java.util.Locale
 
 /**
- * Gera o PDF da Ordem de Serviço (OS) com checklist, fotos antes/durante/depois,
- * assinaturas e dados de GPS — pronto para ser compartilhado via WhatsApp/e-mail.
+ * Gera o PDF da Ordem de Serviço (OS) com checklist, fotos antes/depois,
+ * materiais usados e dados de GPS — pronto para ser compartilhado via WhatsApp/e-mail.
  *
  * Usa o PdfDocument nativo do Android (sem dependências extras). As imagens remotas
- * (fotos e assinaturas) são baixadas com o Glide de forma síncrona em IO.
+ * As fotos remotas são baixadas com o Glide de forma síncrona em IO.
  */
 object OsPdfGenerator {
 
@@ -94,6 +94,7 @@ object OsPdfGenerator {
         ctx.boolRow("Cliente presente", checklist.clientPresent)
         ctx.boolRow("Serviço executado conforme solicitado", checklist.executedAsRequested ?: checklist.serviceMatches)
         ctx.boolRow("Necessitou material adicional", checklist.additionalService)
+        ctx.boolRow("Usou materiais/suprimentos", checklist.materialsUsed)
         ctx.boolRow("Local limpo após execução", checklist.cleanAfterService)
         ctx.boolRow("Avarias visíveis", checklist.visibleDamage)
         ctx.boolRow("Troca de peças", checklist.partsReplaced)
@@ -114,16 +115,21 @@ object OsPdfGenerator {
             ctx.row("Observações", "")
             ctx.paragraph(checklist.observations)
         }
+        if (checklist.materialsUsed == true && checklist.materialsDescription.isNotBlank()) {
+            ctx.row("Materiais/suprimentos usados", "")
+            ctx.paragraph(checklist.materialsDescription)
+        }
 
         // Fotos
-        drawPhotoSection(context, ctx, "Fotos — Antes", checklist.photosBefore)
-        drawPhotoSection(context, ctx, "Fotos — Durante", checklist.photosDuring)
-        drawPhotoSection(context, ctx, "Fotos — Depois", checklist.photosAfter)
+        drawPhotoSection(context, ctx, "Fotos — Chegada / Antes", checklist.photosBefore)
+        if (checklist.photosDuring.isNotEmpty()) {
+            drawPhotoSection(context, ctx, "Fotos — Durante", checklist.photosDuring)
+        }
+        drawPhotoSection(context, ctx, "Fotos — Pós-serviço", checklist.photosAfter)
 
-        // Assinaturas
-        ctx.section("Assinaturas")
-        drawSignature(context, ctx, "Prestador", checklist.providerSignatureName, checklist.providerSignatureUrl, checklist.providerSignedAt?.toDate())
-        drawSignature(context, ctx, "Cliente", checklist.clientSignatureName, checklist.clientSignatureUrl, checklist.clientSignedAt?.toDate(), checklist.clientSignatureDocument)
+        ctx.section("Finalização")
+        ctx.row("Método", "Código único do cliente")
+        ctx.row("Status da OS", checklist.status)
 
         ctx.finishPage()
 
@@ -161,25 +167,6 @@ object OsPdfGenerator {
             x += thumbW + gap
         }
         ctx.y = rowTop + thumbH + 16f
-    }
-
-    private fun drawSignature(
-        context: Context, ctx: DrawContext, role: String,
-        name: String?, url: String?, signedAt: java.util.Date?, document: String? = null
-    ) {
-        ctx.ensureSpace(110f)
-        val top = ctx.y
-        val bmp = url?.let { downloadBitmap(context, it, 200, 80) }
-        if (bmp != null) {
-            val dst = android.graphics.RectF(MARGIN, top, MARGIN + 200f, top + 80f)
-            ctx.canvas.drawBitmap(bmp, null, dst, null)
-        }
-        ctx.canvas.drawLine(MARGIN, top + 84f, MARGIN + 200f, top + 84f, ctx.linePaint)
-        ctx.canvas.drawText("$role: ${name ?: "—"}", MARGIN, top + 98f, ctx.valuePaint)
-        var sub = top + 110f
-        if (document != null) { ctx.canvas.drawText("Documento: $document", MARGIN, sub, ctx.labelPaint); sub += 12f }
-        if (signedAt != null) ctx.canvas.drawText("Assinado em ${dateFormat.format(signedAt)}", MARGIN, sub, ctx.labelPaint)
-        ctx.y = sub + 16f
     }
 
     private fun downloadBitmap(context: Context, url: String, w: Int, h: Int): Bitmap? {

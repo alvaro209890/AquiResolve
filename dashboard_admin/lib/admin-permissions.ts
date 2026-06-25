@@ -170,6 +170,7 @@ const PATH_PERMISSIONS: Array<{ prefix: string; permission: AdminPermission }> =
   { prefix: "/dashboard/configuracoes/guincho", permission: "gerenciarGuincho" },
   { prefix: "/dashboard/servicos/catalogo-app", permission: "gerenciarCatalogo" },
   { prefix: "/dashboard/servicos/combos", permission: "gerenciarCombos" },
+  { prefix: "/dashboard/servicos/checklists", permission: "gestaoPedidos" },
   { prefix: "/dashboard/servicos/visualizar", permission: "gestaoPedidos" },
   { prefix: "/dashboard/servicos/os", permission: "gestaoPedidos" },
   { prefix: "/dashboard/controle/monitoramento", permission: "gestaoPedidos" },

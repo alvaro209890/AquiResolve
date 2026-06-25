@@ -23,7 +23,7 @@ import com.google.android.material.button.MaterialButton
 import kotlinx.coroutines.launch
 
 /**
- * Chat multi-turno do Assistente AquiResolve (v2 do plano 06).
+ * Chat multi-turno do Hello AquiResolve (v2 do plano 06).
  *
  * Streaming SSE token-por-token via [AssistantChatClient] + chips de sugestão
  * na abertura. Substitui o fluxo single-turn antigo de [AssistantActivity].
@@ -49,7 +49,7 @@ class AssistantChatActivity : AppCompatActivity() {
             if (granted && pendingVoiceStart) {
                 startVoiceInput()
             } else if (!granted) {
-                toast("Permita o microfone para falar com o assistente.")
+                toast("Permita o microfone para falar com o Hello.")
             }
             pendingVoiceStart = false
         }
@@ -214,7 +214,7 @@ class AssistantChatActivity : AppCompatActivity() {
 
                     override fun onDone(fullText: String) {
                         runOnUiThread {
-                            assistantMsg.content = fullText.ifEmpty { "Desculpe, não consegui processar sua pergunta. Tente novamente." }
+                            assistantMsg.content = fullText.ifEmpty { "Não consegui processar sua pergunta agora. Tente de novo ou use a busca." }
                             assistantMsg.isStreaming = false
                             adapter.updateLastMessage(assistantMsg)
                             showTyping(false)

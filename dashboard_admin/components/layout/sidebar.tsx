@@ -55,6 +55,8 @@ const navigation = [
       { name: "Visão Geral", href: "/dashboard/servicos", icon: ClipboardList, permission: "dashboard" },
       { name: "Catálogo do App", href: "/dashboard/servicos/catalogo-app", icon: Layers, permission: "gerenciarCatalogo" },
       { name: "Combos Promocionais", href: "/dashboard/servicos/combos", icon: Flame, permission: "gerenciarCombos" },
+      { name: "Checklists de OS", href: "/dashboard/servicos/checklists", icon: ClipboardList, permission: "gestaoPedidos" },
+      { name: "Nichos dos Prestadores", href: "/dashboard/servicos/nichos-prestadores", icon: Users, permission: "aprovarPrestadores" },
     ],
   },
   {

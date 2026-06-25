@@ -1,4 +1,4 @@
-﻿package com.aquiresolve.app
+package com.aquiresolve.app
 
 import android.app.Activity
 import android.content.Intent
@@ -194,6 +194,10 @@ class ProfileActivity : AppCompatActivity() {
         binding.llCashback.setOnClickListener {
             startActivity(Intent(this, CashbackActivity::class.java))
         }
+
+        binding.llNiches.setOnClickListener {
+            startActivity(Intent(this, ProviderNichesActivity::class.java))
+        }
         
         binding.llNotifications.setOnClickListener {
             showNotificationsDialog()
@@ -258,6 +262,8 @@ class ProfileActivity : AppCompatActivity() {
                 // Cashback é benefício do cliente
                 binding.llCashback.visibility = View.GONE
                 binding.dividerCashback.visibility = View.GONE
+                binding.llBankData.visibility = View.VISIBLE
+                binding.llNiches.visibility = View.VISIBLE
 
                 // Esconder botão de documentos se prestador já aprovado
                 lifecycleScope.launch {
@@ -281,6 +287,7 @@ class ProfileActivity : AppCompatActivity() {
                 binding.btnBecomeProvider.visibility = View.VISIBLE
                 binding.btnUploadDocuments.visibility = View.GONE
                 binding.llBankData.visibility = View.GONE
+                binding.llNiches.visibility = View.GONE
                 // Cashback é benefício do cliente
                 binding.llCashback.visibility = View.VISIBLE
                 binding.dividerCashback.visibility = View.VISIBLE

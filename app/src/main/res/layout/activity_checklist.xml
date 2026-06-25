@@ -335,6 +335,35 @@
                             android:layout_marginBottom="8dp" />
 
                         <CheckBox
+                            android:id="@+id/cbMaterialsUsed"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:text="Foi usado material ou suprimento específico no reparo?"
+                            android:textSize="14sp"
+                            android:textColor="@color/text_primary"
+                            android:layout_marginBottom="8dp" />
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            android:id="@+id/tilMaterialsDescription"
+                            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:layout_marginBottom="8dp"
+                            android:hint="Quais materiais/suprimentos foram usados?"
+                            android:visibility="gone">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/etMaterialsDescription"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:minHeight="80dp"
+                                android:gravity="top"
+                                android:inputType="textMultiLine|textCapSentences"
+                                android:textSize="14sp" />
+
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <CheckBox
                             android:id="@+id/cbClientObservations"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"

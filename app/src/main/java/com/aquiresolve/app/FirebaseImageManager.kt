@@ -33,6 +33,7 @@ class FirebaseImageManager {
         // Pastas organizadas
         const val FOLDER_PROFILE_IMAGES = "profile_images"
         const val FOLDER_ORDER_IMAGES = "order_images"
+        const val FOLDER_CHECKLISTS = "checklists"
         const val FOLDER_DOCUMENTS = "documents"
         const val FOLDER_DOCUMENTOS = "Documentos"
         const val FOLDER_CHAT_IMAGES = "chats"
@@ -271,6 +272,11 @@ class FirebaseImageManager {
             }
             FOLDER_ORDER_IMAGES -> {
                 storageRef.child(FOLDER_ORDER_IMAGES)
+                    .child(uploadData.orderId ?: "unknown")
+                    .child(fileName)
+            }
+            FOLDER_CHECKLISTS -> {
+                storageRef.child(FOLDER_CHECKLISTS)
                     .child(uploadData.orderId ?: "unknown")
                     .child(fileName)
             }
