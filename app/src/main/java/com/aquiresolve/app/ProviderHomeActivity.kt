@@ -9,6 +9,10 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
 import com.aquiresolve.app.databinding.ActivityProviderHomeBinding
 import com.aquiresolve.app.models.OrderData
@@ -80,6 +84,7 @@ class ProviderHomeActivity : AppCompatActivity() {
         setContentView(binding.root)
         authManager = FirebaseAuthManager(this)
 
+        setupWindowInsets()
         setupUI()
         setupClickListeners()
         loadProviderData()
@@ -103,7 +108,7 @@ class ProviderHomeActivity : AppCompatActivity() {
      * Configura a interface especifica para prestadores
      */
     private fun setupUI() {
-        // Status bar personalizada para prestadores
+        // Status bar usa a cor do AppBarLayout (definido no XML)
         window.statusBarColor = ContextCompat.getColor(this, R.color.secondary_color)
 
         // Configurar titulo especifico para prestadores
@@ -111,6 +116,31 @@ class ProviderHomeActivity : AppCompatActivity() {
         binding.tvDashboardTitle.text = "Dashboard"
         binding.tvAvailableOrders.text = "Pedidos Disponiveis"
         applyAvailabilityUiState()
+    }
+
+    /**
+     * Aplica os insets do sistema (barra de status + navegacao) para que
+     * a BottomNavigationView nao fique escondida atras dos botoes do sistema
+     * em dispositivos com navegacao por gestos ou 3 botoes (ex: Realme C73).
+     */
+    private fun setupWindowInsets() {
+        WindowCompat.setDecorFitsSystemWindows(window, false)
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.rootLayout) { _, windowInsets ->
+            val systemBars = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars())
+            binding.appBarLayout.updatePadding(top = systemBars.top)
+            binding.contentScroll.updatePadding(bottom = dpToPx(96) + systemBars.bottom)
+            windowInsets
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.bottomNavigation) { v, insets ->
+            v.updatePadding(bottom = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom)
+            insets
+        }
+    }
+
+    private fun dpToPx(value: Int): Int {
+        return (value * resources.displayMetrics.density).toInt()
     }
 
     /**
