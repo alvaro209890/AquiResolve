@@ -174,12 +174,39 @@ Seção "🤝 Parceiros AquiResolve" na `ClientHomeActivity` (abaixo de Combos):
 ### Home Premium (montagem — plano 07)
 A `ClientHomeActivity` foi reorganizada na **ordem Premium** (do topo): Busca inteligente → Banner rotativo → Saudação (1 linha, personalizada com o nome) → **Categorias** → **Card de cashback** → **Combos** → **Parceiros** → **Pedidos recentes** → **CTA Assistente IA** (`cardAssistant`). O botão "Ver Serviços" foi removido (redundante com categorias + bottom nav). O `NestedScrollView` (`contentScroll`) agora vive dentro de um `SwipeRefreshLayout` (`swipeRefresh`): o pull-to-refresh re-chama os `setup*`/`load*` (`setupSwipeRefresh()`). Cada seção dinâmica continua isolada (erro/vazio → `GONE`), insets preservados em `setupWindowInsets`. Mudança é de **código** → exige novo APK.
 
-### Assistente IA (app cliente — plano 06) — `AssistantActivity`
-O cliente descreve o problema em linguagem natural ("minha pia está vazando") e a IA (Groq via **proxy no backend**) identifica o **nicho** do catálogo e direciona para o pedido. A IA é conveniência: qualquer falha cai no fallback "ver todos os serviços", nunca bloqueia a contratação.
-- **App:** `AssistantActivity.kt` + `activity_assistant.xml` (registrada no Manifest). `AssistantClient.kt` (OkHttp, espelha o `RouteClient`) chama `POST /api/ai/classify` com `Authorization: Bearer <ID token>` — a chave Groq **nunca** fica no APK. Envia `CatalogRepository.cachedNicheNames()`; valida o nicho retornado contra o catálogo. "Continuar" → `CreateOrderActivity` (`service_category_name`). **Acessos:** card `cardAssistant` na Home + gancho no estado "sem resultado" da busca (abre o Assistente com `EXTRA_PREFILL`).
-- **Backend:** `POST /api/ai/classify` (`backend/src/routes/ai.routes.js` + `services/ai-classify.service.js`): exige ID token (`authenticateRequest`), rate-limit `aiLimiter` (15/min/IP), chama Groq (`llama-3.3-70b-versatile`, `temperature:0`, `response_format: json_object`), valida `niche ∈ niches` (anti-alucinação), nunca derruba o fluxo. **Env:** `GROQ_API_KEY` (+ opcional `GROQ_MODEL`) no Render. **autoDeploy off → deploy manual** após setar a chave.
-- **Analytics:** `ia_assistente_open`, `ia_nicho_sugerido` (niche/confidence), `ia_sugestao_aceita`.
-- **Status:** 🟢 **No ar** — `GROQ_API_KEY` configurada no Render + deploy feito (2026-06-23). Falta só validar no app com um APK novo. Runbook/rotação da chave em `novas-implementacoes/09-ativacao-ia-runbook.md`.
+### Assistente IA (app cliente — plano 06) — `AssistantChatActivity` (v2 ativa)
+O cliente descreve o problema em linguagem natural e a IA (Groq via **proxy no backend**) mantém uma conversa multi-turno com streaming token-por-token. A IA é conveniência: qualquer falha cai no fallback "ver todos os serviços", nunca bloqueia a contratação.
+
+**Arquivos ativos:**
+- `AssistantChatActivity.kt` + `activity_assistant_chat.xml` — chat multi-turno (v2, **em uso**).
+- `AssistantChatClient.kt` — cliente SSE (streaming) para `POST /api/ai/chat`.
+- `AssistantActivity.kt` + `AssistantClient.kt` — single-turn (v1, **orphan** — declarada no Manifest mas não aberta de nenhuma tela; pode ser removida futuramente).
+
+**Acessos na Home:** card `cardAssistant` ("Não sabe o nome do serviço?") e busca sem resultado (`tvSearchEmptyCta`) abrem `AssistantChatActivity` com `EXTRA_PREFILL`.
+
+**Layout (commit 2238548 — 2026-06-26):**
+- Header com avatar 🤖 em círculo laranja + ponto verde de status online.
+- Mic integrado na barra de input (toggle tap: toca para ligar/desligar). Sem FAB flutuante.
+- Barra laranja "🎙️ Ouvindo..." aparece acima do input quando voz está ativa.
+- Indicador "Hello está digitando..." entre o chat e o input durante streaming.
+- Mensagens do assistente têm mini-avatar 🤖 + borda sutil.
+- Chips de sugestão somem após primeiro envio.
+- Placeholder `...` no balão do assistente antes de o primeiro token chegar.
+- Scroll automático a cada token recebido.
+
+**Voz (corrigido em 2026-06-26):**
+- Toggle tap (não mais hold-to-talk) via `VoiceInputManager` com reconhecedor nativo Android (pt-BR, sem chave de API).
+- **Auto-send após reconhecimento** — antes a v2 só preenchia o campo e esperava o usuário apertar enviar; agora envia automaticamente como a v1 fazia.
+- Botões send/mic desabilitados durante streaming para evitar envio duplo.
+- Permissão `RECORD_AUDIO` + `<queries android.speech.RecognitionService>` no Manifest.
+
+**Backend:**
+- `POST /api/ai/chat` (`backend/src/routes/ai-chat.routes.js` + `services/ai-chat.service.js`): SSE streaming, histórico multi-turno, rate-limit `aiLimiter` (15/min/IP), exige ID token.
+- `POST /api/ai/classify` (v1, ainda registrado em `app.js`): single-turn, mantido para compatibilidade.
+- **Env:** `GROQ_API_KEY` (+ opcional `GROQ_MODEL`, default `llama-3.3-70b-versatile`) no Render.
+
+**Analytics:** `ia_chat_open`, `ia_voz_iniciada`, `ia_voz_reconhecida`, `ia_sugestao_aceita`.
+**Status:** 🟢 **No ar** — `GROQ_API_KEY` configurada no Render (2026-06-23). APK novo necessário para o layout/voz revisados (commit 2238548). Runbook/rotação da chave em `novas-implementacoes/09-ativacao-ia-runbook.md`.
 
 ### Copiloto IA do Painel (plano 08) — aba Manual
 Widget de chat no topo de `/dashboard/manual`: o admin pergunta "como faço X?" e recebe passos com onde clicar, **fundamentado** no conteúdo real do Manual.
