@@ -601,6 +601,22 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // Chats da IA (Hello) — cada usuário vê/só os próprios chats
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    match /ai_chats/{chatId} {
+      allow read, create, update: if isSignedIn()
+        && request.auth.uid == request.resource.data.userId;
+      allow read, update: if isSignedIn()
+        && request.auth.uid == resource.data.userId;
+
+      match /messages/{msgId} {
+        allow read, create: if isSignedIn()
+          && request.auth.uid == get(/databases/$(database)/documents/ai_chats/$(chatId)).data.userId;
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // Logs de auditoria — escrita exclusiva via Admin SDK (dashboard)
     // ═══════════════════════════════════════════════════════════════════════════
 

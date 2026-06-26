@@ -19,14 +19,22 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.aquiresolve.app.databinding.ActivityAssistantChatBinding
 import com.google.android.material.button.MaterialButton
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.Query
+import com.google.firebase.firestore.SetOptions
+import com.google.firebase.Timestamp
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 
 class AssistantChatActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityAssistantChatBinding
+    private val db = FirebaseFirestore.getInstance()
+    private val auth = FirebaseAuth.getInstance()
     private val adapter = ChatAdapter(
         onNicheClick = { niche ->
-            // Abre CreateOrderActivity com o nicho pré-selecionado
             val intent = Intent(this, CreateOrderActivity::class.java)
                 .putExtra("service_category_name", niche)
             startActivity(intent)
@@ -36,6 +44,8 @@ class AssistantChatActivity : AppCompatActivity() {
     private var isStreaming = false
     private var niches: List<String> = emptyList()
     private var voiceManager: VoiceInputManager? = null
+    private var chatId: String? = null
+    private var chatTitle: String = ""
 
     private val micPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -45,6 +55,7 @@ class AssistantChatActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_PREFILL = "prefill_description"
+        const val EXTRA_CHAT_ID = "chat_id"
 
         private val SUGGESTIONS = listOf(
             "\uD83E\uDEA0 Estou com um vazamento",
@@ -58,14 +69,21 @@ class AssistantChatActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (!FirebaseConfig.isInitialized()) {
-            FirebaseConfig.initialize(this)
-        }
+        if (!FirebaseConfig.isInitialized()) FirebaseConfig.initialize(this)
         binding = ActivityAssistantChatBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
         window.statusBarColor = ContextCompat.getColor(this, R.color.primary_color)
-        logEvent("ia_chat_open", null)
+
+        // Chat novo sempre (a menos que venha de histórico)
+        chatId = intent.getStringExtra(EXTRA_CHAT_ID)
+        if (chatId != null) {
+            logEvent("ia_chat_open_existing", null)
+            loadChatMessages()
+        } else {
+            chatId = db.collection("ai_chats").document().id
+            logEvent("ia_chat_open", null)
+        }
 
         setupRecyclerView()
         setupSuggestions()
@@ -82,6 +100,77 @@ class AssistantChatActivity : AppCompatActivity() {
             binding.etInput.setText(prefill)
             binding.etInput.setSelection(prefill.length)
             sendMessage()
+        }
+    }
+
+    private fun loadChatMessages() {
+        val cid = chatId ?: return
+        db.collection("ai_chats").document(cid)
+            .collection("messages")
+            .orderBy("timestamp", Query.Direction.ASCENDING)
+            .get()
+            .addOnSuccessListener { snapshot ->
+                for (doc in snapshot.documents) {
+                    val role = doc.getString("role") ?: continue
+                    val content = doc.getString("content") ?: continue
+                    val niche = doc.getString("niche")
+                    adapter.addMessage(ChatAdapter.ChatMessage(
+                        role = role,
+                        content = content,
+                        suggestedNiche = niche
+                    ))
+                }
+                scrollToBottom()
+            }
+    }
+
+    private fun createChatIfNeeded(title: String) {
+        val uid = auth.currentUser?.uid ?: return
+        val data = hashMapOf<String, Any>(
+            "userId" to uid,
+            "title" to title,
+            "createdAt" to FieldValue.serverTimestamp(),
+            "updatedAt" to FieldValue.serverTimestamp(),
+            "lastMessage" to title
+        )
+        db.collection("ai_chats").document(chatId!!)
+            .set(data, SetOptions.merge())
+    }
+
+    private fun saveMessage(role: String, content: String, niche: String?) {
+        val cid = chatId ?: return
+        val uid = auth.currentUser?.uid ?: return
+        val msg = hashMapOf<String, Any>(
+            "role" to role,
+            "content" to content,
+            "timestamp" to FieldValue.serverTimestamp()
+        )
+        if (niche != null) msg["niche"] = niche
+
+        db.collection("ai_chats").document(cid)
+            .collection("messages").add(msg)
+
+        val updates = hashMapOf<String, Any>(
+            "updatedAt" to FieldValue.serverTimestamp(),
+            "lastMessage" to content.take(120)
+        )
+        if (chatTitle.isEmpty() && role == "user") {
+            chatTitle = content.take(50)
+            updates["title"] = chatTitle
+        }
+        if (niche != null) updates["niche"] = niche
+
+        db.collection("ai_chats").document(cid)
+            .set(updates, SetOptions.merge())
+
+        // Garante que o doc raiz tenha userId (cria se não existir)
+        db.collection("ai_chats").document(cid).get().addOnSuccessListener { doc ->
+            if (!doc.exists() || doc.getString("userId") == null) {
+                db.collection("ai_chats").document(cid).set(
+                    mapOf("userId" to uid, "createdAt" to FieldValue.serverTimestamp()),
+                    SetOptions.merge()
+                )
+            }
         }
     }
 
@@ -121,61 +210,44 @@ class AssistantChatActivity : AppCompatActivity() {
         binding.btnBack.setOnClickListener { finish() }
         binding.btnSend.setOnClickListener { sendMessage() }
         binding.btnMic.setOnClickListener { onMicToggle() }
+        binding.btnHistory.setOnClickListener {
+            startActivity(Intent(this, AssistantChatListActivity::class.java))
+        }
     }
 
-    // ---- Voz: tap para ligar/desligar -----------------------------------------------
+    // ---- Voz ----------------------------------------------------
 
     private fun setupVoice() {
         voiceManager = VoiceInputManager(
             context = this,
-            onReadyForSpeech = {
-                runOnUiThread { setVoiceActive(true) }
-            },
-            onPartial = { text ->
-                runOnUiThread {
-                    binding.etInput.setText(text)
-                    binding.etInput.setSelection(text.length)
-                }
-            },
-            onResult = { text ->
-                runOnUiThread {
-                    binding.etInput.setText(text)
-                    binding.etInput.setSelection(text.length)
-                    setVoiceActive(false)
-                    logEvent("ia_voz_reconhecida", Bundle().apply { putInt("len", text.length) })
-                    sendMessage()
-                }
-            },
-            onError = { msg ->
-                runOnUiThread {
-                    setVoiceActive(false)
-                    if (msg.isNotBlank()) toast(msg)
-                }
-            },
-            onEnd = {
-                runOnUiThread { setVoiceActive(false) }
-            }
+            onReadyForSpeech = { runOnUiThread { setVoiceActive(true) } },
+            onPartial = { text -> runOnUiThread {
+                binding.etInput.setText(text)
+                binding.etInput.setSelection(text.length)
+            }},
+            onResult = { text -> runOnUiThread {
+                binding.etInput.setText(text)
+                binding.etInput.setSelection(text.length)
+                setVoiceActive(false)
+                logEvent("ia_voz_reconhecida", Bundle().apply { putInt("len", text.length) })
+                sendMessage()
+            }},
+            onError = { msg -> runOnUiThread {
+                setVoiceActive(false)
+                if (msg.isNotBlank()) toast(msg)
+            }},
+            onEnd = { runOnUiThread { setVoiceActive(false) } }
         )
-
-        if (voiceManager?.isAvailable() != true) {
-            binding.btnMic.visibility = View.GONE
-        }
+        if (voiceManager?.isAvailable() != true) binding.btnMic.visibility = View.GONE
     }
 
     private fun onMicToggle() {
         val vm = voiceManager ?: return
-        if (vm.isListening) {
-            vm.stop()
-            return
-        }
+        if (vm.isListening) { vm.stop(); return }
         if (isStreaming) return
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
-            == PackageManager.PERMISSION_GRANTED
-        ) {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
             startVoice()
-        } else {
-            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-        }
+        else micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
 
     private fun startVoice() {
@@ -187,19 +259,13 @@ class AssistantChatActivity : AppCompatActivity() {
 
     private fun setVoiceActive(active: Boolean) {
         binding.voiceActiveBar.visibility = if (active) View.VISIBLE else View.GONE
-        binding.btnMic.setBackgroundResource(
-            if (active) R.drawable.bg_mic_button_active else R.drawable.bg_mic_button
-        )
+        binding.btnMic.setBackgroundResource(if (active) R.drawable.bg_mic_button_active else R.drawable.bg_mic_button)
         val tintColor = if (active) R.color.white else R.color.gray_500
         binding.btnMic.setColorFilter(ContextCompat.getColor(this, tintColor))
-        if (!active) {
-            binding.etInput.hint = "Descreva o que precisa..."
-        } else {
-            binding.etInput.hint = "Fale agora..."
-        }
+        binding.etInput.hint = if (active) "Fale agora..." else "Descreva o que precisa..."
     }
 
-    // ---- Envio de mensagem ----------------------------------------------------------
+    // ---- Envio de mensagem ---------------------------------------
 
     private fun sendMessage() {
         if (isStreaming) return
@@ -210,6 +276,8 @@ class AssistantChatActivity : AppCompatActivity() {
         binding.suggestionsScroll.visibility = View.GONE
         hideKeyboard()
 
+        // Salva mensagem do usuário no Firestore
+        saveMessage("user", text, null)
         adapter.addMessage(ChatAdapter.ChatMessage(role = "user", content = text))
         scrollToBottom()
 
@@ -231,9 +299,7 @@ class AssistantChatActivity : AppCompatActivity() {
                 niches = CatalogRepository.cachedNicheNames()
             }
 
-            AssistantChatClient.chat(
-                history,
-                niches,
+            AssistantChatClient.chat(history, niches,
                 object : AssistantChatClient.StreamCallback {
                     override fun onToken(token: String) {
                         runOnUiThread {
@@ -242,15 +308,15 @@ class AssistantChatActivity : AppCompatActivity() {
                             scrollToBottom()
                         }
                     }
-
                     override fun onDone(fullText: String, suggestedNiche: String?) {
                         runOnUiThread {
-                            assistantMsg.content = fullText.ifEmpty {
-                                "Não consegui processar agora. Tente de novo ou use a busca."
-                            }
+                            val finalText = fullText.ifEmpty { "Não consegui processar agora. Tente de novo ou use a busca." }
+                            assistantMsg.content = finalText
                             assistantMsg.isStreaming = false
                             assistantMsg.suggestedNiche = suggestedNiche
                             adapter.updateLastMessage(assistantMsg)
+                            // Salva resposta da IA no Firestore
+                            saveMessage("assistant", finalText, suggestedNiche)
                             showTyping(false)
                             isStreaming = false
                             binding.btnSend.isEnabled = true
@@ -258,14 +324,12 @@ class AssistantChatActivity : AppCompatActivity() {
                             scrollToBottom()
                         }
                     }
-
                     override fun onError(message: String) {
                         runOnUiThread {
-                            if (assistantMsg.content.isEmpty()) {
-                                assistantMsg.content = message
-                            }
+                            if (assistantMsg.content.isEmpty()) assistantMsg.content = message
                             assistantMsg.isStreaming = false
                             adapter.updateLastMessage(assistantMsg)
+                            saveMessage("assistant", message, null)
                             showTyping(false)
                             isStreaming = false
                             binding.btnSend.isEnabled = true
@@ -380,7 +444,6 @@ class ChatAdapter(
 
         fun bind(msg: ChatMessage) {
             tv.text = if (msg.isStreaming && msg.content.isEmpty()) "..." else msg.content
-
             val niche = msg.suggestedNiche
             if (!niche.isNullOrBlank() && !msg.isStreaming) {
                 btnSolicitar.visibility = View.VISIBLE

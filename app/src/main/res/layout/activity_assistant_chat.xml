@@ -85,6 +85,16 @@
 
         </LinearLayout>
 
+        <!-- Botão de histórico de chats -->
+        <ImageButton
+            android:id="@+id/btnHistory"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:src="@drawable/ic_orders"
+            app:tint="@color/white"
+            android:contentDescription="Histórico de chats" />
+
     </LinearLayout>
 
     <!-- Sugestões rápidas (chips horizontais, some após 1ª mensagem) -->
