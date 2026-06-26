@@ -51,10 +51,30 @@ router.post('/chat', async (req, res) => {
         res.write(`data: ${JSON.stringify({ token })}\n\n`);
       }
     },
-    // onDone — sinaliza fim do stream
+    // onDone — sinaliza fim do stream, extrai niche se presente
     (fullText) => {
       if (!res.writableEnded) {
-        res.write(`data: ${JSON.stringify({ done: true, fullText })}\n\n`);
+        // Extrai tag [NICHE:Nome] da resposta antes de enviar
+        const nicheMatch = fullText.match(/\[NICHE:(.+?)\]\s*$/);
+        let displayText = fullText;
+        let suggestedNiche = null;
+        if (nicheMatch) {
+          suggestedNiche = nicheMatch[1].trim();
+          // Remove a tag do texto exibido
+          displayText = fullText.replace(/\s*\[NICHE:.+?\]\s*$/, '').trim();
+        }
+        const donePayload = { done: true, fullText: displayText };
+        if (suggestedNiche) {
+          donePayload.niche = suggestedNiche;
+          // Busca o slug do nicho para o app usar como service_category_name
+          const nicheSlug = suggestedNiche
+            .toLowerCase()
+            .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '');
+          donePayload.nicheSlug = nicheSlug;
+        }
+        res.write(`data: ${JSON.stringify(donePayload)}\n\n`);
         res.end();
       }
     },

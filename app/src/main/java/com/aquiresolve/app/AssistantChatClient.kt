@@ -35,7 +35,7 @@ object AssistantChatClient {
         /** Chamado a cada token recebido do backend */
         fun onToken(token: String)
         /** Chamado quando o stream termina com sucesso */
-        fun onDone(fullText: String)
+        fun onDone(fullText: String, suggestedNiche: String?)
         /** Chamado em caso de erro (rede, auth, IA indisponível) */
         fun onError(message: String)
     }
@@ -129,7 +129,8 @@ object AssistantChatClient {
                         }
                         if (obj.has("done") && obj.getBoolean("done")) {
                             val finalText = obj.optString("fullText", fullText.toString())
-                            callback.onDone(finalText)
+                            val niche = obj.optString("niche", null)
+                            callback.onDone(finalText, niche)
                             return@use
                         }
                         val tok = obj.optString("token", "")
@@ -142,7 +143,7 @@ object AssistantChatClient {
                     }
                 }
                 // Se chegou aqui sem done explícito, stream acabou normalmente
-                callback.onDone(fullText.toString())
+                callback.onDone(fullText.toString(), null)
             }
         } catch (e: Exception) {
             callback.onError("Sem conexão com o Hello. Tente a busca.")

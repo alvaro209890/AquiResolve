@@ -42,16 +42,42 @@
             app:strokeColor="@color/gray_200"
             app:cardUseCompatPadding="false">
 
-            <TextView
-                android:id="@+id/tvMessage"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:maxWidth="260dp"
-                android:paddingHorizontal="14dp"
-                android:paddingVertical="10dp"
-                android:textColor="@color/text_primary"
-                android:textSize="15sp"
-                android:lineSpacingExtra="3dp" />
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tvMessage"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:maxWidth="260dp"
+                    android:paddingHorizontal="14dp"
+                    android:paddingTop="10dp"
+                    android:paddingBottom="6dp"
+                    android:textColor="@color/text_primary"
+                    android:textSize="15sp"
+                    android:lineSpacingExtra="3dp" />
+
+                <!-- Botão "Solicitar Serviço" (visível só quando a IA sugerir um nicho) -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSolicitar"
+                    style="@style/Widget.Material3.Button.TonalButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="10dp"
+                    android:layout_marginEnd="10dp"
+                    android:layout_marginBottom="10dp"
+                    android:text="Solicitar Serviço"
+                    android:textSize="13sp"
+                    android:visibility="gone"
+                    app:cornerRadius="12dp"
+                    app:icon="@drawable/ic_services"
+                    app:iconSize="16dp"
+                    app:backgroundTint="@color/primary_color"
+                    android:textColor="@color/white" />
+
+            </LinearLayout>
 
         </com.google.android.material.card.MaterialCardView>
 

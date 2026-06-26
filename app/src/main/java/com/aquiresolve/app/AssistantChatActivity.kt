@@ -24,7 +24,15 @@ import kotlinx.coroutines.launch
 class AssistantChatActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityAssistantChatBinding
-    private val adapter = ChatAdapter()
+    private val adapter = ChatAdapter(
+        onNicheClick = { niche ->
+            // Abre CreateOrderActivity com o nicho pré-selecionado
+            val intent = Intent(this, CreateOrderActivity::class.java)
+                .putExtra("service_category_name", niche)
+            startActivity(intent)
+            logEvent("ia_niche_click", Bundle().apply { putString("niche", niche) })
+        }
+    )
     private var isStreaming = false
     private var niches: List<String> = emptyList()
     private var voiceManager: VoiceInputManager? = null
@@ -39,12 +47,12 @@ class AssistantChatActivity : AppCompatActivity() {
         const val EXTRA_PREFILL = "prefill_description"
 
         private val SUGGESTIONS = listOf(
-            "🪠 Estou com um vazamento",
-            "🔌 Problema elétrico em casa",
-            "🧹 Preciso de uma faxina",
+            "\uD83E\uDEA0 Estou com um vazamento",
+            "\uD83D\uDD0C Problema elétrico em casa",
+            "\uD83E\uDDF9 Preciso de uma faxina",
             "❄️ Ar condicionado não funciona",
-            "🔧 Montagem de móveis",
-            "🖥️ Formatação de computador"
+            "\uD83D\uDD27 Montagem de móveis",
+            "\uD83D\uDDA5️ Formatação de computador"
         )
     }
 
@@ -135,7 +143,6 @@ class AssistantChatActivity : AppCompatActivity() {
                     binding.etInput.setSelection(text.length)
                     setVoiceActive(false)
                     logEvent("ia_voz_reconhecida", Bundle().apply { putInt("len", text.length) })
-                    // Auto-envia após reconhecimento — comportamento consistente
                     sendMessage()
                 }
             },
@@ -236,12 +243,13 @@ class AssistantChatActivity : AppCompatActivity() {
                         }
                     }
 
-                    override fun onDone(fullText: String) {
+                    override fun onDone(fullText: String, suggestedNiche: String?) {
                         runOnUiThread {
                             assistantMsg.content = fullText.ifEmpty {
                                 "Não consegui processar agora. Tente de novo ou use a busca."
                             }
                             assistantMsg.isStreaming = false
+                            assistantMsg.suggestedNiche = suggestedNiche
                             adapter.updateLastMessage(assistantMsg)
                             showTyping(false)
                             isStreaming = false
@@ -302,13 +310,16 @@ class AssistantChatActivity : AppCompatActivity() {
 
 // --- ChatAdapter ---
 
-class ChatAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+class ChatAdapter(
+    private val onNicheClick: (niche: String) -> Unit
+) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     data class ChatMessage(
         val id: Long = System.nanoTime(),
         val role: String,
         var content: String,
-        var isStreaming: Boolean = false
+        var isStreaming: Boolean = false,
+        var suggestedNiche: String? = null
     )
 
     val messages = mutableListOf<ChatMessage>()
@@ -341,7 +352,7 @@ class ChatAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
         } else {
             val view = LayoutInflater.from(parent.context)
                 .inflate(R.layout.item_chat_message_assistant, parent, false)
-            AssistantViewHolder(view)
+            AssistantViewHolder(view, onNicheClick)
         }
     }
 
@@ -360,11 +371,25 @@ class ChatAdapter : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
         fun bind(msg: ChatMessage) { tv.text = msg.content }
     }
 
-    class AssistantViewHolder(view: View) : RecyclerView.ViewHolder(view) {
+    class AssistantViewHolder(
+        view: View,
+        private val onNicheClick: (niche: String) -> Unit
+    ) : RecyclerView.ViewHolder(view) {
         private val tv: TextView = view.findViewById(R.id.tvMessage)
+        private val btnSolicitar: MaterialButton = view.findViewById(R.id.btnSolicitar)
+
         fun bind(msg: ChatMessage) {
-            // Placeholder animado enquanto o stream ainda não chegou
             tv.text = if (msg.isStreaming && msg.content.isEmpty()) "..." else msg.content
+
+            val niche = msg.suggestedNiche
+            if (!niche.isNullOrBlank() && !msg.isStreaming) {
+                btnSolicitar.visibility = View.VISIBLE
+                btnSolicitar.text = "Solicitar $niche"
+                btnSolicitar.setOnClickListener { onNicheClick(niche) }
+            } else {
+                btnSolicitar.visibility = View.GONE
+                btnSolicitar.setOnClickListener(null)
+            }
         }
     }
 }
