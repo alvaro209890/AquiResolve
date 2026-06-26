@@ -32,6 +32,7 @@ class HomeActivity : AppCompatActivity() {
         // Inicializar ViewBinding
         binding = ActivityHomeBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        InsetsHelper.apply(this, binding.rootLayout, binding.bottomNavigation)
         
         // Configurar a interface
         setupUI()

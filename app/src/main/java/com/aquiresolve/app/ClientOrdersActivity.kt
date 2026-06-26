@@ -59,6 +59,7 @@ class ClientOrdersActivity : AppCompatActivity() {
         // Inicializar ViewBinding
         binding = ActivityClientOrdersBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        InsetsHelper.apply(this, binding.rootLayout, null)
         
         // Inicializar managers
         orderManager = FirebaseOrderManager()

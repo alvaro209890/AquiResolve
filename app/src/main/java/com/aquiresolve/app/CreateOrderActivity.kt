@@ -146,6 +146,7 @@ class CreateOrderActivity : AppCompatActivity() {
         // Inicializar ViewBinding
         binding = ActivityCreateOrderBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        InsetsHelper.apply(this, binding.rootLayout, null)
         
         // Pré-selecionar categoria vinda da tela de serviços (ANTES de configurar spinners)
         val selectedCategoryName = intent.getStringExtra("service_category_name")

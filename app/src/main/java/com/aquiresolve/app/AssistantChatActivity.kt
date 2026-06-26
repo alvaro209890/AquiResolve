@@ -72,6 +72,7 @@ class AssistantChatActivity : AppCompatActivity() {
         if (!FirebaseConfig.isInitialized()) FirebaseConfig.initialize(this)
         binding = ActivityAssistantChatBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        InsetsHelper.apply(this, binding.rootLayout, null)
 
         window.statusBarColor = ContextCompat.getColor(this, R.color.primary_color)
 

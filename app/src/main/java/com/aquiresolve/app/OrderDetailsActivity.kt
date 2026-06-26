@@ -142,6 +142,7 @@ class OrderDetailsActivity : AppCompatActivity() {
         // Inicializar ViewBinding
         binding = ActivityOrderDetailsBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        InsetsHelper.apply(this, binding.rootLayout, null)
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         
         // Obter dados da intent
