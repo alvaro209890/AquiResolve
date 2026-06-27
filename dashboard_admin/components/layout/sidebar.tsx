@@ -97,7 +97,9 @@ const navigation = [
     permission: "financeiro",
     children: [
       { name: "Painel Financeiro", href: "/dashboard/financeiro", icon: BarChart3, permission: "financeiro" },
+      { name: "Analytics", href: "/dashboard/financeiro/analytics", icon: TrendingUp, permission: "financeiro" },
       { name: "Pagamentos", href: "/dashboard/financeiro/faturamento", icon: FileText, permission: "financeiro" },
+      { name: "Relatórios", href: "/dashboard/financeiro/relatorios", icon: BarChart3, permission: "financeiro" },
     ],
   },
   {
