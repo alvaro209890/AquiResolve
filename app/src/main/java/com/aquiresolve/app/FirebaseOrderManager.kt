@@ -9,6 +9,7 @@ import com.aquiresolve.app.utils.awaitCurrentUser
 import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
 import okhttp3.OkHttpClient
@@ -1041,16 +1042,17 @@ class FirebaseOrderManager {
     }
     
     /**
-     * Listener em tempo real para mudanças nos pedidos
+     * Listener em tempo real para mudanças nos pedidos.
+     * @return ListenerRegistration para remover o listener com .remove() quando não for mais necessário.
      */
-    fun listenToUserOrders(onOrdersChanged: (List<OrderData>) -> Unit) {
+    fun listenToUserOrders(onOrdersChanged: (List<OrderData>) -> Unit): ListenerRegistration? {
         val user = auth.currentUser
         if (user == null) {
             Log.e(TAG, "Usuário não autenticado")
-            return
+            return null
         }
         
-        db.collection(ORDERS_COLLECTION)
+        return db.collection(ORDERS_COLLECTION)
             .whereEqualTo("clientId", user.uid)
             .orderBy("createdAt", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .addSnapshotListener { snapshot, error ->
@@ -1068,10 +1070,11 @@ class FirebaseOrderManager {
     }
     
     /**
-     * Listener em tempo real para um pedido específico
+     * Listener em tempo real para um pedido específico.
+     * @return ListenerRegistration para remover o listener com .remove() quando não for mais necessário.
      */
-    fun listenToOrder(orderId: String, onOrderChanged: (OrderData?) -> Unit) {
-        db.collection(ORDERS_COLLECTION)
+    fun listenToOrder(orderId: String, onOrderChanged: (OrderData?) -> Unit): ListenerRegistration? {
+        return db.collection(ORDERS_COLLECTION)
             .document(orderId)
             .addSnapshotListener { snapshot, error ->
                 if (error != null) {

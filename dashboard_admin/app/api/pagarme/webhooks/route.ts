@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import crypto from 'crypto'
 import { PagarmeWebhook } from '@/types/pagarme'
 import { PagarmeFirebaseSync } from '@/lib/services/pagarme-firebase-sync'
 import { getAdminFirestore, adminApp } from '@/lib/firebase-admin'
@@ -74,8 +75,36 @@ async function resolveLocalOrder(
 }
 
 /**
+ * Verifica a assinatura HMAC do webhook do Pagar.me.
+ * O Pagar.me envia o header X-Hub-Signature: sha256=<hex>.
+ * A chave secreta é configurada no dashboard do Pagar.me e armazenada em PAGARME_WEBHOOK_SECRET.
+ */
+async function verifySignature(request: NextRequest): Promise<boolean> {
+  const secret = process.env.PAGARME_WEBHOOK_SECRET
+  if (!secret) {
+    console.warn('⚠️ PAGARME_WEBHOOK_SECRET não configurado — webhook aceito sem verificação HMAC. Configure a chave de assinatura do Pagar.me.')
+    return true // backwards-compatible: aceita webhook se secret não configurado
+  }
+  const signature = request.headers.get('X-Hub-Signature')
+  if (!signature || !signature.startsWith('sha256=')) {
+    console.warn('⚠️ Webhook sem assinatura HMAC ou formato inválido.')
+    return false
+  }
+  // Ler o body raw (não JSON parseado) para o HMAC
+  const rawBody = await request.clone().text()
+  const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex')
+  try {
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))
+  } catch {
+    return false
+  }
+}
+
+/**
  * POST /api/pagarme/webhooks
  * Recebe webhooks do Pagar.me e sincroniza com Firebase.
+ *
+ * Verifica assinatura HMAC (X-Hub-Signature) antes de processar.
  *
  * IMPORTANTE: a atualização de STATUS do pedido (awaiting_payment → distributing) é feita
  * pelo backend de pagamentos (Render) em /api/payments/webhook/pagarme, que é a fonte da verdade.
@@ -84,6 +113,14 @@ async function resolveLocalOrder(
  */
 export async function POST(request: NextRequest) {
   try {
+    // 1. Verificar assinatura HMAC antes de processar
+    if (!(await verifySignature(request))) {
+      return NextResponse.json(
+        { success: false, error: 'Assinatura inválida' },
+        { status: 401 }
+      )
+    }
+
     const webhook: PagarmeWebhook = await request.json()
 
     console.log('📥 Webhook recebido:', {
