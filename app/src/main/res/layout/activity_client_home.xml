@@ -238,15 +238,15 @@
                 android:textStyle="bold"
                 android:layout_marginBottom="20dp" />
 
-            <!-- Card de cashback em destaque (logo após Categorias, na ordem Premium) -->
+            <!-- Pílula de cashback discreta (estilo da arte: navy compacto, não em destaque) -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/cardCashback"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                app:cardCornerRadius="16dp"
-                app:cardElevation="4dp"
-                app:cardBackgroundColor="@color/primary_color"
-                android:layout_marginBottom="24dp"
+                app:cardCornerRadius="28dp"
+                app:cardElevation="2dp"
+                app:cardBackgroundColor="@color/cashback_dark"
+                android:layout_marginBottom="20dp"
                 android:clickable="true"
                 android:focusable="true">
 
@@ -254,8 +254,28 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:padding="16dp"
+                    android:paddingStart="12dp"
+                    android:paddingEnd="16dp"
+                    android:paddingVertical="10dp"
                     android:gravity="center_vertical">
+
+                    <!-- Moeda dourada com cifrão -->
+                    <FrameLayout
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:layout_marginEnd="12dp"
+                        android:background="@drawable/bg_coin_gold">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_gravity="center"
+                            android:text="$"
+                            android:textColor="#0E2A47"
+                            android:textSize="18sp"
+                            android:textStyle="bold" />
+
+                    </FrameLayout>
 
                     <LinearLayout
                         android:layout_width="0dp"
@@ -266,8 +286,8 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="💸 Seu Cashback"
-                            android:textSize="14sp"
+                            android:text="Cashback disponível"
+                            android:textSize="13sp"
                             android:textColor="@color/white"
                             android:alpha="0.85" />
 
@@ -276,28 +296,18 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="R$ 0,00"
-                            android:textSize="26sp"
+                            android:textSize="20sp"
                             android:textStyle="bold"
-                            android:textColor="@color/white"
-                            android:layout_marginTop="4dp" />
-
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="disponível para usar"
-                            android:textSize="12sp"
-                            android:textColor="@color/white"
-                            android:alpha="0.75"
-                            android:layout_marginTop="2dp" />
+                            android:textColor="@color/white" />
 
                     </LinearLayout>
 
                     <ImageView
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
                         android:src="@drawable/ic_arrow_right"
                         android:tint="@color/white"
-                        android:alpha="0.8" />
+                        android:alpha="0.7" />
 
                 </LinearLayout>
 

@@ -102,6 +102,20 @@ class AssistantChatActivity : AppCompatActivity() {
             binding.etInput.setSelection(prefill.length)
             sendMessage()
         }
+
+        // Se veio do botão flutuante de microfone, inicia voz automaticamente
+        if (intent.getBooleanExtra(\"start_with_voice\", false)) {
+            binding.root.postDelayed({ startVoiceIfPermitted() }, 400)
+        }
+    }
+
+    private fun startVoiceIfPermitted() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO)
+            == PackageManager.PERMISSION_GRANTED) {
+            startVoice()
+        } else {
+            micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
     }
 
     private fun loadChatMessages() {

@@ -22,6 +22,11 @@ class FirebaseMessagingService : FirebaseMessagingService() {
         private const val CHANNEL_ID = "default_channel"
         private const val CHANNEL_NAME = "Default Channel"
         private const val CHANNEL_DESCRIPTION = "Canal padrão para notificações"
+        
+        // Canal dedicado para mensagens (som garantido, não agrupado com outras notificações)
+        private const val CHANNEL_MSG_ID = "messages_channel"
+        private const val CHANNEL_MSG_NAME = "Mensagens"
+        private const val CHANNEL_MSG_DESCRIPTION = "Notificações de mensagens da Central e chat"
     }
     
     override fun onNewToken(token: String) {
@@ -46,27 +51,42 @@ class FirebaseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(remoteMessage: RemoteMessage) {
         super.onMessageReceived(remoteMessage)
         
-        // Prioridade: dados da mensagem > notificação
-        if (remoteMessage.data.isNotEmpty()) {
-            val title = remoteMessage.data["title"] ?: "Nova notificação"
-            val message = remoteMessage.data["message"] ?: "Você tem uma nova notificação"
-            val orderId = remoteMessage.data["order_id"] ?: remoteMessage.data["orderId"]
-            val type = remoteMessage.data["type"] // order, chat, payment
-            sendNotification(title, message, orderId, type)
-        } else {
-            remoteMessage.notification?.let { notification ->
-                val title = notification.title ?: "Nova notificação"
-                val message = notification.body ?: "Você tem uma nova notificação"
-                sendNotification(title, message, null, null)
-            }
-        }
+        // Prioridade: mescla notification + data. O backend manda title/body no
+        // campo `notification` e campos extras (type, orderId, providerId, etc.) no `data`.
+        val notif = remoteMessage.notification
+        val title = notif?.title
+            ?: remoteMessage.data["title"]
+            ?: "Nova notificação"
+        val message = notif?.body
+            ?: remoteMessage.data["message"]
+            ?: remoteMessage.data["body"]
+            ?: "Você tem uma nova notificação"
+        val orderId = remoteMessage.data["order_id"]
+            ?: remoteMessage.data["orderId"]
+        val type = remoteMessage.data["type"]
+        val providerId = remoteMessage.data["providerId"]
+        val clientId = remoteMessage.data["clientId"]
+        val messageId = remoteMessage.data["messageId"]
+        
+        sendNotification(title, message, orderId, type, providerId, clientId)
     }
     
     private fun sendRegistrationToServer(@Suppress("UNUSED_PARAMETER") token: String) {
         // Implementação intencionalmente vazia para evitar persistência local desnecessária.
     }
     
-    private fun sendNotification(title: String, message: String, orderId: String?, type: String?) {
+    private fun sendNotification(
+        title: String,
+        message: String,
+        orderId: String?,
+        type: String?,
+        providerId: String? = null,
+        clientId: String? = null
+    ) {
+        val isMessageType = type.equals("provider_message", ignoreCase = true)
+            || type.equals("central_message", ignoreCase = true)
+            || type.equals("chat", ignoreCase = true)
+
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val privacyManager = FirebasePrivacyManager(this@FirebaseMessagingService)
@@ -74,11 +94,14 @@ class FirebaseMessagingService : FirebaseMessagingService() {
                 // Verificar se notificações estão habilitadas
                 if (!privacyManager.isSettingEnabled("notifications_enabled")) return@launch
                 
-                // Filtrar por tipo de notificação (quando type vem no payload)
-                when (type?.lowercase()) {
-                    "order" -> if (!privacyManager.isSettingEnabled("order_notifications_enabled")) return@launch
-                    "chat" -> if (!privacyManager.isSettingEnabled("chat_notifications_enabled")) return@launch
-                    "payment" -> if (!privacyManager.isSettingEnabled("payment_notifications_enabled")) return@launch
+                // Filtrar por tipo de notificação
+                when {
+                    type.equals("order", ignoreCase = true) ->
+                        if (!privacyManager.isSettingEnabled("order_notifications_enabled")) return@launch
+                    isMessageType ->
+                        if (!privacyManager.isSettingEnabled("chat_notifications_enabled")) return@launch
+                    type.equals("payment", ignoreCase = true) ->
+                        if (!privacyManager.isSettingEnabled("payment_notifications_enabled")) return@launch
                 }
                 
                 // Verificar horário silencioso
@@ -92,11 +115,19 @@ class FirebaseMessagingService : FirebaseMessagingService() {
                 val vibrationEnabled = privacyManager.isSettingEnabled("notification_vibration_enabled")
                 
                 runOnMainThread {
-                    displayNotification(title, message, orderId, soundEnabled, vibrationEnabled, type)
+                    displayNotification(
+                        title, message, orderId,
+                        soundEnabled, vibrationEnabled,
+                        type, isMessageType
+                    )
                 }
             } catch (e: Exception) {
                 runOnMainThread {
-                    displayNotification(title, message, orderId, true, true, type)
+                    displayNotification(
+                        title, message, orderId,
+                        true, true,
+                        type, isMessageType
+                    )
                 }
             }
         }
@@ -130,11 +161,24 @@ class FirebaseMessagingService : FirebaseMessagingService() {
         orderId: String?,
         soundEnabled: Boolean,
         vibrationEnabled: Boolean,
-        type: String?
+        type: String?,
+        isMessageType: Boolean
     ) {
+        // Escolhe qual Activity abrir ao tocar na notificação
         val intent = if (orderId != null) {
             Intent(this, OrderDetailsActivity::class.java).apply {
                 putExtra("order_id", orderId)
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+        } else if (type.equals("provider_message", ignoreCase = true)) {
+            // Abrir chat do prestador (ProviderChatActivity ou HomeActivity como fallback)
+            Intent(this, HomeActivity::class.java).apply {
+                putExtra("open_provider_chat", true)
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+        } else if (type.equals("central_message", ignoreCase = true)) {
+            // Abrir chat do cliente com a Central
+            Intent(this, ClientCentralChatActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
         } else {
@@ -144,7 +188,7 @@ class FirebaseMessagingService : FirebaseMessagingService() {
         }
         
         val pendingIntent = PendingIntent.getActivity(
-            this, 0, intent,
+            this, System.currentTimeMillis().toInt(), intent,
             PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
         )
         
@@ -156,36 +200,62 @@ class FirebaseMessagingService : FirebaseMessagingService() {
             NewOrderSoundHelper.playNewOrderSound(applicationContext)
         }
 
-        val defaultSoundUri = if (soundEnabled && !isOrderNotification) {
-            RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+        // Para mensagens, sempre usa o canal dedicado com som garantido
+        val (channelId, channelName, channelDesc, soundUri) = if (isMessageType) {
+            // Canal de mensagens: som SEMPRE toca (ignora soundEnabled global).
+            // O usuário controla via chat_notifications_enabled e quiet_hours.
+            Tuple4(
+                CHANNEL_MSG_ID,
+                CHANNEL_MSG_NAME,
+                CHANNEL_MSG_DESCRIPTION,
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+            )
         } else {
-            null
+            Tuple4(
+                CHANNEL_ID,
+                CHANNEL_NAME,
+                CHANNEL_DESCRIPTION,
+                if (soundEnabled && !isOrderNotification)
+                    RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+                else null
+            )
         }
-        val notificationBuilder = NotificationCompat.Builder(this, CHANNEL_ID)
+        
+        val notificationBuilder = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(R.drawable.ic_notifications)
             .setContentTitle(title)
             .setContentText(message)
             .setAutoCancel(true)
-            .setSound(defaultSoundUri)
+            .setSound(soundUri)
             .setVibrate(if (vibrationEnabled) longArrayOf(0, 250, 250, 250) else longArrayOf(0))
             .setContentIntent(pendingIntent)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(if (isMessageType) NotificationCompat.PRIORITY_HIGH else NotificationCompat.PRIORITY_DEFAULT)
         
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         
-        // Criar canal de notificação para Android 8.0+
+        // Criar canais de notificação para Android 8.0+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_HIGH
+            // Canal padrão
+            val defaultChannel = NotificationChannel(
+                CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_DEFAULT
+            ).apply { description = CHANNEL_DESCRIPTION }
+            notificationManager.createNotificationChannel(defaultChannel)
+
+            // Canal dedicado para mensagens (importância alta = som + heads-up)
+            val msgChannel = NotificationChannel(
+                CHANNEL_MSG_ID, CHANNEL_MSG_NAME, NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = CHANNEL_DESCRIPTION
+                description = CHANNEL_MSG_DESCRIPTION
+                enableVibration(vibrationEnabled)
             }
-            notificationManager.createNotificationChannel(channel)
+            notificationManager.createNotificationChannel(msgChannel)
         }
         
-        // Enviar notificação
-        notificationManager.notify(0, notificationBuilder.build())
+        // ID único por tipo para não agrupar mensagens com outras notificações
+        val notifyId = if (isMessageType) System.currentTimeMillis().toInt() else 0
+        notificationManager.notify(notifyId, notificationBuilder.build())
     }
+    
+    /** Tuple simples para retornar múltiplos valores em displayNotification */
+    private data class Tuple4<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)
 } 

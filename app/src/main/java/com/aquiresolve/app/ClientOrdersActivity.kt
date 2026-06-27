@@ -37,6 +37,7 @@ class ClientOrdersActivity : AppCompatActivity() {
 
     // ViewBinding para acesso aos elementos da interface
     private lateinit var binding: ActivityClientOrdersBinding
+    private val floatingMic = FloatingMicHelper()
     
     // Variáveis para controle de estado
     private var isLoading = false
@@ -60,6 +61,7 @@ class ClientOrdersActivity : AppCompatActivity() {
         binding = ActivityClientOrdersBinding.inflate(layoutInflater)
         setContentView(binding.root)
         InsetsHelper.apply(this, binding.rootLayout, null)
+        floatingMic.attach(this)
         
         // Inicializar managers
         orderManager = FirebaseOrderManager()
@@ -332,6 +334,7 @@ class ClientOrdersActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        floatingMic.detach()
         super.onDestroy()
         ordersListener?.remove()
         ordersListener = null

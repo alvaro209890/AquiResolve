@@ -38,6 +38,7 @@ class ProfileActivity : AppCompatActivity() {
     private lateinit var authManager: FirebaseAuthManager
     private lateinit var permissionManager: com.aquiresolve.app.utils.ActivityPermissionManager
     private lateinit var firebaseImageManager: FirebaseImageManager
+    private val floatingMic = FloatingMicHelper()
     private val cashbackManager = CashbackManager()
 
     // Launcher para galeria
@@ -91,6 +92,7 @@ class ProfileActivity : AppCompatActivity() {
         // Inicializar ViewBinding
         binding = ActivityProfileBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        floatingMic.attach(this)
         
         // Configurar a interface
         setupUI()
@@ -1170,6 +1172,7 @@ class ProfileActivity : AppCompatActivity() {
      * Limpa os recursos quando a activity é destruída
      */
     override fun onDestroy() {
+        floatingMic.detach()
         super.onDestroy()
         // Limpar recursos se necessário
     }

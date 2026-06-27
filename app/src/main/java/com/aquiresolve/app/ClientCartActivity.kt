@@ -41,6 +41,7 @@ class ClientCartActivity : AppCompatActivity() {
     private lateinit var cartAdapter: CartItemsAdapter
     private lateinit var cartManager: FirebaseCartManager
     private lateinit var authManager: FirebaseAuthManager
+    private val floatingMic = FloatingMicHelper()
 
     private var cartItems: List<CartItemData> = emptyList()
     private var checkoutInProgress = false
@@ -80,6 +81,7 @@ class ClientCartActivity : AppCompatActivity() {
 
         cartManager = FirebaseCartManager(this)
         authManager = FirebaseAuthManager(this)
+        floatingMic.attach(this)
 
         setupRecycler()
         setupClickListeners()
@@ -545,5 +547,10 @@ class ClientCartActivity : AppCompatActivity() {
 
     private fun showToast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    override fun onDestroy() {
+        floatingMic.detach()
+        super.onDestroy()
     }
 }

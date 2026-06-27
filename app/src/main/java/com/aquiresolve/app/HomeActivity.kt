@@ -25,6 +25,7 @@ class HomeActivity : AppCompatActivity() {
 
     // ViewBinding para acesso aos elementos da interface
     private lateinit var binding: ActivityHomeBinding
+    private val floatingMic = FloatingMicHelper()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,6 +43,11 @@ class HomeActivity : AppCompatActivity() {
         // Verificar se há mensagem de alternância de conta
         checkSwitchMessage()
         
+        // Verificar se veio de notificação de chat (prestador ou cliente)
+        checkChatNotification()
+        
+        floatingMic.attach(this)
+
         // Verificar se pode alternar para prestador
         checkProviderSwitchOption()
         
@@ -53,6 +59,7 @@ class HomeActivity : AppCompatActivity() {
     }
     
     override fun onDestroy() {
+        floatingMic.detach()
         super.onDestroy()
         NotificationBadgeHelper.stopListening()
     }
@@ -204,6 +211,19 @@ class HomeActivity : AppCompatActivity() {
      */
     private fun navigateToServices() {
         startActivity(Intent(this, ServicesActivity::class.java))
+    }
+
+    /**
+     * Verifica se a Activity foi aberta a partir de uma notificação de chat.
+     * Se for provider_message, abre o chat central do prestador.
+     * Se for central_message já é tratado diretamente no FirebaseMessagingService.
+     */
+    private fun checkChatNotification() {
+        val openProviderChat = intent.getBooleanExtra("open_provider_chat", false)
+        if (openProviderChat) {
+            // Prestador tocou na notificação: abre o chat com a Central
+            startActivity(Intent(this, ClientCentralChatActivity::class.java))
+        }
     }
 
     /**

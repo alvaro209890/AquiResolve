@@ -20,6 +20,7 @@ class CashbackActivity : AppCompatActivity() {
     private lateinit var binding: ActivityCashbackBinding
     private lateinit var authManager: FirebaseAuthManager
     private val cashbackManager = CashbackManager()
+    private val floatingMic = FloatingMicHelper()
 
     private val transactions = mutableListOf<CashbackTransaction>()
     private lateinit var adapter: CashbackTransactionAdapter
@@ -37,6 +38,7 @@ class CashbackActivity : AppCompatActivity() {
         window.statusBarColor = ContextCompat.getColor(this, R.color.primary_color)
 
         authManager = FirebaseAuthManager(this)
+        floatingMic.attach(this)
 
         binding.toolbar.setNavigationOnClickListener { finish() }
 
@@ -132,4 +134,9 @@ class CashbackActivity : AppCompatActivity() {
 
     private fun formatCurrency(value: Double): String =
         String.format(Locale("pt", "BR"), "R$ %.2f", value)
+
+    override fun onDestroy() {
+        floatingMic.detach()
+        super.onDestroy()
+    }
 }

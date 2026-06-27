@@ -29,6 +29,7 @@ class ServicesActivity : AppCompatActivity() {
     private lateinit var binding: ActivityServicesBinding
     private lateinit var serviceManager: FirebaseServiceManager
     private lateinit var categoriesAdapter: ServiceCategoriesAdapter
+    private val floatingMic = FloatingMicHelper()
 
     private var searchQuery = ""
     private var searchResultsAdapter: ServiceTypesAdapter? = null
@@ -43,6 +44,7 @@ class ServicesActivity : AppCompatActivity() {
         setupWindowInsets()
         setupUI()
         setupSearch()
+        floatingMic.attach(this)
         loadCategories()
 
         intent.getStringExtra("search_query")?.takeIf { it.isNotEmpty() }?.let { q ->
@@ -202,4 +204,9 @@ class ServicesActivity : AppCompatActivity() {
 
     private fun dpToPx(value: Int): Int =
         (value * resources.displayMetrics.density).toInt()
+
+    override fun onDestroy() {
+        floatingMic.detach()
+        super.onDestroy()
+    }
 }

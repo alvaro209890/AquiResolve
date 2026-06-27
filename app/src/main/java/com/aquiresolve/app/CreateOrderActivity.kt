@@ -57,6 +57,7 @@ class CreateOrderActivity : AppCompatActivity() {
 
     // ViewBinding para acesso aos elementos da interface
     private lateinit var binding: ActivityCreateOrderBinding
+    private val floatingMic = FloatingMicHelper()
     
     // Variáveis para controle de estado
     private var isLoading = false
@@ -147,6 +148,7 @@ class CreateOrderActivity : AppCompatActivity() {
         binding = ActivityCreateOrderBinding.inflate(layoutInflater)
         setContentView(binding.root)
         InsetsHelper.apply(this, binding.rootLayout, null)
+        floatingMic.attach(this)
         
         // Pré-selecionar categoria vinda da tela de serviços (ANTES de configurar spinners)
         val selectedCategoryName = intent.getStringExtra("service_category_name")
@@ -1750,6 +1752,7 @@ class CreateOrderActivity : AppCompatActivity() {
      * Limpa os recursos quando a activity é destruída
      */
     override fun onDestroy() {
+        floatingMic.detach()
         super.onDestroy()
         // Limpar recursos se necessário
     }

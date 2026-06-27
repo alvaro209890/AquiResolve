@@ -50,6 +50,7 @@ class ClientHomeActivity : AppCompatActivity() {
     private val auth = FirebaseAuth.getInstance()
     private val centralChatRepo = CentralChatRepository()
     private var centralUnreadListener: ListenerRegistration? = null
+    private val floatingMic = FloatingMicHelper()
 
     // Carrossel de banners
     private var bannerAdapter: BannerAdapter? = null
@@ -92,6 +93,7 @@ class ClientHomeActivity : AppCompatActivity() {
         setupWindowInsets()
         setupUI()
         setupClickListeners()
+        floatingMic.attach(this)
         setupSwipeRefresh()
         setupCategories()
         setupBannerCarousel()
@@ -146,6 +148,7 @@ class ClientHomeActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        floatingMic.detach()
         super.onDestroy()
         // Garante que o loop dos carrosséis não vaze (mesmo cuidado dos listeners)
         stopBannerAutoScroll()

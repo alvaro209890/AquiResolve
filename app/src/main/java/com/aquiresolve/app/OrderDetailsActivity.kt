@@ -61,6 +61,7 @@ class OrderDetailsActivity : AppCompatActivity() {
 
     // ViewBinding para acesso aos elementos da interface
     private lateinit var binding: ActivityOrderDetailsBinding
+    private val floatingMic = FloatingMicHelper()
     
     // Variáveis para controle de estado
     private var orderId: String? = null
@@ -143,6 +144,7 @@ class OrderDetailsActivity : AppCompatActivity() {
         binding = ActivityOrderDetailsBinding.inflate(layoutInflater)
         setContentView(binding.root)
         InsetsHelper.apply(this, binding.rootLayout, null)
+        floatingMic.attach(this)
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         
         // Obter dados da intent
@@ -1744,6 +1746,7 @@ class OrderDetailsActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        floatingMic.detach()
         stopProviderLocationUpdates()
         runCatching { binding.mapOrder.onDetach() }
         super.onDestroy()
