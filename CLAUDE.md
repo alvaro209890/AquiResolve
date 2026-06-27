@@ -349,6 +349,18 @@ Espelha o Chat com Clientes, para prestadores. Página `/dashboard/controle/chat
   - `POST /card`
   - `POST /pix`
   - `GET /{orderId}/status`
+- O backend e a camada de compatibilidade com a Pagar.me v5: ele nao confia no
+  valor do APK, recarrega pedido/carrinho no Firestore e normaliza o payload final
+  antes de chamar `POST /orders`.
+- Correcao 2026-06-27 (`642e229`): cartao legado do APK (`card_number`,
+  `card_holder_name`, `card_expiration_date`, `card_cvv`) e convertido para o
+  formato v5 (`number`, `holder_name`, `exp_month`, `exp_year`, `cvv`); checkout
+  de carrinho usa codigo curto no gateway e preserva o codigo local completo em
+  `metadata.order_id`. Detalhes: `docs/CORRECAO_PAGAMENTOS_PAGARME_2026-06-27.md`.
+- Status atual conhecido: cartao chega corretamente ao gateway; cartao de teste em
+  chave live volta `not_authorized`. PIX tambem chega ao gateway, mas a chave do
+  Render retorna `action_forbidden`, indicando permissao/configuracao PIX na conta
+  Pagar.me, nao erro de payload do app/backend.
 
 ### Arquivo de configuração Firebase
 `app/google-services.json` — **NÃO está no repositório** (adicionar manualmente ou via CI/CD secrets)
@@ -697,7 +709,9 @@ Cashback é uma configuração financeira crítica. Só o Firebase Admin SDK (vi
 | `providerBalance` sempre zero | Campo não era atualizado ao concluir pedido | CORRIGIDO: `PATCH /api/orders/[id]` com `status=completed` faz `FieldValue.increment(commission)` em `providers/{id}` e `users/{id}` |
 | Providers aparecem vazios | Firestore `providers` vazio ou SDK não autenticado | Verificar auth e dados no Firestore |
 | Pedidos não aparecem | `NEXT_PUBLIC_FIREBASE_*` não configurados | Preencher `.env.local` |
-| Pagar.me falha | Chave de API incorreta ou expirada | Verificar `API_KEY_PRIVATE_PAGARME` |
+| Pagar.me falha com 422 `The request is invalid` | Payload final incompatível com Core API v5 ou dados obrigatórios ausentes | Ver `docs/CORRECAO_PAGAMENTOS_PAGARME_2026-06-27.md`; o backend deve normalizar payload legado do APK antes de chamar `/orders` |
+| PIX falha com `action_forbidden` mesmo com HTTP 200 da Pagar.me | Chave/conta Pagar.me sem permissao PIX habilitada para a acao | Verificar configuracao da conta Pagar.me usada por `PAGARME_SECRET_KEY` no Render; trocar/liberar chave e retestar |
+| Pagar.me falha com 401/403 | Chave de API incorreta, expirada ou de outro produto/conta | Verificar `PAGARME_SECRET_KEY` no Render para o app; `API_KEY_PRIVATE_PAGARME` do painel local nao substitui automaticamente a chave do backend |
 | Storage Upload falha | `storageBucket` incorreto | Verificar `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET` |
 | Catálogo não salva no painel | Regra bloqueia escrita client-SDK (esperado) | O painel usa `POST/DELETE /api/catalog` (Admin SDK); confira `FIREBASE_SERVICE_ACCOUNT` no Vercel |
 | Catálogo não aparece no app | `service_categories` vazio | Rodar `node dashboard_admin/scripts/seed-catalog.mjs`; o app cai no fallback estático se vazio |

@@ -33,12 +33,15 @@ prestador, bloqueio de usuário, catálogo, reembolso, cashback) passa por **API
 que ignoram as regras. `master@aquiresolve.com` existe só no doc `adminmaster/master` (login custom
 via `/api/auth/master-login`), não como usuário Firebase Auth. Documentado em `CLAUDE.md`.
 
-## ✅ Verificado íntegro (sem bugs)
+## ✅ Verificado integro e atualizacoes posteriores
 
-- **Backend de pagamentos (Render):** fluxo cartão/PIX/status/webhook, autorização do payload
-  (`payment-authorization.service`), sincronização de status (`payment-status-sync.service`,
-  `awaiting_payment → distributing`), posse da sessão de pagamento, `toCents` à prova de IEEE-754,
-  rate-limit e CORS. Sem bugs.
+- **Backend de pagamentos (Render):** a auditoria original verificou fluxo
+  cartão/PIX/status/webhook, autorização do payload (`payment-authorization.service`),
+  sincronização de status (`payment-status-sync.service`, `awaiting_payment → distributing`),
+  posse da sessão de pagamento, `toCents` à prova de IEEE-754, rate-limit e CORS.
+  **Atualizacao 2026-06-27:** foi encontrado e corrigido um bug posterior de
+  compatibilidade do payload enviado a Pagar.me v5 no checkout real do APK debug.
+  Ver `docs/CORRECAO_PAGAMENTOS_PAGARME_2026-06-27.md`.
 - **Reembolso** (`/api/orders/[id]/refund`) e **reconciliação `charge.refunded`** no webhook do painel.
 - **Chat:** upsert de `chatConversations/{orderId}` no envio de mensagem (Central Operacional).
 - **Catálogo dinâmico no app** (`CatalogRepository` + fallback estático).
