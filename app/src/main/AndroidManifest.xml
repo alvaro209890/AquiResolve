@@ -315,6 +315,11 @@
             android:name=".ProviderLocationForegroundService"
             android:exported="false"
             android:foregroundServiceType="location" />
+
+        <service
+            android:name=".AlertForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
         <activity
             android:name=".PaymentActivity"
             android:exported="false"

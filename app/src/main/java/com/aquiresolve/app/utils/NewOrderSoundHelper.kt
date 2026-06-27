@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
+import com.aquiresolve.app.AlertForegroundService
 
 /**
  * Helper para tocar o som de alerta quando um novo pedido chega para prestadores aprovados.
@@ -38,6 +39,7 @@ object NewOrderSoundHelper {
     private val continuousSessions = mutableMapOf<String, Long>()
     private var continuousPlayer: MediaPlayer? = null
     private var continuousSessionId: Long = 0L
+    private var appContext: Context? = null  // guardado para parar o Foreground Service
     
     /**
      * Toca o som de alerta de novo pedido.
@@ -209,9 +211,16 @@ object NewOrderSoundHelper {
                 return
             }
 
+            // Guarda o application context para uso futuro (parar o Foreground Service)
+            this.appContext = appContext
+
             continuousSessionId += 1L
             val sessionId = continuousSessionId
             continuousSessions[orderId] = sessionId
+
+            // Iniciar Foreground Service para manter o processo vivo em background
+            AlertForegroundService.start(appContext)
+
             Log.d(TAG, "Iniciando loop contínuo para pedido $orderId (session=$sessionId)")
         }
 
@@ -232,6 +241,20 @@ object NewOrderSoundHelper {
                 Log.d(TAG, "Todos os loops contínuos parados")
             }
             stopContinuousPlayer()
+
+            // Se não há mais sons ativos, para o Foreground Service
+            if (continuousSessions.isEmpty()) {
+                val ctx = this.appContext
+                if (ctx != null) {
+                    mainHandler.post {
+                        try {
+                            AlertForegroundService.stop(ctx)
+                        } catch (e: Exception) {
+                            Log.w(TAG, "Erro ao parar AlertForegroundService: ${e.message}")
+                        }
+                    }
+                }
+            }
         }
     }
 

@@ -154,7 +154,7 @@ object ProviderNewOrderAlertManager {
             val initialLocation = userDoc.getGeoPoint("coordinates")
 
             withContext(Dispatchers.Main) {
-                stopMonitoring("reiniciar listener")
+                stopMonitoring("reiniciar listener", keepSound = true)
 
                 monitoredProviderId = userId
                 providerServicesNormalized = services
@@ -426,7 +426,7 @@ object ProviderNewOrderAlertManager {
         }
     }
 
-    private fun stopMonitoring(reason: String) {
+    private fun stopMonitoring(reason: String, keepSound: Boolean = false) {
         if (ordersListener != null || monitoredProviderId != null) {
             Log.d(TAG, "Parando listener global de pedidos: $reason")
         }
@@ -435,9 +435,11 @@ object ProviderNewOrderAlertManager {
         ordersListener = null
         ordersStatusListener?.remove()
         ordersStatusListener = null
-        // Para todos os sons contínuos ativos
-        NewOrderSoundHelper.stopSound()
-        alertedOrderIds.clear()
+        // Só para os sons se não for um refresh (keepSound=true)
+        if (!keepSound) {
+            NewOrderSoundHelper.stopSound()
+            alertedOrderIds.clear()
+        }
         monitoredProviderId = null
         hasInitialSnapshot = false
         providerServicesNormalized = emptySet()
