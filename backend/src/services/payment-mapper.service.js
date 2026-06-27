@@ -15,7 +15,8 @@ function extractGatewayMessage(error) {
     return responseData.message.trim();
   }
 
-  const firstGatewayError = Array.isArray(responseData.errors) ? responseData.errors[0] : null;
+  const gatewayErrors = responseData.errors;
+  const firstGatewayError = Array.isArray(gatewayErrors) ? gatewayErrors[0] : null;
 
   if (
     firstGatewayError &&
@@ -24,6 +25,62 @@ function extractGatewayMessage(error) {
     firstGatewayError.message.trim()
   ) {
     return firstGatewayError.message.trim();
+  }
+
+  if (gatewayErrors && typeof gatewayErrors === 'object' && !Array.isArray(gatewayErrors)) {
+    const details = Object.entries(gatewayErrors)
+      .flatMap(([field, value]) => {
+        if (Array.isArray(value)) {
+          return value.map((message) => ({ field, message }));
+        }
+        return [{ field, message: value }];
+      })
+      .map(({ field, message }) => {
+        const normalizedMessage =
+          typeof message === 'string'
+            ? message.trim()
+            : message && typeof message === 'object' && typeof message.message === 'string'
+              ? message.message.trim()
+              : '';
+
+        return normalizedMessage ? `${field}: ${normalizedMessage}` : '';
+      })
+      .filter(Boolean);
+
+    if (details.length > 0) {
+      return details.slice(0, 3).join('; ');
+    }
+  }
+
+  return null;
+}
+
+function extractGatewayDetails(error) {
+  const responseData = error.response && error.response.data;
+
+  if (!responseData || typeof responseData !== 'object') {
+    return null;
+  }
+
+  const gatewayErrors = responseData.errors;
+  if (!gatewayErrors) {
+    return null;
+  }
+
+  if (Array.isArray(gatewayErrors)) {
+    return gatewayErrors.slice(0, 5).map((item) => ({
+      message: typeof item?.message === 'string' ? item.message : String(item || ''),
+      parameter: typeof item?.parameter_name === 'string' ? item.parameter_name : null
+    }));
+  }
+
+  if (typeof gatewayErrors === 'object') {
+    return Object.entries(gatewayErrors)
+      .slice(0, 8)
+      .map(([field, value]) => ({
+        field,
+        messages: Array.isArray(value) ? value.map(String).slice(0, 5) : [String(value)]
+      }));
   }
 
   return null;
@@ -40,7 +97,8 @@ function mapPagarmeError(error) {
 
     if (status === 400 || status === 404 || status === 422) {
       return new HttpError(status, gatewayMessage || 'Requisição rejeitada pelo gateway', {
-        code: 'PAYMENT_FAILED'
+        code: 'PAYMENT_FAILED',
+        details: extractGatewayDetails(error)
       });
     }
 
