@@ -175,12 +175,19 @@ service cloud.firestore {
     }
 
     // Permite que qualquer prestador autenticado marque um pedido como rejeitado
-    // (adiciona seu UID ao array rejectedBy). Só em pedidos ainda não atribuídos.
+    // SÓ PARA ELE (adiciona seu próprio UID ao array rejectedBy). Só em pedidos
+    // ainda não atribuídos. Como apenas 'rejectedBy' muda, o status/preço/atribuição
+    // permanecem — a recusa de um prestador NUNCA cancela o pedido para os demais.
+    // Endurecido: o chamador precisa estar no novo rejectedBy e não pode remover
+    // quem já recusou (não dá pra "limpar" recusas de outros).
     function validProviderRejectUpdate() {
       return isSignedIn()
         && resource.data.status in ['distributing', 'pending', 'available']
-        && request.resource.data.diff(resource.data).affectedKeys()
-            .hasOnly(['rejectedBy']);
+        && (resource.data.get('assignedProvider', null) == null
+            || resource.data.get('assignedProvider', null) == '')
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['rejectedBy'])
+        && request.auth.uid in request.resource.data.rejectedBy
+        && request.resource.data.rejectedBy.hasAll(resource.data.get('rejectedBy', []));
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

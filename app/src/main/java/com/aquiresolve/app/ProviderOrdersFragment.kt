@@ -540,15 +540,15 @@ class ProviderOrdersFragment : Fragment() {
                     return@launch
                 }
                 
-                // Adicionar este prestador ao array rejectedBy do pedido
-                // (não muda o status do pedido — apenas o esconde deste prestador)
+                // Adicionar este prestador ao array rejectedBy do pedido.
+                // Só 'rejectedBy' muda (arrayUnion do próprio uid) — não altera o status,
+                // então a recusa apenas esconde o pedido DESTE prestador, sem cancelá-lo
+                // para os demais. (Gravar campos extras quebraria validProviderRejectUpdate.)
                 firestore.collection("orders")
                     .document(order.id)
                     .update(
-                        mapOf(
-                            "rejectedBy" to com.google.firebase.firestore.FieldValue.arrayUnion(user.uid),
-                            "rejectedAt_${user.uid}" to com.google.firebase.Timestamp.now()
-                        )
+                        "rejectedBy",
+                        com.google.firebase.firestore.FieldValue.arrayUnion(user.uid)
                     )
                     .await()
                 

@@ -216,10 +216,13 @@ class FirebaseMessagingService : FirebaseMessagingService() {
                 NewOrderSoundHelper.startContinuousPlay(applicationContext, orderId)
             }
 
-            // Reativa o listener Firestore pra monitorar novos pedidos
+            // Reativa o listener Firestore pra monitorar novos pedidos e registra
+            // este pedido para que o som PARE sozinho quando algum prestador aceitar
+            // (sem isso, um som iniciado por FCM tocaria sem parar após o aceite).
             val alarmManager = ProviderNewOrderAlertManager
             Handler(Looper.getMainLooper()).post {
                 alarmManager.refreshMonitoring()
+                alarmManager.watchAlertedOrders(setOf(orderId))
             }
         } else if (isOrderNotification && soundEnabled) {
             NewOrderSoundHelper.playNewOrderSound(applicationContext)

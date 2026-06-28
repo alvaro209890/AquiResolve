@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.aquiresolve.app.utils.NewOrderSoundHelper
-import com.google.firebase.Timestamp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CoroutineScope
@@ -57,19 +56,18 @@ class RejectOrderReceiver : BroadcastReceiver() {
             }
 
             val db = FirebaseFirestore.getInstance()
-            val now = Timestamp.now()
 
             for (orderId in orderIds) {
                 try {
-                    // Marcar pedido como rejeitado por este prestador
-                    // Usa FieldValue.arrayUnion para adicionar ao array rejectedBy
+                    // Marcar pedido como rejeitado APENAS por este prestador.
+                    // Só 'rejectedBy' é alterado (arrayUnion do próprio uid) — assim a
+                    // regra validProviderRejectUpdate aprova e o status do pedido NÃO
+                    // muda, ou seja, recusar não cancela o pedido para os outros.
                     db.collection("orders")
                         .document(orderId)
                         .update(
-                            mapOf(
-                                "rejectedBy" to com.google.firebase.firestore.FieldValue.arrayUnion(currentUser.uid),
-                                "rejectedAt_${currentUser.uid}" to now
-                            )
+                            "rejectedBy",
+                            com.google.firebase.firestore.FieldValue.arrayUnion(currentUser.uid)
                         )
                         .await()
 

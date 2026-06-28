@@ -292,7 +292,8 @@ object ProviderNewOrderAlertManager {
                 }
 
                 // Configurar listener para parar o som quando o pedido for aceito
-                setupOrderAcceptedListener(newIds)
+                // (monitora TODOS os pedidos alertados, não só os novos)
+                setupOrderAcceptedListener()
 
                 showHeadsUpNotification(context, newIds)
                 Log.d(TAG, "Alerta de novo pedido disparado (${newIds.size} pedidos, som contínuo)")
@@ -303,13 +304,28 @@ object ProviderNewOrderAlertManager {
     }
 
     /**
-     * Configura um listener Firestore que monitora os pedidos alertados.
-     * Quando o status muda para "assigned" (alguém aceitou), para o som.
+     * Registra pedidos cujo som contínuo foi iniciado por OUTRO caminho (ex.: push FCM
+     * com o app fechado, em FirebaseMessagingService) para que o som também pare
+     * automaticamente quando algum prestador aceitar o pedido. Sem isso, um som
+     * iniciado via FCM tocaria para sempre mesmo depois de outro prestador aceitar.
      */
-    private fun setupOrderAcceptedListener(orderIds: Set<String>) {
+    fun watchAlertedOrders(orderIds: Set<String>) {
         if (orderIds.isEmpty()) return
+        Handler(Looper.getMainLooper()).post {
+            alertedOrderIds.addAll(orderIds)
+            setupOrderAcceptedListener()
+        }
+    }
 
-        val monitoredIds = orderIds.toList()
+    /**
+     * Configura um listener Firestore que monitora TODOS os pedidos atualmente
+     * alertados (alertedOrderIds). Quando o status de um deles muda para "assigned"
+     * (alguém aceitou) ou sai de disponível, para o som daquele pedido.
+     */
+    private fun setupOrderAcceptedListener() {
+        val monitoredIds = alertedOrderIds.toList().take(30) // limite do whereIn
+        if (monitoredIds.isEmpty()) return
+
         Log.d(TAG, "Monitorando status de ${monitoredIds.size} pedido(s) alertados")
 
         // Remove listener anterior se existir
