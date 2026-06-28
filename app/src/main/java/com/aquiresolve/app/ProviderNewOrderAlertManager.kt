@@ -146,6 +146,18 @@ object ProviderNewOrderAlertManager {
                 return
             }
 
+            // Só alerta quem está DISPONÍVEL. Indisponível => para o monitoramento e
+            // qualquer som em andamento (stopMonitoring com keepSound=false). Quando o
+            // prestador volta a ficar disponível, toggleAvailability chama
+            // refreshMonitoring() e o listener é reatachado.
+            val isAvailable = providerDoc.getBoolean("isAvailable")
+                ?: userDoc.getBoolean("isAvailable")
+                ?: true
+            if (!isAvailable) {
+                withContext(Dispatchers.Main) { stopMonitoring("prestador indisponível") }
+                return
+            }
+
             val rawServices = extractProviderServices(providerDoc, userDoc)
             val services = ServiceNicheCatalog.normalizeProviderServices(rawServices)
 
@@ -200,6 +212,13 @@ object ProviderNewOrderAlertManager {
                 // Ticker para expandir o raio do guincho ao longo do tempo.
                 dispatchHandler.removeCallbacks(dispatchTicker)
                 dispatchHandler.postDelayed(dispatchTicker, DISPATCH_REFRESH_MS)
+
+                // Se ainda há sons ativos de pedidos alertados (ex.: após um refresh com
+                // keepSound=true), re-arma o listener que PARA o som quando alguém aceita
+                // — stopMonitoring removeu o ordersStatusListener, então recriamos aqui.
+                if (alertedOrderIds.isNotEmpty()) {
+                    setupOrderAcceptedListener()
+                }
 
                 Log.d(TAG, "Listener global de novos pedidos ativo para prestador: $userId")
             }

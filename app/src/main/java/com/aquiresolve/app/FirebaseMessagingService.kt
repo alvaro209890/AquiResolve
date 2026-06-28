@@ -17,6 +17,7 @@ import com.google.firebase.messaging.RemoteMessage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import java.util.*
 
 class FirebaseMessagingService : FirebaseMessagingService() {
@@ -107,6 +108,14 @@ class FirebaseMessagingService : FirebaseMessagingService() {
                     type.equals("payment", ignoreCase = true) ->
                         if (!privacyManager.isSettingEnabled("payment_notifications_enabled")) return@launch
                 }
+
+                // Alerta de novo pedido SÓ toca se o prestador estiver DISPONÍVEL.
+                // O backend já filtra indisponíveis, mas re-checamos no cliente para
+                // cobrir a corrida (toggle de disponibilidade entre o envio e a entrega).
+                if (type.equals("order", ignoreCase = true) && !isProviderAvailableForOrders()) {
+                    android.util.Log.d("FCM", "Pedido ignorado: prestador indisponível")
+                    return@launch
+                }
                 
                 // Verificar horário silencioso
                 if (privacyManager.isSettingEnabled("quiet_hours_enabled")) {
@@ -139,6 +148,24 @@ class FirebaseMessagingService : FirebaseMessagingService() {
     
     private fun runOnMainThread(block: () -> Unit) {
         android.os.Handler(android.os.Looper.getMainLooper()).post(block)
+    }
+
+    /**
+     * Lê providers/{uid}.isAvailable (fallback users/{uid}). Em caso de erro ou
+     * usuário deslogado, assume DISPONÍVEL (true) para não perder um pedido — o
+     * backend já não envia FCM a prestadores marcados como indisponíveis.
+     */
+    private suspend fun isProviderAvailableForOrders(): Boolean {
+        return try {
+            val uid = FirebaseConfig.getAuth().currentUser?.uid ?: return true
+            val db = com.google.firebase.firestore.FirebaseFirestore.getInstance()
+            val providerDoc = db.collection("providers").document(uid).get().await()
+            providerDoc.getBoolean("isAvailable")
+                ?: db.collection("users").document(uid).get().await().getBoolean("isAvailable")
+                ?: true
+        } catch (_: Exception) {
+            true
+        }
     }
     
     private fun isInQuietHours(startStr: String, endStr: String): Boolean {
