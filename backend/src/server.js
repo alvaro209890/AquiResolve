@@ -20,7 +20,11 @@ app.listen(config.port, () => {
   });
 
   // Inicia listener de notificação de novos pedidos para prestadores
-  providerNotification.start();
+  try {
+    providerNotification.start();
+  } catch (err) {
+    logger.warn('ProviderNotification: erro ao iniciar', { error: err.message });
+  }
 });
 
 startKeepAlive(config);

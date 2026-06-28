@@ -7,18 +7,36 @@ const logger = require('../utils/logger');
  * Escuta mudanças em `orders` com status distributing/pending e envia FCM
  * para prestadores aprovados cujos nichos batem com o pedido.
  *
- * Inicializado no app.js (sem bloquear o startup).
+ * Inicializado no server.js (sem bloquear o startup em caso de erro).
  */
 class ProviderNotificationService {
   constructor() {
-    this.db = admin.firestore();
+    this.db = null;
     this.listener = null;
     this.started = false;
+    this.fcmReady = false;
   }
 
   start() {
     if (this.started) return;
+
+    // Verifica se Firebase Admin está inicializado
+    if (!admin.apps || admin.apps.length === 0) {
+      logger.warn('ProviderNotification: Firebase Admin não inicializado, pulando');
+      return;
+    }
+
+    this.db = admin.firestore();
     this.started = true;
+
+    // Verifica se FCM messaging está disponível
+    try {
+      admin.messaging();
+      this.fcmReady = true;
+      logger.info('ProviderNotification: FCM messaging disponível');
+    } catch (_) {
+      logger.warn('ProviderNotification: FCM messaging não disponível — notificações serão apenas locais');
+    }
 
     const statuses = ['pending', 'distributing', 'available',
       'PENDING', 'DISTRIBUTING', 'AVAILABLE'];
@@ -102,7 +120,12 @@ class ProviderNotificationService {
     // Remove duplicatas
     const uniqueTokens = [...new Set(tokens)];
 
-    // Envia FCM
+    // Envia FCM (se disponível)
+    if (!this.fcmReady) {
+      logger.info('FCM não disponível — notificação local apenas', { niche, count: uniqueTokens.length });
+      return;
+    }
+
     const message = {
       notification: {
         title: 'Novo pedido disponível',
