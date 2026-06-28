@@ -627,6 +627,14 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // Tokens FCM — cada usuário gerencia o próprio; backend lê com Admin SDK
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    match /fcm_tokens/{userId} {
+      allow read, write: if isSignedIn() && request.auth.uid == userId;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // Logs de auditoria — escrita exclusiva via Admin SDK (dashboard)
     // ═══════════════════════════════════════════════════════════════════════════
 

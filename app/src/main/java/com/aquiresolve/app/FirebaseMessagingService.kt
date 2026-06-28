@@ -7,6 +7,9 @@ import android.content.Context
 import android.content.Intent
 import android.media.RingtoneManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.aquiresolve.app.utils.NewOrderSoundHelper
 import com.google.firebase.messaging.FirebaseMessagingService
@@ -38,9 +41,8 @@ class FirebaseMessagingService : FirebaseMessagingService() {
             val auth = FirebaseConfig.getAuth()
             val currentUser = auth.currentUser
             if (currentUser != null) {
-                val notificationManager = FirebaseNotificationManager(this)
                 CoroutineScope(Dispatchers.IO).launch {
-                    notificationManager.saveUserToken(currentUser.uid)
+                    FirebaseNotificationManager.saveUserToken(currentUser.uid)
                 }
             }
         } catch (_: Exception) {
@@ -203,7 +205,23 @@ class FirebaseMessagingService : FirebaseMessagingService() {
             title.contains("pedido", ignoreCase = true) ||
             message.contains("pedido", ignoreCase = true)
 
-        if (isOrderNotification && soundEnabled) {
+        // Para pedidos novos: dispara o alerta contínuo (loop) + Foreground Service
+        // Isso garante que o prestador ouça o som mesmo com o app fechado
+        if (isOrderNotification && soundEnabled && orderId != null) {
+            // Inicia o Foreground Service pra manter o processo vivo
+            AlertForegroundService.start(applicationContext)
+
+            // Som contínuo em loop — só para quando aceitar/rejeitar
+            Handler(Looper.getMainLooper()).post {
+                NewOrderSoundHelper.startContinuousPlay(applicationContext, orderId)
+            }
+
+            // Reativa o listener Firestore pra monitorar novos pedidos
+            val alarmManager = ProviderNewOrderAlertManager
+            Handler(Looper.getMainLooper()).post {
+                alarmManager.refreshMonitoring()
+            }
+        } else if (isOrderNotification && soundEnabled) {
             NewOrderSoundHelper.playNewOrderSound(applicationContext)
         }
 

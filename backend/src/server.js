@@ -2,6 +2,7 @@ const { loadEnv } = require('./config/env');
 const { initializeFirebase } = require('./config/firebase');
 const { createApp } = require('./app');
 const { startKeepAlive } = require('./services/keep-alive.service');
+const providerNotification = require('./services/provider-notification.service');
 const logger = require('./utils/logger');
 
 const config = loadEnv();
@@ -17,6 +18,9 @@ app.listen(config.port, () => {
     keepAliveUrl: config.keepAliveUrl || null,
     keepAliveIntervalMs: config.keepAliveIntervalMs
   });
+
+  // Inicia listener de notificação de novos pedidos para prestadores
+  providerNotification.start();
 });
 
 startKeepAlive(config);

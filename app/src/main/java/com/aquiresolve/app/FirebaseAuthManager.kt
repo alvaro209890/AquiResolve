@@ -114,8 +114,7 @@ class FirebaseAuthManager(private val context: Context) {
 
                 // Registrar token FCM (best-effort)
                 try {
-                    val notificationManager = FirebaseNotificationManager(context)
-                    notificationManager.saveUserToken(user.uid)
+                    FirebaseNotificationManager.saveUserToken(user.uid)
                 } catch (_: Exception) {}
                 
                 android.util.Log.d("FirebaseAuthManager", "🎉 CADASTRO COMPLETADO COM SUCESSO!")
@@ -202,8 +201,7 @@ class FirebaseAuthManager(private val context: Context) {
 
                 // Registrar token FCM
                 try {
-                    val notificationManager = FirebaseNotificationManager(context)
-                    notificationManager.saveUserToken(user.uid)
+                    FirebaseNotificationManager.saveUserToken(user.uid)
                 } catch (_: Exception) {}
 
                 // Registrar hora de login no Firestore
