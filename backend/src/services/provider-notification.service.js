@@ -126,23 +126,24 @@ class ProviderNotificationService {
       return;
     }
 
+    // IMPORTANTE: mensagem DATA-ONLY (sem o bloco `notification` de topo).
+    // Com `notification`, um app morto/background recebe a notificação pela
+    // bandeja do sistema e o onMessageReceived do app NÃO roda — então o
+    // alerta sonoro contínuo (AlertForegroundService + NewOrderSoundHelper)
+    // nunca dispara, e o prestador só ouve som com o app aberto.
+    // Data-only + priority high acorda o app e chama onMessageReceived mesmo
+    // com o app fechado; o app monta a própria notificação a partir de
+    // data.title/data.body e inicia o som contínuo.
     const message = {
-      notification: {
-        title: 'Novo pedido disponível',
-        body: `Pedido de ${niche} aguardando prestador!`,
-      },
       data: {
         type: 'order',
         order_id: order.id,
         niche: niche,
+        title: 'Novo pedido disponível',
+        body: `Pedido de ${niche} aguardando prestador!`,
       },
       android: {
         priority: 'high',
-        notification: {
-          sound: 'default',
-          channelId: 'orders',
-          priority: 'high',
-        },
       },
     };
 

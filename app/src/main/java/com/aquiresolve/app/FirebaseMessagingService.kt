@@ -42,7 +42,8 @@ class FirebaseMessagingService : FirebaseMessagingService() {
             val currentUser = auth.currentUser
             if (currentUser != null) {
                 CoroutineScope(Dispatchers.IO).launch {
-                    FirebaseNotificationManager.saveUserToken(currentUser.uid)
+                    // onNewToken já entrega o token de REGISTRO FCM correto — persiste direto.
+                    FirebaseNotificationManager.saveToken(currentUser.uid, token)
                 }
             }
         } catch (_: Exception) {

@@ -137,7 +137,8 @@ service cloud.firestore {
     function validProviderAcceptUpdate() {
       return isSignedIn()
         && resource.data.status in ['distributing', 'pending', 'available']
-        && (resource.data.assignedProvider == null || resource.data.assignedProvider == '')
+        && (resource.data.get('assignedProvider', null) == null
+            || resource.data.get('assignedProvider', null) == '')
         && request.resource.data.status == 'assigned'
         && request.resource.data.assignedProvider == request.auth.uid
         && request.resource.data.assignedProviderName is string

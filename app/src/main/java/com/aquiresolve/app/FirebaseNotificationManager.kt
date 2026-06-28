@@ -21,10 +21,27 @@ object FirebaseNotificationManager {
      */
     suspend fun saveUserToken(userId: String) = withContext(Dispatchers.IO) {
         try {
-            val token = com.google.firebase.installations.FirebaseInstallations.getInstance()
-                .getToken(false).await().token
+            // IMPORTANTE: usar o token de REGISTRO do FCM (FirebaseMessaging.getToken),
+            // NÃO o token do Firebase Installations (FIS). O FIS retorna um JWT de auth
+            // interno que NÃO serve para enviar push — o backend não consegue entregar
+            // notificações a ele (era a causa do prestador não receber som/alerta com o
+            // app fechado: o token salvo era inválido para FCM).
+            val token = com.google.firebase.messaging.FirebaseMessaging.getInstance()
+                .token.await()
 
-            if (token.isBlank()) {
+            saveToken(userId, token)
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao salvar token FCM para $userId: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Persiste um token FCM já conhecido (ex.: o recebido em onNewToken), sem
+     * re-consultar o FirebaseMessaging.
+     */
+    suspend fun saveToken(userId: String, token: String?) = withContext(Dispatchers.IO) {
+        try {
+            if (token.isNullOrBlank()) {
                 Log.w(TAG, "Token FCM vazio para usuário $userId")
                 return@withContext
             }
