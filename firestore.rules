@@ -635,6 +635,15 @@ service cloud.firestore {
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
+    // Banners da Home do prestador — leitura autenticada, escrita via Admin SDK
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    match /provider_banners/{id} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
     // Logs de auditoria — escrita exclusiva via Admin SDK (dashboard)
     // ═══════════════════════════════════════════════════════════════════════════
 

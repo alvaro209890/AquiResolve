@@ -205,6 +205,30 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- Carrossel de banners para prestadores (gerenciado pelo painel; escondido quando vazio) -->
+            <LinearLayout
+                android:id="@+id/sectionBanners"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone"
+                android:layout_marginBottom="20dp">
+
+                <androidx.viewpager2.widget.ViewPager2
+                    android:id="@+id/bannerPager"
+                    android:layout_width="match_parent"
+                    android:layout_height="160dp" />
+
+                <LinearLayout
+                    android:id="@+id/bannerDots"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_gravity="center_horizontal"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="10dp" />
+
+            </LinearLayout>
+
             <!-- Botão de disponibilidade -->
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnAvailability"

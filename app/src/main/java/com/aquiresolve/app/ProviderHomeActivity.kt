@@ -3,7 +3,12 @@ package com.aquiresolve.app
 import android.Manifest
 import android.content.Intent
 import android.content.res.ColorStateList
+import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.view.View
+import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
@@ -14,7 +19,10 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
+import androidx.viewpager2.widget.ViewPager2
+import com.aquiresolve.app.adapters.BannerAdapter
 import com.aquiresolve.app.databinding.ActivityProviderHomeBinding
+import com.aquiresolve.app.models.HomeBanner
 import com.aquiresolve.app.models.OrderData
 import com.aquiresolve.app.utils.LocationPermissionHelper
 import com.aquiresolve.app.utils.PermissionHelper
@@ -66,6 +74,12 @@ class ProviderHomeActivity : AppCompatActivity() {
     private var requestedLocationPermissionForTracking = false
     private var requestedNotificationPermissionForTracking = false
 
+    // Carrossel de banners
+    private var bannerAdapter: BannerAdapter? = null
+    private val bannerHandler = Handler(Looper.getMainLooper())
+    private var bannerAutoScroll: Runnable? = null
+    private var bannerCount = 0
+
     private val requestNotificationPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) {
@@ -87,12 +101,14 @@ class ProviderHomeActivity : AppCompatActivity() {
         setupWindowInsets()
         setupUI()
         setupClickListeners()
+        setupBannerCarousel()
         loadProviderData()
     }
 
     override fun onResume() {
         super.onResume()
         ProviderNewOrderAlertManager.refreshMonitoring()
+        startBannerAutoScroll()
 
         // Recarrega apos voltar para refletir mudancas recentes no Firestore.
         lifecycleScope.launch {
@@ -102,6 +118,16 @@ class ProviderHomeActivity : AppCompatActivity() {
             loadAvailableOrders()
             refreshProviderLocationTracking()
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        stopBannerAutoScroll()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        stopBannerAutoScroll()
     }
 
     /**
@@ -767,5 +793,109 @@ class ProviderHomeActivity : AppCompatActivity() {
      */
     private fun showToast(message: String) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    // Carrossel de banners (igual ao da Home do cliente)
+    // ═══════════════════════════════════════════════════════════════════
+
+    private fun setupBannerCarousel() {
+        bannerAdapter = BannerAdapter(emptyList()) { banner -> onBannerClicked(banner) }
+        binding.bannerPager.adapter = bannerAdapter
+
+        binding.bannerPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
+            override fun onPageSelected(position: Int) {
+                updateBannerDots(position)
+                restartBannerAutoScroll()
+            }
+        })
+
+        applyBanners(ProviderBannerRepository.cachedBanners())
+
+        lifecycleScope.launch {
+            val banners = try { ProviderBannerRepository.load() } catch (_: Exception) { emptyList() }
+            applyBanners(banners)
+        }
+    }
+
+    private fun applyBanners(banners: List<HomeBanner>) {
+        bannerCount = banners.size
+        if (banners.isEmpty()) {
+            binding.sectionBanners.visibility = View.GONE
+            stopBannerAutoScroll()
+            return
+        }
+        binding.sectionBanners.visibility = View.VISIBLE
+        bannerAdapter?.updateItems(banners)
+        buildBannerDots(banners.size)
+        updateBannerDots(binding.bannerPager.currentItem)
+        startBannerAutoScroll()
+    }
+
+    private fun buildBannerDots(count: Int) {
+        binding.bannerDots.removeAllViews()
+        val size = (8 * resources.displayMetrics.density).toInt()
+        val margin = (3 * resources.displayMetrics.density).toInt()
+        repeat(count) {
+            val dot = View(this)
+            val lp = LinearLayout.LayoutParams(size, size)
+            lp.marginStart = margin
+            lp.marginEnd = margin
+            dot.layoutParams = lp
+            dot.setBackgroundResource(R.drawable.banner_dot_inactive)
+            binding.bannerDots.addView(dot)
+        }
+        binding.bannerDots.visibility = if (count > 1) View.VISIBLE else View.GONE
+    }
+
+    private fun updateBannerDots(active: Int) {
+        for (i in 0 until binding.bannerDots.childCount) {
+            binding.bannerDots.getChildAt(i).setBackgroundResource(
+                if (i == active) R.drawable.banner_dot_active else R.drawable.banner_dot_inactive
+            )
+        }
+    }
+
+    private fun startBannerAutoScroll() {
+        if (bannerCount <= 1) return
+        stopBannerAutoScroll()
+        val runnable = Runnable {
+            if (bannerCount <= 1) return@Runnable
+            val next = (binding.bannerPager.currentItem + 1) % bannerCount
+            binding.bannerPager.setCurrentItem(next, true)
+        }
+        bannerAutoScroll = runnable
+        bannerHandler.postDelayed(runnable, 4000L)
+    }
+
+    private fun restartBannerAutoScroll() {
+        stopBannerAutoScroll()
+        startBannerAutoScroll()
+    }
+
+    private fun stopBannerAutoScroll() {
+        bannerAutoScroll?.let { bannerHandler.removeCallbacks(it) }
+    }
+
+    private fun onBannerClicked(banner: HomeBanner) {
+        when (banner.actionType) {
+            HomeBanner.ACTION_CASHBACK -> {} // prestador não tem cashback
+            HomeBanner.ACTION_NICHE -> {
+                val niche = banner.actionValue.trim()
+                if (niche.isNotEmpty()) {
+                    startActivity(Intent(this, ProviderNichesActivity::class.java))
+                }
+            }
+            HomeBanner.ACTION_SERVICE -> {
+                startActivity(Intent(this, ProviderOrdersActivity::class.java))
+            }
+            HomeBanner.ACTION_URL -> {
+                val u = banner.actionValue.trim()
+                if (u.startsWith("http://") || u.startsWith("https://")) {
+                    try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(u))) } catch (_: Exception) {}
+                }
+            }
+            else -> {} // none ou desconhecido
+        }
     }
 }
