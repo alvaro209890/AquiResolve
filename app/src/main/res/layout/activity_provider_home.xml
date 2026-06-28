@@ -515,18 +515,50 @@
             </LinearLayout>
 
             <!-- Pedidos disponíveis -->
-            <TextView
-                android:id="@+id/tvAvailableOrders"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Pedidos Disponíveis"
-                android:textSize="18sp"
-                android:textStyle="bold"
-                android:textColor="@color/text_primary"
-                android:layout_marginBottom="16dp" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginBottom="16dp">
 
-            <!-- Card de pedidos disponíveis -->
+                <TextView
+                    android:id="@+id/tvAvailableOrders"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="Pedidos Disponíveis"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/text_primary" />
+
+                <TextView
+                    android:id="@+id/tvAvailableOrdersCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textSize="12sp"
+                    android:textStyle="bold"
+                    android:textColor="@color/primary_color"
+                    android:visibility="gone"
+                    android:background="@drawable/status_background"
+                    android:paddingHorizontal="10dp"
+                    android:paddingVertical="4dp" />
+
+            </LinearLayout>
+
+            <!-- Lista de pedidos disponíveis (cards) -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rvAvailableOrders"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false"
+                android:overScrollMode="never"
+                tools:listitem="@layout/item_provider_order" />
+
+            <!-- Estado vazio / mensagem de status -->
             <com.google.android.material.card.MaterialCardView
+                android:id="@+id/cardNoOrders"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 app:cardCornerRadius="12dp"
@@ -537,21 +569,43 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical"
-                    android:padding="16dp">
+                    android:gravity="center"
+                    android:padding="24dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="📭"
+                        android:textSize="36sp"
+                        android:layout_marginBottom="8dp" />
 
                     <TextView
                         android:id="@+id/tvNoAvailableOrders"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:text="Nenhum pedido disponível no momento."
-                        android:textSize="16sp"
+                        android:textSize="15sp"
                         android:textColor="@color/gray_600"
                         android:gravity="center"
-                        android:padding="32dp" />
+                        android:lineSpacingExtra="2dp" />
 
                 </LinearLayout>
 
             </com.google.android.material.card.MaterialCardView>
+
+            <!-- Botão ver todos (aparece quando há mais pedidos que o preview) -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnSeeAllOrders"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Ver todos os pedidos"
+                android:textColor="@color/primary_color"
+                android:visibility="gone"
+                app:icon="@drawable/ic_arrow_right"
+                app:iconGravity="textEnd"
+                app:iconTint="@color/primary_color"
+                android:layout_marginTop="4dp" />
 
         </LinearLayout>
 

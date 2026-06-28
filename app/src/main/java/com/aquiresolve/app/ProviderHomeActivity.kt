@@ -19,12 +19,15 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.viewpager2.widget.ViewPager2
 import com.aquiresolve.app.adapters.BannerAdapter
+import com.aquiresolve.app.adapters.ProviderOrdersAdapter
 import com.aquiresolve.app.databinding.ActivityProviderHomeBinding
 import com.aquiresolve.app.models.HomeBanner
 import com.aquiresolve.app.models.OrderData
 import com.aquiresolve.app.utils.LocationPermissionHelper
+import com.aquiresolve.app.utils.NewOrderSoundHelper
 import com.aquiresolve.app.utils.PermissionHelper
 import com.aquiresolve.app.utils.ServiceNicheCatalog
 import com.google.firebase.Timestamp
@@ -66,6 +69,8 @@ class ProviderHomeActivity : AppCompatActivity() {
     private val auth = FirebaseAuth.getInstance()
 
     private var allAvailableOrders = emptyList<OrderData>()
+    private val displayedOrders = mutableListOf<OrderData>()
+    private var availableOrdersAdapter: ProviderOrdersAdapter? = null
     private var selectedAvailableOrdersFilter = AvailableOrdersFilter.ALL
     private var providerServicesNormalized = emptySet<String>()
     private var isProviderAvailable = true
@@ -141,7 +146,61 @@ class ProviderHomeActivity : AppCompatActivity() {
         binding.tvWelcome.text = "Bem-vindo de volta!"
         binding.tvDashboardTitle.text = "Dashboard"
         binding.tvAvailableOrders.text = "Pedidos Disponiveis"
+        setupAvailableOrdersList()
         applyAvailabilityUiState()
+    }
+
+    /**
+     * Lista de pedidos disponiveis na Home (cards). "Ver pedido" abre os
+     * detalhes (onde o prestador aceita) e "Rejeitar" recusa so para ele.
+     */
+    private fun setupAvailableOrdersList() {
+        availableOrdersAdapter = ProviderOrdersAdapter(
+            orders = displayedOrders,
+            onOrderClick = { order -> openOrderDetails(order) },
+            onRejectOrder = { order -> rejectAvailableOrder(order) }
+        )
+        binding.rvAvailableOrders.apply {
+            layoutManager = LinearLayoutManager(this@ProviderHomeActivity)
+            adapter = availableOrdersAdapter
+            isNestedScrollingEnabled = false
+        }
+        binding.btnSeeAllOrders.setOnClickListener {
+            startActivity(Intent(this, ProviderOrdersActivity::class.java))
+        }
+    }
+
+    private fun openOrderDetails(order: OrderData) {
+        val intent = Intent(this, OrderDetailsActivity::class.java)
+        intent.putExtra("order_id", order.id)
+        intent.putExtra("is_provider_view", true)
+        startActivity(intent)
+    }
+
+    /**
+     * Recusa um pedido so para este prestador (adiciona o uid em rejectedBy).
+     * So 'rejectedBy' muda -> nao cancela para os demais (ver validProviderRejectUpdate).
+     */
+    private fun rejectAvailableOrder(order: OrderData) {
+        val uid = auth.currentUser?.uid
+        if (uid == null) {
+            showToast("Usuario nao autenticado.")
+            return
+        }
+        lifecycleScope.launch {
+            try {
+                db.collection("orders").document(order.id)
+                    .update("rejectedBy", com.google.firebase.firestore.FieldValue.arrayUnion(uid))
+                    .await()
+                NewOrderSoundHelper.stopSound(order.id)
+                // Remove da lista local na hora (feedback imediato)
+                allAvailableOrders = allAvailableOrders.filter { it.id != order.id }
+                applyAvailableOrdersFilters(showToastResult = false)
+                showToast("Pedido recusado.")
+            } catch (e: Exception) {
+                showToast("Erro ao recusar pedido: ${e.message}")
+            }
+        }
     }
 
     /**
@@ -730,55 +789,46 @@ class ProviderHomeActivity : AppCompatActivity() {
     }
 
     private fun updateAvailableOrdersSummary(orders: List<OrderData>, query: String) {
-        if (!isProviderAvailable) {
-            binding.tvNoAvailableOrders.text = "Voce esta indisponivel. Ative para receber novos pedidos."
-            return
-        }
-
-        if (providerServicesNormalized.isEmpty()) {
-            binding.tvNoAvailableOrders.text = "Configure seus servicos no perfil para receber pedidos."
-            return
-        }
-
-        if (orders.isEmpty()) {
-            binding.tvNoAvailableOrders.text = if (query.isNotEmpty()) {
+        // Caminhos de estado vazio: mostra o card de mensagem e esconde a lista.
+        val emptyMessage: String? = when {
+            !isProviderAvailable ->
+                "Voce esta indisponivel. Ative para receber novos pedidos."
+            providerServicesNormalized.isEmpty() ->
+                "Configure seus servicos no perfil para receber pedidos."
+            orders.isEmpty() -> if (query.isNotEmpty()) {
                 "Nenhum pedido encontrado para \"$query\"."
             } else {
                 "Nenhum pedido disponivel no momento."
             }
+            else -> null
+        }
+
+        if (emptyMessage != null) {
+            displayedOrders.clear()
+            availableOrdersAdapter?.notifyDataSetChanged()
+            binding.rvAvailableOrders.visibility = View.GONE
+            binding.cardNoOrders.visibility = View.VISIBLE
+            binding.tvNoAvailableOrders.text = emptyMessage
+            binding.tvAvailableOrdersCount.visibility = View.GONE
+            binding.btnSeeAllOrders.visibility = View.GONE
             return
         }
 
-        binding.tvNoAvailableOrders.text = buildAvailableOrdersSummary(orders)
-    }
-
-    private fun buildAvailableOrdersSummary(orders: List<OrderData>): String {
+        // Há pedidos: popula os cards (limitando o preview na Home).
         val preview = orders.take(AVAILABLE_ORDERS_PREVIEW_LIMIT)
-        val header = if (orders.size > preview.size) {
-            "Mostrando ${preview.size} de ${orders.size} pedidos disponiveis.\nAbra \"Meus Pedidos\" para ver todos.\n\n"
-        } else {
-            "${orders.size} pedido(s) disponivel(is):\n\n"
-        }
+        displayedOrders.clear()
+        displayedOrders.addAll(preview)
+        availableOrdersAdapter?.notifyDataSetChanged()
 
-        val body = preview.joinToString(separator = "\n\n") { order ->
-            val protocol = order.protocol.ifBlank { order.id.takeLast(6) }
-            val service = order.serviceType.ifBlank { order.serviceName.ifBlank { "Servico" } }
-            val statusText = when {
-                order.status.equals(OrderData.STATUS_PENDING, ignoreCase = true) -> "Pendente"
-                order.status.equals(OrderData.STATUS_DISTRIBUTING, ignoreCase = true) -> "Em distribuicao"
-                else -> order.status
-            }
-            val commission = if (order.providerCommission > 0) {
-                formatCurrency(order.providerCommission)
-            } else {
-                "a combinar"
-            }
-            val address = order.address.ifBlank { "Endereco nao informado" }
+        binding.rvAvailableOrders.visibility = View.VISIBLE
+        binding.cardNoOrders.visibility = View.GONE
 
-            "#$protocol | $service\n$statusText | Comissao: $commission\n$address"
-        }
+        binding.tvAvailableOrdersCount.visibility = View.VISIBLE
+        binding.tvAvailableOrdersCount.text = orders.size.toString()
 
-        return header + body
+        // Botao "Ver todos" so quando há mais pedidos do que cabem no preview.
+        binding.btnSeeAllOrders.visibility =
+            if (orders.size > preview.size) View.VISIBLE else View.GONE
     }
 
     /**

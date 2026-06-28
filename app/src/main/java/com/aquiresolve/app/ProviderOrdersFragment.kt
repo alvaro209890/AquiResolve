@@ -97,9 +97,6 @@ class ProviderOrdersFragment : Fragment() {
             onOrderClick = { order ->
                 showOrderDetails(order)
             },
-            onAcceptOrder = { order ->
-                acceptOrder(order)
-            },
             onRejectOrder = { order ->
                 rejectOrder(order)
             }

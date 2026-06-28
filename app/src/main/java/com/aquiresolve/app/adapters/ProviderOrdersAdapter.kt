@@ -15,13 +15,13 @@ import java.util.*
 
 /**
  * ProviderOrdersAdapter - Adapter para lista de pedidos do prestador
- * 
- * Exibe pedidos disponíveis para o prestador com opções de aceitar/recusar
+ *
+ * Exibe pedidos disponíveis em cards: "Ver pedido" abre os detalhes (onde o
+ * prestador aceita) e "Rejeitar" recusa o pedido só para ele.
  */
 class ProviderOrdersAdapter(
     private val orders: List<OrderData>,
     private val onOrderClick: (OrderData) -> Unit,
-    private val onAcceptOrder: (OrderData) -> Unit,
     private val onRejectOrder: (OrderData) -> Unit
 ) : RecyclerView.Adapter<ProviderOrdersAdapter.OrderViewHolder>() {
 
@@ -47,8 +47,9 @@ class ProviderOrdersAdapter(
         private val tvPrice: TextView = itemView.findViewById(R.id.tvPrice)
         private val tvDate: TextView = itemView.findViewById(R.id.tvDate)
         private val tvStatus: TextView = itemView.findViewById(R.id.tvStatus)
-        private val btnAccept: MaterialButton = itemView.findViewById(R.id.btnAccept)
+        private val btnViewOrder: MaterialButton = itemView.findViewById(R.id.btnViewOrder)
         private val btnReject: MaterialButton = itemView.findViewById(R.id.btnReject)
+        private val actionButtons: View = itemView.findViewById(R.id.actionButtons)
 
         fun bind(order: OrderData) {
             // Configurar dados do pedido
@@ -68,52 +69,43 @@ class ProviderOrdersAdapter(
             val dateFormat = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
             tvDate.text = dateFormat.format(order.createdAt.toDate())
             
-            // Configurar status
-            when (order.status.lowercase(Locale.ROOT)) {
+            // Status + se o pedido ainda pode ser recusado (ainda não atribuído)
+            val rejectable: Boolean = when (order.status.lowercase(Locale.ROOT)) {
                 "pending" -> {
                     tvStatus.text = "Pendente"
                     tvStatus.setTextColor(ContextCompat.getColor(itemView.context, R.color.warning_color))
-                    btnAccept.visibility = View.VISIBLE
-                    btnReject.visibility = View.VISIBLE
+                    true
                 }
                 "available", "distributing" -> {
                     tvStatus.text = "Disponível"
                     tvStatus.setTextColor(ContextCompat.getColor(itemView.context, R.color.info_color))
-                    btnAccept.visibility = View.VISIBLE
-                    btnReject.visibility = View.VISIBLE
+                    true
                 }
                 "accepted", "assigned", "in_progress" -> {
                     tvStatus.text = "Aceito"
                     tvStatus.setTextColor(ContextCompat.getColor(itemView.context, R.color.success_color))
-                    btnAccept.visibility = View.GONE
-                    btnReject.visibility = View.GONE
+                    false
                 }
                 "rejected" -> {
                     tvStatus.text = "Recusado"
                     tvStatus.setTextColor(ContextCompat.getColor(itemView.context, R.color.error_color))
-                    btnAccept.visibility = View.GONE
-                    btnReject.visibility = View.GONE
+                    false
                 }
                 else -> {
                     tvStatus.text = order.status
                     tvStatus.setTextColor(ContextCompat.getColor(itemView.context, R.color.text_secondary))
-                    btnAccept.visibility = View.GONE
-                    btnReject.visibility = View.GONE
+                    false
                 }
             }
-            
-            // Configurar listeners
-            cardOrder.setOnClickListener {
-                onOrderClick(order)
-            }
-            
-            btnAccept.setOnClickListener {
-                onAcceptOrder(order)
-            }
-            
-            btnReject.setOnClickListener {
-                onRejectOrder(order)
-            }
+
+            // "Ver pedido" sempre disponível; "Rejeitar" só enquanto o pedido pode ser recusado.
+            btnReject.visibility = if (rejectable) View.VISIBLE else View.GONE
+            actionButtons.visibility = View.VISIBLE
+
+            // Listeners — tanto o card quanto "Ver pedido" abrem os detalhes
+            cardOrder.setOnClickListener { onOrderClick(order) }
+            btnViewOrder.setOnClickListener { onOrderClick(order) }
+            btnReject.setOnClickListener { onRejectOrder(order) }
         }
     }
 }

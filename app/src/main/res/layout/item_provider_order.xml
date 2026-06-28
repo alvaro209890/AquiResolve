@@ -4,10 +4,12 @@
     android:id="@+id/cardOrder"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="12dp"
-    app:cardCornerRadius="12dp"
-    app:cardElevation="4dp"
+    android:layout_marginBottom="14dp"
+    app:cardCornerRadius="16dp"
+    app:cardElevation="3dp"
     app:cardBackgroundColor="@color/surface_color"
+    app:strokeWidth="1dp"
+    app:strokeColor="@color/gray_200"
     android:clickable="true"
     android:focusable="true"
     android:foreground="?attr/selectableItemBackground">
@@ -18,13 +20,13 @@
         android:orientation="vertical"
         android:padding="16dp">
 
-        <!-- Header com tipo de serviço e status -->
+        <!-- Header: tipo de serviço + status -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginBottom="8dp">
+            android:layout_marginBottom="12dp">
 
             <TextView
                 android:id="@+id/tvServiceType"
@@ -32,43 +34,103 @@
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
                 android:text="Elétrica"
-                android:textSize="16sp"
+                android:textSize="18sp"
                 android:textStyle="bold"
+                android:maxLines="1"
+                android:ellipsize="end"
                 android:textColor="@color/text_primary" />
 
             <TextView
                 android:id="@+id/tvStatus"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="Pendente"
-                android:textSize="12sp"
+                android:text="Disponível"
+                android:textSize="11sp"
                 android:textStyle="bold"
                 android:background="@drawable/status_background"
-                android:paddingHorizontal="8dp"
-                android:paddingVertical="4dp"
+                android:paddingHorizontal="10dp"
+                android:paddingVertical="5dp"
+                android:layout_marginStart="8dp"
                 android:textColor="@color/white" />
 
         </LinearLayout>
 
-        <!-- Cliente -->
-        <TextView
-            android:id="@+id/tvClientName"
+        <!-- Destaque do ganho do prestador -->
+        <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Cliente: João Silva"
-            android:textSize="14sp"
-            android:textColor="@color/text_secondary"
-            android:layout_marginBottom="4dp" />
+            android:layout_marginBottom="12dp"
+            app:cardCornerRadius="10dp"
+            app:cardElevation="0dp"
+            app:cardBackgroundColor="@color/surface_success">
+
+            <TextView
+                android:id="@+id/tvPrice"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="💰 Você ganha: R$ 150,00"
+                android:textSize="16sp"
+                android:textStyle="bold"
+                android:textColor="@color/success_color"
+                android:paddingHorizontal="12dp"
+                android:paddingVertical="10dp" />
+
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Cliente -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:layout_marginBottom="6dp">
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/ic_person"
+                app:tint="@color/gray_500"
+                android:layout_marginEnd="8dp" />
+
+            <TextView
+                android:id="@+id/tvClientName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Cliente: João Silva"
+                android:textSize="14sp"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:textColor="@color/text_secondary" />
+
+        </LinearLayout>
 
         <!-- Endereço -->
-        <TextView
-            android:id="@+id/tvAddress"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Rua das Flores, 123 - Centro"
-            android:textSize="14sp"
-            android:textColor="@color/text_secondary"
-            android:layout_marginBottom="8dp" />
+            android:orientation="horizontal"
+            android:gravity="top"
+            android:layout_marginBottom="8dp">
+
+            <ImageView
+                android:layout_width="16dp"
+                android:layout_height="16dp"
+                android:src="@drawable/ic_location"
+                app:tint="@color/gray_500"
+                android:layout_marginEnd="8dp"
+                android:layout_marginTop="1dp" />
+
+            <TextView
+                android:id="@+id/tvAddress"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="Rua das Flores, 123 - Centro"
+                android:textSize="14sp"
+                android:maxLines="2"
+                android:ellipsize="end"
+                android:textColor="@color/text_secondary" />
+
+        </LinearLayout>
 
         <!-- Descrição -->
         <TextView
@@ -80,107 +142,84 @@
             android:textColor="@color/text_primary"
             android:maxLines="2"
             android:ellipsize="end"
-            android:layout_marginBottom="12dp" />
+            android:lineSpacingExtra="2dp"
+            android:layout_marginBottom="10dp" />
 
-        <!-- Footer com preço, data e botões -->
+        <!-- Data -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
-            <!-- Preço -->
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
+            <ImageView
+                android:layout_width="14dp"
+                android:layout_height="14dp"
+                android:src="@drawable/ic_calendar"
+                app:tint="@color/gray_400"
+                android:layout_marginEnd="6dp" />
 
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Valor"
-                    android:textSize="12sp"
-                    android:textColor="@color/text_secondary" />
-
-                <TextView
-                    android:id="@+id/tvPrice"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="R$ 150,00"
-                    android:textSize="16sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/success_color" />
-
-            </LinearLayout>
-
-            <!-- Data -->
-            <LinearLayout
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Data"
-                    android:textSize="12sp"
-                    android:textColor="@color/text_secondary" />
-
-                <TextView
-                    android:id="@+id/tvDate"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="15/12/2024 14:30"
-                    android:textSize="14sp"
-                    android:textColor="@color/text_primary" />
-
-            </LinearLayout>
-
-            <!-- Botões de ação -->
-            <LinearLayout
+            <TextView
+                android:id="@+id/tvDate"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal">
+                android:text="15/12/2024 14:30"
+                android:textSize="12sp"
+                android:textColor="@color/gray_500" />
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnAccept"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Aceitar"
-                    android:textSize="12sp"
-                    app:cornerRadius="16dp"
-                    android:backgroundTint="@color/success_color"
-                    android:textColor="@color/white"
-                    android:layout_marginEnd="8dp"
-                    app:icon="@drawable/ic_check"
-                    app:iconSize="16dp"
-                    app:iconTint="@color/white" />
+        </LinearLayout>
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnReject"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Recusar"
-                    android:textSize="12sp"
-                    app:cornerRadius="16dp"
-                    android:backgroundTint="@color/error_color"
-                    android:textColor="@color/white"
-                    app:icon="@drawable/ic_close"
-                    app:iconSize="16dp"
-                    app:iconTint="@color/white" />
+        <!-- Divisória -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="@color/divider"
+            android:layout_marginTop="12dp"
+            android:layout_marginBottom="12dp" />
 
-            </LinearLayout>
+        <!-- Ações: Ver pedido + Rejeitar -->
+        <LinearLayout
+            android:id="@+id/actionButtons"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnViewOrder"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1.6"
+                android:text="Ver pedido"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                app:cornerRadius="12dp"
+                android:backgroundTint="@color/primary_color"
+                android:textColor="@color/white"
+                android:layout_marginEnd="10dp"
+                app:icon="@drawable/ic_visibility"
+                app:iconSize="18dp"
+                app:iconGravity="textStart"
+                app:iconTint="@color/white" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnReject"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="0dp"
+                android:layout_height="46dp"
+                android:layout_weight="1"
+                android:text="Rejeitar"
+                android:textSize="14sp"
+                android:textStyle="bold"
+                app:cornerRadius="12dp"
+                android:textColor="@color/error_color"
+                app:strokeColor="@color/error_color"
+                app:icon="@drawable/ic_close"
+                app:iconSize="18dp"
+                app:iconGravity="textStart"
+                app:iconTint="@color/error_color" />
 
         </LinearLayout>
 
     </LinearLayout>
 
 </com.google.android.material.card.MaterialCardView>
-
-
-
-
-
-
