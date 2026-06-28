@@ -399,9 +399,18 @@ object ProviderNewOrderAlertManager {
             "Toque para visualizar ou use os botões abaixo."
         }
 
-        // Intent principal: abrir tela de pedidos
-        val viewIntent = Intent(context, ProviderOrdersActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        // Intent principal (toque no corpo da notificação): abre o app DIRETO no
+        // pedido quando há um único pedido; com vários, abre a lista de pedidos.
+        val viewIntent = if (count == 1) {
+            Intent(context, OrderDetailsActivity::class.java).apply {
+                putExtra("order_id", newOrderIds.first())
+                putExtra("is_provider_view", true)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+        } else {
+            Intent(context, ProviderOrdersActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
         }
         val viewPendingIntent = PendingIntent.getActivity(
             context, 2101, viewIntent,

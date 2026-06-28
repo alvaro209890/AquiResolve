@@ -203,9 +203,16 @@ class FirebaseMessagingService : FirebaseMessagingService() {
                 flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
         } else if (orderId != null) {
+            // Toque no corpo da notificação abre o app DIRETO no pedido.
+            // Em alertas de novo pedido (type=order) usa a visão do prestador.
             Intent(this, OrderDetailsActivity::class.java).apply {
                 putExtra("order_id", orderId)
-                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                if (type.equals("order", ignoreCase = true)) {
+                    putExtra("is_provider_view", true)
+                }
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP
             }
         } else if (type.equals("provider_message", ignoreCase = true)) {
             // Abrir chat do prestador (ProviderChatActivity ou HomeActivity como fallback)
