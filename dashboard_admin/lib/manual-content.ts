@@ -106,6 +106,16 @@ export const SECTIONS: ManualSection[] = [
           "Ative o combo — aparece na seção 'Combos' da Home do app.",
         ],
       },
+      {
+        title: "Checklists de OS",
+        body:
+          "Consulta das Ordens de Serviço: para cada pedido em andamento/concluído você vê o checklist do prestador — fotos de antes/durante/depois, materiais usados, GPS, assinaturas e a finalização por código do cliente. Útil para auditar a execução e resolver disputas. Somente leitura (o prestador preenche pelo app).",
+        steps: [
+          "Abra Serviços → Checklists de OS.",
+          "Busque por pedido, cliente, prestador ou serviço.",
+          "Clique em 'Abrir checklist' para ver fotos, materiais e status.",
+        ],
+      },
     ],
   },
   {
@@ -321,6 +331,17 @@ export const SECTIONS: ManualSection[] = [
           "Defina título, subtítulo, ação e cor de fundo.",
           "Defina a ordem (número menor = aparece primeiro).",
           "Ative e salve — aparece no carrossel do app.",
+        ],
+      },
+      {
+        title: "Banners do Prestador",
+        body:
+          "Coleção provider_banners: carrossel 'Aumente seus ganhos' na Home do PRESTADOR (separado dos banners do cliente). Mesma estrutura — imagem (~1200×500), título, subtítulo, cor e ação (abrir nicho, buscar serviço, link ou nenhuma; prestador NÃO tem cashback). A seção some no app quando não há banners ativos. Reflete no app sem novo APK.",
+        steps: [
+          "Abra Configurações → Banners do Prestador → Novo banner.",
+          "Envie a imagem ou informe uma URL e preencha título/subtítulo.",
+          "Escolha a ação (niche/service/url/none) e a ordem.",
+          "Ative e salve — aparece no carrossel da Home do prestador.",
         ],
       },
       {

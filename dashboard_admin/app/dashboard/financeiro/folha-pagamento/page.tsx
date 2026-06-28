@@ -1,13 +1,11 @@
 "use client"
 
-import { AppShell } from "@/components/layout/app-shell"
 import { PageWithBack } from "@/components/layout/page-with-back"
 import { Card, CardContent } from "@/components/ui/card"
 import { AlertCircle, Users } from "lucide-react"
 
 export default function FolhaPagamentoPage() {
   return (
-    <AppShell>
       <PageWithBack backButtonLabel="Voltar para Financeiro">
         <div className="space-y-6">
           <div>
@@ -66,6 +64,5 @@ export default function FolhaPagamentoPage() {
           </Card>
         </div>
       </PageWithBack>
-    </AppShell>
   )
 }

@@ -1,7 +1,6 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { AppShell } from "@/components/layout/app-shell"
 import { PageWithBack } from "@/components/layout/page-with-back"
 import { ServiceChecklistPanel } from "@/components/orders/service-checklist-panel"
 import { Badge } from "@/components/ui/badge"
@@ -118,8 +117,7 @@ export default function ChecklistsPage() {
   }, [rows])
 
   return (
-    <AppShell>
-      <PageWithBack backButtonLabel="Voltar para Serviços">
+    <PageWithBack backButtonLabel="Voltar para Serviços">
         <div className="space-y-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
@@ -233,7 +231,6 @@ export default function ChecklistsPage() {
           )}
         </div>
       </PageWithBack>
-    </AppShell>
   )
 }
 

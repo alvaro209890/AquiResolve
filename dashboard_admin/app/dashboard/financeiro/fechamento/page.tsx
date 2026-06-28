@@ -1,12 +1,10 @@
 "use client"
 
 import { AlertCircle, Calendar } from "lucide-react"
-import { AppShell } from "@/components/layout/app-shell"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 
 export default function FechamentoPage() {
   return (
-    <AppShell>
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Fechamento</h1>
@@ -39,6 +37,5 @@ export default function FechamentoPage() {
           </CardContent>
         </Card>
       </div>
-    </AppShell>
   )
 }

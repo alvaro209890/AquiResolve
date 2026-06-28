@@ -166,6 +166,10 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
   const isActive = (href: string, exact = false) =>
     pathname === href || (!exact && href !== "/" && pathname.startsWith(href + "/"))
 
+  // Um grupo está "ativo" quando a rota atual pertence a um de seus filhos.
+  const groupHasActiveChild = (children?: { href: string }[]) =>
+    !!children?.some((c) => isActive(c.href))
+
   const filteredNavigation = navigation
     .map((item) => item.children
       ? {
@@ -209,9 +213,11 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
                     aria-expanded={expandedItems.includes(item.name)}
                     className={cn(
                       "w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150",
-                      expandedItems.includes(item.name)
-                        ? "text-foreground bg-muted"
-                        : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                      groupHasActiveChild(item.children)
+                        ? "text-primary bg-primary/10"
+                        : expandedItems.includes(item.name)
+                          ? "text-foreground bg-muted"
+                          : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                     )}
                   >
                     <div className="flex items-center gap-3">
@@ -236,10 +242,10 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
                           onClick={() => setOpen(false)}
                           aria-current={isActive(child.href) ? "page" : undefined}
                           className={cn(
-                            "flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors duration-150",
+                            "relative flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-all duration-150",
                             isActive(child.href)
-                              ? "bg-primary text-primary-foreground font-medium"
-                              : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
+                              ? "bg-gradient-to-r from-primary to-amber-500 text-primary-foreground font-medium shadow-sm shadow-primary/30 before:absolute before:-left-[13px] before:top-1/2 before:-translate-y-1/2 before:h-5 before:w-1 before:rounded-full before:bg-primary"
+                              : "text-muted-foreground hover:text-foreground hover:bg-muted/60 hover:translate-x-0.5"
                           )}
                         >
                           <child.icon className="h-3.5 w-3.5 shrink-0" aria-hidden />
@@ -255,9 +261,9 @@ export function Sidebar({ open, setOpen }: SidebarProps) {
                   onClick={() => setOpen(false)}
                   aria-current={isActive(item.href!) ? "page" : undefined}
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150",
+                    "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150",
                     isActive(item.href!, item.exact)
-                      ? "bg-primary text-primary-foreground"
+                      ? "bg-gradient-to-r from-primary to-amber-500 text-primary-foreground shadow-md shadow-primary/25"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted/60",
                     item.isMaster && !isActive(item.href!, item.exact) && "text-muted-foreground/70"
                   )}
