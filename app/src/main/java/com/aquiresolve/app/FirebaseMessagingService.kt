@@ -236,9 +236,11 @@ class FirebaseMessagingService : FirebaseMessagingService() {
             PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
         )
         
-        val isOrderNotification = type.equals("order", ignoreCase = true) ||
-            title.contains("pedido", ignoreCase = true) ||
-            message.contains("pedido", ignoreCase = true)
+        // SÓ alertas reais de novo pedido (type == "order") disparam a sirene contínua.
+        // Antes, qualquer notificação cujo título/corpo contivesse "pedido" (ex.: uma
+        // mensagem de chat "Cadê meu pedido?") era classificada como novo pedido e
+        // tocava a sirene indevidamente — inclusive para prestador indisponível.
+        val isOrderNotification = type.equals("order", ignoreCase = true) && !isMessageType
 
         // Para pedidos novos: dispara o alerta contínuo (loop) + Foreground Service
         // Isso garante que o prestador ouça o som mesmo com o app fechado

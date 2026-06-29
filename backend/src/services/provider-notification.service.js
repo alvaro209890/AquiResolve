@@ -77,7 +77,18 @@ class ProviderNotificationService {
    * Notifica prestadores aprovados cujos nichos batem com o pedido.
    */
   async notifyProviders(order) {
-    const niche = (order.serviceCategory || order.service_category_name || '').trim();
+    // O nicho do pedido. Pedidos NORMAIS (CreateOrderActivity/carrinho) gravam o nicho
+    // em `serviceName` (serviceType = serviço específico). Só o guincho grava
+    // `serviceCategory`. Sem o fallback para `serviceName`, todo pedido comum ficava
+    // "sem nicho" e NENHUM prestador era notificado por push (som com app fechado nunca
+    // disparava p/ serviços comuns). A correspondência é com providers.services
+    // (array de nichos), então `serviceName` é o campo certo.
+    const niche = (
+      order.serviceCategory ||
+      order.service_category_name ||
+      order.serviceName ||
+      ''
+    ).trim();
     if (!niche) {
       logger.warn('Pedido sem nicho, ignorando notificação', { orderId: order.id });
       return;
