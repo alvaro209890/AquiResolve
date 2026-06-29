@@ -2,12 +2,53 @@ const express = require('express');
 
 const { authenticateRequest } = require('../middlewares/auth');
 const { streamChat } = require('../services/ai-chat.service');
+const { analyzeImage } = require('../services/ai-vision.service');
 const logger = require('../utils/logger');
 
 const router = express.Router();
 
 // Toda rota de chat exige autenticação Firebase
 router.use(authenticateRequest);
+
+/**
+ * POST /api/ai/vision
+ * Body: { image: "<base64|dataURL>", mimeType?: string, text?: string, niches: string[] }
+ * Resposta: { text, niche, nicheSlug }
+ *
+ * A Helô olha a FOTO do problema do cliente e identifica o serviço/nicho (Groq vision).
+ * Não-streaming (uma resposta só). Imagem nunca é persistida no servidor.
+ */
+router.post('/vision', async (req, res) => {
+  const image = req.body?.image;
+  const mimeType = req.body?.mimeType;
+  const text = req.body?.text;
+  const niches = Array.isArray(req.body?.niches)
+    ? req.body.niches.map((n) => String(n).trim()).filter(Boolean).slice(0, 60)
+    : [];
+
+  if (!image || typeof image !== 'string') {
+    return res.status(400).json({ error: 'Envie uma imagem.' });
+  }
+  if (niches.length === 0) {
+    return res.status(400).json({ error: 'Lista de nichos vazia.' });
+  }
+  // Guarda de tamanho: base64 ~1.37x os bytes; limita a ~8MB de payload de imagem.
+  if (image.length > 8 * 1024 * 1024) {
+    return res.status(413).json({ error: 'Imagem muito grande. Tente uma foto menor.' });
+  }
+
+  try {
+    const result = await analyzeImage({ image, mimeType, text, niches });
+    return res.json(result);
+  } catch (error) {
+    logger.error('Erro na análise de imagem da Helô', {
+      error: error.message,
+      code: error.code,
+    });
+    const status = error.code === 'AI_NOT_CONFIGURED' ? 503 : 502;
+    return res.status(status).json({ error: 'Não consegui analisar a imagem agora.' });
+  }
+});
 
 /**
  * POST /api/ai/chat

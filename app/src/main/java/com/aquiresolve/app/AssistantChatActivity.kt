@@ -53,6 +53,25 @@ class AssistantChatActivity : AppCompatActivity() {
             else toast("Permita o microfone para falar com o Helô.")
         }
 
+    // ---- Análise de imagem (Helô vê a foto e diz o serviço) ----
+    private var cameraImageUri: android.net.Uri? = null
+
+    private val pickImageLauncher =
+        registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+            if (uri != null) processSelectedImage(uri)
+        }
+
+    private val takePhotoLauncher =
+        registerForActivityResult(ActivityResultContracts.TakePicture()) { success ->
+            if (success) cameraImageUri?.let { processSelectedImage(it) }
+        }
+
+    private val cameraPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) launchCamera()
+            else toast("Permita a câmera para enviar uma foto.")
+        }
+
     companion object {
         const val EXTRA_PREFILL = "prefill_description"
         const val EXTRA_CHAT_ID = "chat_id"
@@ -225,9 +244,150 @@ class AssistantChatActivity : AppCompatActivity() {
         binding.btnBack.setOnClickListener { finish() }
         binding.btnSend.setOnClickListener { sendMessage() }
         binding.btnMic.setOnClickListener { onMicToggle() }
+        binding.btnAttachImage.setOnClickListener { showImageSourceChooser() }
         binding.btnHistory.setOnClickListener {
             startActivity(Intent(this, AssistantChatListActivity::class.java))
         }
+    }
+
+    // ---- Imagem: escolha da fonte, captura e análise ----------------
+
+    private fun showImageSourceChooser() {
+        if (isStreaming) return
+        val options = arrayOf("📷 Tirar foto", "🖼️ Escolher da galeria")
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Enviar foto para a Helô analisar")
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> startCameraWithPermission()
+                    1 -> pickImageLauncher.launch("image/*")
+                }
+            }
+            .show()
+    }
+
+    private fun startCameraWithPermission() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+            == PackageManager.PERMISSION_GRANTED) {
+            launchCamera()
+        } else {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
+    }
+
+    private fun launchCamera() {
+        try {
+            val file = java.io.File(cacheDir, "helo_capture_${System.currentTimeMillis()}.jpg")
+            val uri = androidx.core.content.FileProvider.getUriForFile(
+                this, "$packageName.fileprovider", file
+            )
+            cameraImageUri = uri
+            takePhotoLauncher.launch(uri)
+        } catch (e: Exception) {
+            toast("Não foi possível abrir a câmera.")
+        }
+    }
+
+    /** Decodifica a imagem da Uri, reduz (<=1024px), comprime JPEG e envia para a Helô. */
+    private fun processSelectedImage(uri: android.net.Uri) {
+        if (isStreaming) return
+        lifecycleScope.launch {
+            val base64 = try {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    encodeDownscaledJpeg(uri)
+                }
+            } catch (e: Exception) {
+                null
+            }
+            if (base64.isNullOrBlank()) {
+                toast("Não consegui ler essa imagem. Tente outra.")
+                return@launch
+            }
+            analyzeImage(base64)
+        }
+    }
+
+    private fun encodeDownscaledJpeg(uri: android.net.Uri): String {
+        contentResolver.openInputStream(uri).use { input ->
+            val original = android.graphics.BitmapFactory.decodeStream(input)
+                ?: throw IllegalStateException("decode falhou")
+            val maxSide = 1024
+            val w = original.width
+            val h = original.height
+            val scale = if (w >= h) maxSide.toFloat() / w else maxSide.toFloat() / h
+            val bmp = if (scale < 1f) {
+                android.graphics.Bitmap.createScaledBitmap(
+                    original, (w * scale).toInt().coerceAtLeast(1), (h * scale).toInt().coerceAtLeast(1), true
+                )
+            } else original
+            val out = java.io.ByteArrayOutputStream()
+            bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 75, out)
+            return android.util.Base64.encodeToString(out.toByteArray(), android.util.Base64.NO_WRAP)
+        }
+    }
+
+    private fun analyzeImage(imageBase64: String) {
+        // Bolha do usuário indicando a foto enviada
+        saveMessage("user", "📷 Foto enviada para análise", null)
+        adapter.addMessage(ChatAdapter.ChatMessage(role = "user", content = "📷 Foto enviada para análise"))
+        binding.suggestionsScroll.visibility = View.GONE
+        scrollToBottom()
+
+        showTyping(true)
+        isStreaming = true
+        binding.btnSend.isEnabled = false
+        binding.btnMic.isEnabled = false
+        binding.btnAttachImage.isEnabled = false
+        logEvent("ia_imagem_enviada", null)
+
+        val assistantMsg = ChatAdapter.ChatMessage(role = "assistant", content = "", isStreaming = true)
+        adapter.addMessage(assistantMsg)
+        scrollToBottom()
+
+        lifecycleScope.launch {
+            if (niches.isEmpty()) {
+                try { CatalogRepository.load() } catch (_: Exception) {}
+                niches = CatalogRepository.cachedNicheNames()
+            }
+            AssistantVisionClient.analyze(
+                imageBase64 = imageBase64,
+                text = null,
+                niches = niches,
+                callback = object : AssistantVisionClient.Callback {
+                    override fun onResult(result: AssistantVisionClient.Result) {
+                        runOnUiThread {
+                            assistantMsg.content = result.text
+                            assistantMsg.isStreaming = false
+                            assistantMsg.suggestedNiche = result.niche
+                            adapter.updateLastMessage(assistantMsg)
+                            saveMessage("assistant", result.text, result.niche)
+                            if (result.niche != null) {
+                                logEvent("ia_imagem_niche", Bundle().apply { putString("niche", result.niche) })
+                            }
+                            finishImageAnalysis()
+                        }
+                    }
+                    override fun onError(message: String) {
+                        runOnUiThread {
+                            assistantMsg.content = message
+                            assistantMsg.isStreaming = false
+                            adapter.updateLastMessage(assistantMsg)
+                            saveMessage("assistant", message, null)
+                            finishImageAnalysis()
+                        }
+                    }
+                }
+            )
+        }
+    }
+
+    private fun finishImageAnalysis() {
+        showTyping(false)
+        isStreaming = false
+        binding.btnSend.isEnabled = true
+        binding.btnMic.isEnabled = true
+        binding.btnAttachImage.isEnabled = true
+        scrollToBottom()
     }
 
     // ---- Voz ----------------------------------------------------

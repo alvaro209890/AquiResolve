@@ -69,6 +69,11 @@ function loadEnv() {
     // IA do app cliente (plano 06) — proxy Groq. A chave vive SÓ no backend, nunca no APK.
     groqApiKey: getEnv('GROQ_API_KEY', { required: false, defaultValue: '' }),
     groqModel: getEnv('GROQ_MODEL', { required: false, defaultValue: 'llama-3.3-70b-versatile' }),
+    // Modelo multimodal (visão) da Groq usado pela análise de imagem da Helô.
+    groqVisionModel: getEnv('GROQ_VISION_MODEL', {
+      required: false,
+      defaultValue: 'meta-llama/llama-4-scout-17b-16e-instruct',
+    }),
     corsOrigin: getEnv('CORS_ORIGIN', { required: false, defaultValue: '*' }),
     keepAliveEnabled: parseBoolean(
       getEnv('KEEP_ALIVE_ENABLED', {
