@@ -207,11 +207,13 @@ class ProviderProfileFragment : Fragment() {
                 binding.etAgency.setText(bankData?.get("agency") as? String ?: "")
                 binding.etAccount.setText(bankData?.get("account") as? String ?: "")
 
-                val imageUrl = providerPhoto?.takeIf { it.isNotBlank() } ?: localUser?.profileImageUrl
-                loadProfileImage(imageUrl)
+                // Foto da CONTA DE PRESTADOR apenas (providers/{uid}.profileImageUrl).
+                // SEM fallback para a foto de cliente (users): as fotos são separadas, então
+                // a tela do prestador mostra só a foto de prestador (ou o placeholder padrão).
+                loadProfileImage(providerPhoto?.takeIf { it.isNotBlank() })
             } catch (e: Exception) {
                 android.util.Log.e("ProviderProfileFragment", "Erro ao carregar dados do prestador: ${e.message}")
-                loadProfileImage(localUser?.profileImageUrl)
+                loadProfileImage(null)
                 showToast("❌ Erro ao carregar perfil")
             }
         }

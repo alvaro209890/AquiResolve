@@ -971,22 +971,13 @@ class ProfileActivity : AppCompatActivity() {
     private fun updateProfileImageInFirestore(userId: String, imageUrl: String) {
         lifecycleScope.launch {
             try {
+                // Foto da CONTA DE CLIENTE — grava SÓ em users/{uid}.profileImageUrl.
+                // NÃO toca em providers/{uid}: a conta de prestador tem foto própria
+                // (ProviderProfileFragment), independente da foto de cliente.
                 val result = authManager.updateUserProfileImage(userId, imageUrl)
                 if (!result.isSuccess) {
                     showToast("❌ Erro ao salvar foto no servidor")
                     return@launch
-                }
-
-                // Sempre tentar atualizar coleção providers (mesma foto para ambos os perfis)
-                try {
-                    val providerDoc = com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                        .collection("providers").document(userId).get().await()
-                    if (providerDoc.exists()) {
-                        val providerManager = FirebaseProviderManager()
-                        providerManager.updateProfileImage(userId, imageUrl)
-                    }
-                } catch (e: Exception) {
-                    android.util.Log.d("ProfileActivity", "Sem perfil de prestador para atualizar: ${e.message}")
                 }
 
                 showToast("✅ Foto do perfil atualizada com sucesso!")
