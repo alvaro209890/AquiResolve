@@ -462,9 +462,22 @@ class OrderDetailsActivity : AppCompatActivity() {
             binding.cardImages.visibility = View.GONE
         }
         
-        // Configurar prestador (se atribuído)
-        if (!order.assignedProviderName.isNullOrEmpty()) {
+        // Card da contraparte: o cliente vê o PRESTADOR; o prestador vê o CLIENTE.
+        // A foto e o nome aparecem de um para o outro assim que o pedido é atribuído.
+        if (isProviderView) {
+            // Prestador vê o cliente do pedido.
             binding.cardProvider.visibility = View.VISIBLE
+            binding.tvCounterpartHeader.text = "Cliente"
+            binding.tvProviderName.text = order.clientName.ifBlank { "Cliente" }
+            binding.tvProviderRating.text = "👤 Cliente"
+            if (order.clientId.isNotBlank()) {
+                loadClientRating(order.clientId)
+                loadClientImage(order.clientId)
+            }
+        } else if (!order.assignedProviderName.isNullOrEmpty()) {
+            // Cliente vê o prestador atribuído.
+            binding.cardProvider.visibility = View.VISIBLE
+            binding.tvCounterpartHeader.text = "Prestador Atribuído"
             binding.tvProviderName.text = order.assignedProviderName
             binding.tvProviderRating.text = "⭐ Prestador Atribuído"
             // Carregar nota média real e foto do prestador
@@ -474,6 +487,7 @@ class OrderDetailsActivity : AppCompatActivity() {
             }
         } else {
             binding.cardProvider.visibility = View.VISIBLE
+            binding.tvCounterpartHeader.text = "Prestador Atribuído"
             binding.tvProviderName.text = when (order.status) {
                 "distributing" -> "Não atribuído"
                 "pending" -> "Não atribuído"
@@ -885,6 +899,58 @@ class OrderDetailsActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 android.util.Log.w("OrderDetails", "Erro ao carregar foto do prestador: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Carrega a foto de perfil do cliente (users/{clientId}.profileImageUrl) no mesmo
+     * ImageView da contraparte — usado quando o prestador abre o pedido.
+     */
+    private fun loadClientImage(clientId: String) {
+        lifecycleScope.launch {
+            try {
+                val userDoc = FirebaseFirestore.getInstance()
+                    .collection("users").document(clientId).get().await()
+                if (userDoc.exists()) {
+                    val imageUrl = userDoc.getString("profileImageUrl")
+                    if (!imageUrl.isNullOrEmpty()) {
+                        binding.ivProviderPhoto.setPadding(0, 0, 0, 0)
+                        binding.ivProviderPhoto.imageTintList = null
+                        Glide.with(this@OrderDetailsActivity)
+                            .load(imageUrl)
+                            .transform(CircleCrop())
+                            .placeholder(R.drawable.ic_person)
+                            .error(R.drawable.ic_person)
+                            .into(binding.ivProviderPhoto)
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("OrderDetails", "Erro ao carregar foto do cliente: ${e.message}")
+            }
+        }
+    }
+
+    /**
+     * Carrega a reputação pública do cliente (users/{clientId}.clientRating) para o
+     * prestador ver com quem vai atender.
+     */
+    private fun loadClientRating(clientId: String) {
+        lifecycleScope.launch {
+            try {
+                val userDoc = FirebaseFirestore.getInstance()
+                    .collection("users").document(clientId).get().await()
+                if (userDoc.exists()) {
+                    val rating = userDoc.getDouble("clientRating") ?: 0.0
+                    val total = (userDoc.getLong("clientTotalRatings") ?: 0L).toInt()
+                    binding.tvProviderRating.text = if (rating > 0) {
+                        "⭐ ${String.format("%.1f", rating)} ($total avaliações) · Cliente"
+                    } else {
+                        "👤 Cliente"
+                    }
+                }
+            } catch (e: Exception) {
+                android.util.Log.w("OrderDetails", "Erro ao carregar nota do cliente: ${e.message}")
             }
         }
     }

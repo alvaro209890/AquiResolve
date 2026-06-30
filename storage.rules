@@ -66,8 +66,10 @@ service firebase.storage {
     }
 
     // ===== FOTOS DE PERFIL =====
+    // Leitura liberada a qualquer usuário autenticado: cliente e prestador precisam
+    // ver a foto um do outro no pedido/chat. Escrita continua exclusiva do dono.
     match /profile_images/{userId}/{fileName} {
-      allow read: if isOwner(userId);
+      allow read: if isSignedIn();
       allow write: if ownerCanModifyImage(userId, 10 * 1024 * 1024);
     }
 
