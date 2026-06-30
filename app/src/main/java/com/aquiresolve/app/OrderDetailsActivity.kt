@@ -136,6 +136,15 @@ class OrderDetailsActivity : AppCompatActivity() {
         }
     }
 
+    // Após enviar a solicitação de reembolso, recarrega para refletir o novo estado.
+    private val refundRequestLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            loadOrderDetails()
+        }
+    }
+
     // Quando a avaliação do cliente é disparada logo após finalizar com código
     // (fluxo one-shot), o prestador deve voltar à Home ao concluir/pular. Quando é
     // disparada pelo botão persistente "Avaliar Cliente" de um pedido já concluído,
@@ -404,9 +413,18 @@ class OrderDetailsActivity : AppCompatActivity() {
             // Estado do reembolso (qualquer refundStatus — não só cancelamento do cliente).
             // Prazos alinhados à Política: PIX até 5 dias úteis; cartão 1 ou 2 faturas.
             when (order.refundStatus?.lowercase(Locale("pt", "BR"))) {
+                "requested" -> {
+                    binding.cardRefundInfo.visibility = View.VISIBLE
+                    binding.tvRefundInfo.text = "📨 Solicitação de reembolso enviada.\n\nSua solicitação está em análise pela equipe. Você será avisado quando houver uma decisão."
+                }
+                "rejected" -> {
+                    binding.cardRefundInfo.visibility = View.VISIBLE
+                    val motivo = order.refundRejectionReason?.takeIf { it.isNotBlank() } ?: "Sem motivo informado"
+                    binding.tvRefundInfo.text = "❌ Reembolso recusado.\n\nMotivo: $motivo\n\nEm caso de dúvida, fale com o suporte."
+                }
                 "pending" -> {
                     binding.cardRefundInfo.visibility = View.VISIBLE
-                    binding.tvRefundInfo.text = "💳 Reembolso solicitado.\n\nO valor será estornado pelo mesmo meio de pagamento — PIX em até 5 dias úteis; cartão em 1 ou 2 faturas. Você será avisado quando for concluído."
+                    binding.tvRefundInfo.text = "💳 Reembolso aprovado.\n\nO valor será estornado pelo mesmo meio de pagamento — PIX em até 5 dias úteis; cartão em 1 ou 2 faturas. Você será avisado quando for concluído."
                 }
                 "processing" -> {
                     binding.cardRefundInfo.visibility = View.VISIBLE
@@ -428,9 +446,30 @@ class OrderDetailsActivity : AppCompatActivity() {
                     binding.cardRefundInfo.visibility = View.GONE
                 }
             }
+
+            // Botão "Solicitar reembolso": só para o CLIENTE, em pedido PAGO, que ainda
+            // não tem solicitação aberta nem reembolso em andamento/concluído. Recusado
+            // pode solicitar de novo.
+            val refund = order.refundStatus?.lowercase(Locale("pt", "BR"))
+            val canRequestRefund = !isProviderView
+                && orderWasPaid(order)
+                && (refund.isNullOrEmpty() || refund == "rejected")
+            if (canRequestRefund) {
+                binding.btnRequestRefund.visibility = View.VISIBLE
+                binding.btnRequestRefund.text =
+                    if (refund == "rejected") "Solicitar reembolso novamente" else "Solicitar reembolso"
+                binding.btnRequestRefund.setOnClickListener {
+                    refundRequestLauncher.launch(
+                        Intent(this, RefundRequestActivity::class.java).putExtra("order_id", order.id)
+                    )
+                }
+            } else {
+                binding.btnRequestRefund.visibility = View.GONE
+            }
         } else {
             binding.cardCancellationInfo.visibility = View.GONE
             binding.cardRefundInfo.visibility = View.GONE
+            binding.btnRequestRefund.visibility = View.GONE
         }
         
         // Configurar complemento

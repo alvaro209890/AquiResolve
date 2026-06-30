@@ -141,6 +141,15 @@ service cloud.firestore {
             'qualityRating', 'punctualityRating', 'communicationRating',
             'cleanlinessRating', 'ratingTags', 'updatedAt'
           ])
+          // Cliente abre uma SOLICITAÇÃO de reembolso (motivo + fotos) num pedido
+          // que foi pago. A decisão (aprovar/recusar) é só via Admin SDK (painel).
+          || (
+            request.resource.data.refundStatus == 'requested'
+            && resource.data.get('paymentStatus', '').lower() in ['paid', 'captured', 'approved', 'confirmed']
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'refundStatus', 'refundReason', 'refundPhotos', 'refundRequestedAt', 'updatedAt'
+            ])
+          )
         );
     }
 

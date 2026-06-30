@@ -11,9 +11,11 @@ export async function GET(request: NextRequest) {
     await requireAdminPermission(request, 'financeiro')
     const db = getAdminFirestore()
 
+    // 'requested' = solicitação do cliente aguardando decisão; 'pending' = aprovado,
+    // aguardando o estorno na Pagar.me (estados legados/automáticos).
     const snap = await db
       .collection('orders')
-      .where('refundStatus', '==', 'pending')
+      .where('refundStatus', 'in', ['requested', 'pending'])
       .get()
 
     const toMillis = (v: unknown): number => {
@@ -47,6 +49,9 @@ export async function GET(request: NextRequest) {
           cancelledBy: d.cancelledBy ?? null,
           cancellationReason: d.cancellationReason ?? null,
           refundStatus: d.refundStatus ?? null,
+          // Solicitação do cliente: motivo descrito + fotos anexadas.
+          refundReason: d.refundReason ?? null,
+          refundPhotos: Array.isArray(d.refundPhotos) ? d.refundPhotos : [],
           refundRequestedAtMs: toMillis(d.refundRequestedAt ?? d.cancelledAt ?? d.updatedAt),
           // Sinaliza se dá pra estornar pelo endpoint (precisa de transação Pagar.me).
           hasGatewayTransaction: Boolean(

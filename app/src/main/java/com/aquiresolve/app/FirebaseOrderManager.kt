@@ -1164,14 +1164,68 @@ class FirebaseOrderManager {
             }
             
             orderRef.update(updates).await()
-            
+
             Log.d(TAG, "Pedido cancelado com sucesso: $orderId por $cancelledBy")
             Result.success(Unit)
-            
+
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao cancelar pedido: ${e.message}")
             Log.e(TAG, "OrderId: $orderId")
             Log.e(TAG, "Stack trace: ${e.stackTraceToString()}")
+            Result.failure(e)
+        }
+    }
+
+    /**
+     * Cliente solicita reembolso descrevendo o motivo e anexando fotos.
+     * Só é permitido em pedido pago (a regra Firestore também valida isso).
+     * Grava refundStatus='requested' + motivo + fotos; o admin aprova/recusa no painel.
+     */
+    suspend fun requestRefund(
+        orderId: String,
+        reason: String,
+        photoUrls: List<String>
+    ): Result<Unit> {
+        if (orderId.isBlank()) {
+            return Result.failure(IllegalArgumentException("ID do pedido inválido"))
+        }
+        val trimmedReason = reason.trim()
+        if (trimmedReason.length < 10) {
+            return Result.failure(IllegalArgumentException("Descreva o motivo com pelo menos 10 caracteres"))
+        }
+        return try {
+            val user = auth.awaitCurrentUser()
+                ?: return Result.failure(IllegalStateException("Usuário não autenticado"))
+
+            val orderRef = db.collection(ORDERS_COLLECTION).document(orderId)
+            val snap = orderRef.get().await()
+            if (!snap.exists()) {
+                return Result.failure(IllegalStateException("Pedido não encontrado"))
+            }
+            if (snap.getString("clientId") != user.uid) {
+                return Result.failure(SecurityException("Somente o cliente dono do pedido pode solicitar reembolso"))
+            }
+            val paymentStatus = (snap.getString("paymentStatus") ?: "").lowercase()
+            if (paymentStatus !in setOf("paid", "captured", "approved", "confirmed")) {
+                return Result.failure(IllegalStateException("Só é possível solicitar reembolso de pedido pago"))
+            }
+            val current = (snap.getString("refundStatus") ?: "").lowercase()
+            if (current in setOf("requested", "processing", "completed")) {
+                return Result.failure(IllegalStateException("Já existe uma solicitação de reembolso para este pedido"))
+            }
+
+            val updates = mutableMapOf<String, Any>(
+                "refundStatus" to "requested",
+                "refundReason" to trimmedReason,
+                "refundPhotos" to photoUrls,
+                "refundRequestedAt" to Timestamp.now(),
+                "updatedAt" to Timestamp.now()
+            )
+            orderRef.update(updates).await()
+            Log.d(TAG, "Solicitação de reembolso registrada: $orderId")
+            Result.success(Unit)
+        } catch (e: Exception) {
+            Log.e(TAG, "Erro ao solicitar reembolso: ${e.message}")
             Result.failure(e)
         }
     }

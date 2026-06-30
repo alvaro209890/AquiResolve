@@ -649,6 +649,18 @@
 
                     </com.google.android.material.card.MaterialCardView>
 
+                    <!-- Botão de solicitar reembolso (cliente, pedido pago sem solicitação) -->
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnRequestRefund"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Solicitar reembolso"
+                        android:textColor="@color/white"
+                        android:backgroundTint="@color/primary_color"
+                        app:cornerRadius="10dp"
+                        android:layout_marginTop="12dp"
+                        android:visibility="gone" />
+
                 </LinearLayout>
 
             </com.google.android.material.card.MaterialCardView>

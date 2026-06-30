@@ -84,9 +84,16 @@ data class OrderData(
     @PropertyName("cancellationReason")
     val cancellationReason: String? = null,
     @PropertyName("refundStatus")
-    val refundStatus: String? = null, // "pending", "processing", "completed", "failed"
+    val refundStatus: String? = null, // "requested", "pending", "processing", "completed", "rejected", "failed"
     @PropertyName("refundRequestedAt")
     val refundRequestedAt: Timestamp? = null,
+    // Solicitação de reembolso feita pelo cliente (motivo + fotos) e a decisão do admin.
+    @PropertyName("refundReason")
+    val refundReason: String? = null,
+    @PropertyName("refundPhotos")
+    val refundPhotos: List<String> = emptyList(),
+    @PropertyName("refundRejectionReason")
+    val refundRejectionReason: String? = null,
     
     // Preços
     @PropertyName("estimatedPrice")
