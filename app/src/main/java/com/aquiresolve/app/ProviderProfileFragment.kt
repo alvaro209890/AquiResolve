@@ -481,7 +481,10 @@ class ProviderProfileFragment : Fragment() {
             try {
                 val uploadData = FirebaseImageManager.ImageUploadData(
                     uri = croppedUri,
-                    fileName = "profile_${userId}.jpg",
+                    // Arquivo dedicado do prestador, separado da foto de cliente
+                    // (profile_<uid>.jpg) — assim a conta de prestador pode ter uma foto
+                    // diferente da conta de cliente do mesmo usuário.
+                    fileName = "provider_${userId}.jpg",
                     folder = FirebaseImageManager.FOLDER_PROFILE_IMAGES,
                     userId = userId,
                     orderId = null
@@ -805,26 +808,17 @@ class ProviderProfileFragment : Fragment() {
     private fun updateProfileImageInFirestore(userId: String, imageUrl: String) {
         lifecycleScope.launch {
             try {
-                // Atualizar coleção users (clientes e prestadores)
-                val usersResult = authManager.updateUserProfileImage(userId, imageUrl)
-                if (!usersResult.isSuccess) {
-                    showToast("❌ Erro ao salvar foto no servidor")
+                // Foto da CONTA DE PRESTADOR — grava SÓ em providers/{uid}.profileImageUrl.
+                // Não toca em users/{uid} (foto de cliente), para que a conta de prestador
+                // possa ter uma foto diferente da conta de cliente do mesmo usuário.
+                val providerManager = FirebaseProviderManager()
+                val result = providerManager.updateProfileImage(userId, imageUrl)
+                if (result !is FirebaseProviderManager.ProviderResult.Success) {
+                    showToast("❌ Erro ao salvar foto do prestador")
                     return@launch
                 }
 
-                // Sempre atualizar coleção providers (mesma foto para ambos os perfis)
-                try {
-                    val providerDoc = com.google.firebase.firestore.FirebaseFirestore.getInstance()
-                        .collection("providers").document(userId).get().await()
-                    if (providerDoc.exists()) {
-                        val providerManager = FirebaseProviderManager()
-                        providerManager.updateProfileImage(userId, imageUrl)
-                    }
-                } catch (e: Exception) {
-                    android.util.Log.d("ProviderProfileFragment", "Sem perfil de prestador para atualizar: ${e.message}")
-                }
-
-                showToast("✅ Foto do perfil atualizada com sucesso!")
+                showToast("✅ Foto do perfil de prestador atualizada com sucesso!")
                 loadProviderData()
             } catch (e: Exception) {
                 showToast("❌ Erro ao salvar foto: ${e.message}")

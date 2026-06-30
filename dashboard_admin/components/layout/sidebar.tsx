@@ -37,6 +37,7 @@ import {
   BookOpen,
   Wrench,
   Activity,
+  RotateCcw,
 } from "lucide-react"
 
 const navigation = [
@@ -99,6 +100,7 @@ const navigation = [
       { name: "Painel Financeiro", href: "/dashboard/financeiro", icon: BarChart3, permission: "financeiro" },
       { name: "Analytics", href: "/dashboard/financeiro/analytics", icon: TrendingUp, permission: "financeiro" },
       { name: "Pagamentos", href: "/dashboard/financeiro/faturamento", icon: FileText, permission: "financeiro" },
+      { name: "Reembolsos", href: "/dashboard/financeiro/reembolsos", icon: RotateCcw, permission: "financeiro" },
       { name: "Relatórios", href: "/dashboard/financeiro/relatorios", icon: BarChart3, permission: "financeiro" },
     ],
   },

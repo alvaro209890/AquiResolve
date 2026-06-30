@@ -882,20 +882,25 @@ class OrderDetailsActivity : AppCompatActivity() {
     private fun loadProviderImage(providerId: String) {
         lifecycleScope.launch {
             try {
-                val providerDoc = FirebaseFirestore.getInstance()
-                    .collection("providers").document(providerId).get().await()
-                if (providerDoc.exists()) {
-                    val imageUrl = providerDoc.getString("profileImageUrl")
-                    if (!imageUrl.isNullOrEmpty()) {
-                        binding.ivProviderPhoto.setPadding(0, 0, 0, 0)
-                        binding.ivProviderPhoto.imageTintList = null
-                        Glide.with(this@OrderDetailsActivity)
-                            .load(imageUrl)
-                            .transform(CircleCrop())
-                            .placeholder(R.drawable.ic_person)
-                            .error(R.drawable.ic_person)
-                            .into(binding.ivProviderPhoto)
-                    }
+                val db = FirebaseFirestore.getInstance()
+                // Foto da conta de PRESTADOR (providers/{uid}.profileImageUrl). Se o
+                // prestador ainda não tem foto dedicada, cai para a foto de usuário
+                // (users/{uid}.profileImageUrl) — assim o cliente sempre vê algo.
+                val providerDoc = db.collection("providers").document(providerId).get().await()
+                var imageUrl = providerDoc.getString("profileImageUrl")
+                if (imageUrl.isNullOrEmpty()) {
+                    val userDoc = db.collection("users").document(providerId).get().await()
+                    imageUrl = userDoc.getString("profileImageUrl")
+                }
+                if (!imageUrl.isNullOrEmpty()) {
+                    binding.ivProviderPhoto.setPadding(0, 0, 0, 0)
+                    binding.ivProviderPhoto.imageTintList = null
+                    Glide.with(this@OrderDetailsActivity)
+                        .load(imageUrl)
+                        .transform(CircleCrop())
+                        .placeholder(R.drawable.ic_person)
+                        .error(R.drawable.ic_person)
+                        .into(binding.ivProviderPhoto)
                 }
             } catch (e: Exception) {
                 android.util.Log.w("OrderDetails", "Erro ao carregar foto do prestador: ${e.message}")

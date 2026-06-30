@@ -280,6 +280,18 @@ export const SECTIONS: ManualSection[] = [
         ],
       },
       {
+        title: "Reembolsos pendentes",
+        body:
+          "Fila dedicada (Financeiro → Reembolsos) com os pedidos PAGOS que foram cancelados pelo cliente ou expiraram sem prestador (refundStatus = 'pending') e ainda aguardam o estorno. Evita perder reembolsos: o cancelamento/expiração só MARCA a pendência; o estorno na Pagar.me é feito aqui, por um admin.",
+        steps: [
+          "Abra Financeiro → Reembolsos.",
+          "Cada cartão mostra cliente, serviço, valor, motivo e há quanto tempo está pendente.",
+          "Clique em 'Processar reembolso', confirme valor/motivo no diálogo.",
+          "O estorno é executado na Pagar.me (mesmo meio de pagamento); o pedido vira refunded e o cliente é notificado. Requer permissão 'Operar financeiro'.",
+          "Pedidos sem transação Pagar.me aparecem sinalizados e exigem estorno manual fora do painel.",
+        ],
+      },
+      {
         title: "Saldos de Prestadores",
         body:
           "Lista com o saldo acumulado de cada prestador (campo providerBalance). Ao concluir um pedido, o painel credita automaticamente a comissão do prestador. O repasse manual (transferência) é feito fora do painel.",
