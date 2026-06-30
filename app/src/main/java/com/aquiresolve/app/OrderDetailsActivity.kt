@@ -79,6 +79,13 @@ class OrderDetailsActivity : AppCompatActivity() {
     // OS Checklist
     private var osChecklist: OsChecklistData? = null
     private var osStatusCard: com.google.android.material.card.MaterialCardView? = null
+
+    // Avaliação do cliente pelo prestador (mão inversa): indica se este pedido já foi
+    // avaliado pelo prestador. Carregado de client_reviews quando o pedido está concluído
+    // na visão do prestador, para oferecer um ponto de entrada PERSISTENTE de avaliação
+    // (espelha o "Avaliar Serviço" do cliente) — antes a avaliação do cliente só era
+    // disparada uma única vez logo após finalizar com código.
+    private var hasRatedClientCached = false
     
     // Map overlays
     private var clientMarker: Marker? = null
@@ -129,11 +136,22 @@ class OrderDetailsActivity : AppCompatActivity() {
         }
     }
 
-    // Após avaliar (ou pular a avaliação do) cliente, o prestador volta à Home.
+    // Quando a avaliação do cliente é disparada logo após finalizar com código
+    // (fluxo one-shot), o prestador deve voltar à Home ao concluir/pular. Quando é
+    // disparada pelo botão persistente "Avaliar Cliente" de um pedido já concluído,
+    // ele permanece na tela e apenas atualizamos o estado dos botões.
+    private var returnHomeAfterClientRating = false
     private val clientRatingResultLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
-    ) {
-        goToProviderHome()
+    ) { result ->
+        if (result.resultCode == RESULT_OK) {
+            hasRatedClientCached = true
+            order?.let { setActionButtons(it) }
+        }
+        if (returnHomeAfterClientRating) {
+            returnHomeAfterClientRating = false
+            goToProviderHome()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -240,6 +258,7 @@ class OrderDetailsActivity : AppCompatActivity() {
                     if (orderData != null) {
                         order = orderData
                         loadChecklistData(orderData.id)
+                        loadProviderRatedClientState(orderData)
                         updateUI(orderData)
                     } else {
                         showErrorMessage("Pedido não encontrado")
@@ -274,6 +293,28 @@ class OrderDetailsActivity : AppCompatActivity() {
             } catch (e: Exception) {
                 android.util.Log.w("OrderDetails", "Erro ao carregar checklist: ${e.message}")
             }
+        }
+    }
+
+    /**
+     * Na visão do prestador, descobre se o cliente deste pedido já foi avaliado
+     * (doc em client_reviews com id = orderId). Usado para oferecer/ocultar o botão
+     * persistente "Avaliar Cliente" em pedidos concluídos. Nunca lança.
+     */
+    private fun loadProviderRatedClientState(order: OrderData) {
+        if (!isProviderView || order.status != OrderData.STATUS_COMPLETED) {
+            hasRatedClientCached = false
+            return
+        }
+        lifecycleScope.launch {
+            try {
+                hasRatedClientCached = orderManager.hasRatedClient(order.id)
+            } catch (e: Exception) {
+                android.util.Log.w("OrderDetails", "Erro ao verificar avaliação do cliente: ${e.message}")
+                hasRatedClientCached = false
+            }
+            // Reconfigurar botões agora que sabemos o estado da avaliação.
+            this@OrderDetailsActivity.order?.let { setActionButtons(it) }
         }
     }
 
@@ -544,7 +585,12 @@ class OrderDetailsActivity : AppCompatActivity() {
                     }
                 }
                 OrderData.STATUS_COMPLETED -> {
-                    if (osChecklist != null) "Ver OS" to "—" else "Ver Detalhes" to "—"
+                    when {
+                        // Ponto de entrada PERSISTENTE para o prestador avaliar o cliente.
+                        !hasRatedClientCached -> "Avaliar Cliente" to (if (osChecklist != null) "Ver OS" else "—")
+                        osChecklist != null -> "Ver OS" to "—"
+                        else -> "Ver Detalhes" to "—"
+                    }
                 }
                 OrderData.STATUS_CANCELLED, OrderData.STATUS_EXPIRED -> "Ver Detalhes" to "—"
                 else -> "Ver Detalhes" to "—"
@@ -604,7 +650,22 @@ class OrderDetailsActivity : AppCompatActivity() {
                     binding.btnSecondaryAction.isEnabled = true
                     binding.btnSecondaryAction.visibility = View.VISIBLE
                 }
-                OrderData.STATUS_COMPLETED, OrderData.STATUS_CANCELLED, OrderData.STATUS_EXPIRED -> {
+                OrderData.STATUS_COMPLETED -> {
+                    binding.btnPrimaryAction.isEnabled = true
+                    // Mantém o secundário ("Ver OS") visível quando o primário virou
+                    // "Avaliar Cliente"; senão (já avaliado) esconde.
+                    if (secondaryText != "—") {
+                        binding.btnSecondaryAction.visibility = View.VISIBLE
+                        binding.btnSecondaryAction.isEnabled = true
+                        // "Ver OS" não é ação destrutiva — não usar vermelho.
+                        binding.btnSecondaryAction.setTextColor(
+                            ContextCompat.getColor(this, R.color.secondary_color)
+                        )
+                    } else {
+                        binding.btnSecondaryAction.visibility = View.GONE
+                    }
+                }
+                OrderData.STATUS_CANCELLED, OrderData.STATUS_EXPIRED -> {
                     binding.btnPrimaryAction.isEnabled = true
                     binding.btnSecondaryAction.visibility = View.GONE
                 }
@@ -679,7 +740,11 @@ class OrderDetailsActivity : AppCompatActivity() {
                         }
                     }
                     OrderData.STATUS_COMPLETED -> {
-                        if (osChecklist != null) viewOsHistory(order) else openChat()
+                        when {
+                            !hasRatedClientCached -> launchClientRating(order)
+                            osChecklist != null -> viewOsHistory(order)
+                            else -> openChat()
+                        }
                     }
                     else -> openChat()
                 }
@@ -730,6 +795,7 @@ class OrderDetailsActivity : AppCompatActivity() {
                                 delay(1000)
                                 // Convida o prestador a avaliar o cliente; ao concluir
                                 // (ou pular), o launcher leva de volta à Home do prestador.
+                                returnHomeAfterClientRating = true
                                 launchClientRating(order)
                             } else {
                                 loadOrderDetails()
@@ -849,6 +915,10 @@ class OrderDetailsActivity : AppCompatActivity() {
                     }
                     OrderData.STATUS_DISTRIBUTING, OrderData.STATUS_PENDING, OrderData.STATUS_AVAILABLE -> {
                         binding.contentLayout.smoothScrollTo(0, 0)
+                    }
+                    // Secundário "Ver OS" quando o primário virou "Avaliar Cliente".
+                    OrderData.STATUS_COMPLETED -> {
+                        if (osChecklist != null) viewOsHistory(order) else openChat()
                     }
                     else -> {}
                 }
