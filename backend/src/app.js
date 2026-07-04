@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 
 const healthRoutes = require('./routes/health.routes');
 const paymentsRoutes = require('./routes/payments.routes');
+const paymentsWebhookRoutes = require('./routes/payments-webhook.routes');
 const cronRoutes = require('./routes/cron.routes');
 const routeRoutes = require('./routes/route.routes');
 const aiRoutes = require('./routes/ai.routes');
@@ -69,7 +70,14 @@ function createApp({ config }) {
   app.disable('x-powered-by');
   app.use(helmet());
   app.use(cors(createCorsOptions(config)));
-  app.use(express.json({ limit: '1mb' }));
+  app.use(express.json({
+    limit: '1mb',
+    // Guarda o corpo cru para a validação HMAC do webhook Pagar.me
+    // (a assinatura é calculada sobre os bytes originais, não o JSON re-serializado).
+    verify: (req, _res, buf) => {
+      req.rawBody = buf;
+    }
+  }));
 
   app.use((req, res, next) => {
     req.requestId = req.headers['x-request-id'] || crypto.randomUUID();
@@ -85,6 +93,9 @@ function createApp({ config }) {
   );
 
   app.use('/api/health', healthRoutes);
+  // Webhook ANTES do paymentLimiter: a Pagar.me pode mandar rajadas de eventos
+  // legítimos e não pode levar 429 (a autenticidade é validada no controller).
+  app.use('/api/payments/webhook', paymentsWebhookRoutes);
   app.use('/api/payments', paymentLimiter, paymentsRoutes);
   app.use('/api/route', routeRoutes);
   app.use('/api/ai', aiLimiter, aiRoutes);

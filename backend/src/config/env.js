@@ -63,6 +63,11 @@ function loadEnv() {
       defaultValue: 'https://api.pagar.me/core/v5'
     }),
     pagarmeSecretKey: getEnv('PAGARME_SECRET_KEY', { required: false, defaultValue: '' }),
+    // Segredo do webhook Pagar.me (validação HMAC/Basic/estático — ver utils/webhook-auth.js).
+    // Vazio = webhook aceito sem validação (comportamento legado, só até configurar).
+    pagarmeWebhookSecret:
+      getEnv('PAGARME_WEBHOOK_SECRET', { required: false, defaultValue: '' }) ||
+      getEnv('PAYMENT_WEBHOOK_SECRET', { required: false, defaultValue: '' }),
     firebaseProjectId: getEnv('FIREBASE_PROJECT_ID', { required: false, defaultValue: '' }),
     firebaseClientEmail: getEnv('FIREBASE_CLIENT_EMAIL', { required: false, defaultValue: '' }),
     firebasePrivateKey: (getEnv('FIREBASE_PRIVATE_KEY', { required: false, defaultValue: '' }) || '').replace(/\\n/g, '\n'),

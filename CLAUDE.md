@@ -560,6 +560,7 @@ GROQ_API_KEY=gsk_...        # IA do assistente do app (plano 06); opcional GROQ_
 | POST | `/api/payments/pix` | Pagamento PIX |
 | POST | `/api/payments/pricing/calculate` | Cálculo de preço — lê `catalog_services` (Firestore) PRIMEIRO, com fallback na tabela hardcoded. Requer `FIREBASE_*` no Render |
 | GET | `/api/payments/{orderId}/status` | Status do pagamento |
+| POST | `/api/payments/webhook/pagarme` | Webhook Pagar.me (sem token Firebase, **fora do rate limit**). Autenticidade validada em `utils/webhook-auth.js` (HMAC-SHA256/SHA1 do raw body, Basic/Bearer ou secret estático — constant-time) contra `PAGARME_WEBHOOK_SECRET`; idempotência por event.id em `payment_webhook_events/{id}` (claim atômico; duplicata → 200 sem reprocessar; erro libera o claim p/ retry). Ao virar `paid`, `syncPaymentStatusToFirestore` põe o pedido em `distributing` e o listener `provider-notification.service.js` dispara o FCM aos prestadores do nicho sozinho. Config pendente: cadastrar URL + secret no dashboard Pagar.me (ver `novas-implementacoes/18-webhook-pagarme-pendente.md`) |
 | POST | `/api/ai/classify` | Assistente IA (plano 06): classifica a descrição do cliente em UM nicho do catálogo (proxy Groq). Exige ID token + rate-limit. Requer `GROQ_API_KEY` no Render |
 
 ### Deploy (Render.com)
@@ -718,7 +719,7 @@ Cashback é uma configuração financeira crítica. Só o Firebase Admin SDK (vi
 | Serviços/preços do painel não refletem na cobrança | `catalog_services` vazio OU backend sem `FIREBASE_*` no Render | Rodar `node dashboard_admin/scripts/seed-catalog-services.mjs`; conferir `FIREBASE_*` no Render (backend lê Firestore-first) |
 | Novos serviços não aparecem na lista do app | App ainda com APK antigo (lista de serviços era hardcoded) | Gerar novo APK (`./gradlew assembleDebug`); preço de serviços já existentes muda na hora via backend |
 | Reembolso falha no painel | `API_KEY_PRIVATE_PAGARME` ausente ou cobrança não-paga | Conferir chave no Vercel; só cobranças `paid`/`captured` são reembolsáveis |
-| Webhook Pagar.me rejeitado (401) | `PAGARME_WEBHOOK_SECRET` no Render ≠ segredo enviado pelo painel Pagar.me | Manter os dois iguais OU deixar ambos vazios (polling de 5s do app já confirma o pagamento) |
+| Webhook Pagar.me rejeitado (401) | `PAGARME_WEBHOOK_SECRET` no Render ≠ credencial configurada no dashboard Pagar.me | O backend aceita HMAC do raw body, Basic (`usuario:senha` no env), Bearer ou header estático (`utils/webhook-auth.js`); manter env e dashboard iguais OU deixar ambos vazios (aceita com warning; polling do app segue confirmando) |
 | Botão "Salvar Serviços" desabilitado permanentemente | Prestador tem solicitação `pending` em `provider_specialty_requests` | Aprovar ou rejeitar no painel (`/dashboard/controle/especialidades`); o botão reabilita no próximo reload |
 | **Recusa de pedido pelo prestador não funciona / som não para** | O app gravava `rejectedBy` **+** `rejectedAt_<uid>` na recusa, mas `validProviderRejectUpdate` exigia `hasOnly(['rejectedBy'])` → toda recusa caía em `PERMISSION_DENIED` (silencioso), nunca persistia. E som iniciado por push FCM (app fechado) não tinha listener pra parar no aceite | **CORRIGIDO 2026-06-28**: app grava só `rejectedBy` (arrayUnion do próprio uid); regra endurecida (só `rejectedBy` muda → status intacto, recusa não cancela p/ os outros; chamador precisa estar no array e não pode remover os demais); `watchAlertedOrders` registra o som FCM pra parar no aceite. Regra **publicada**; exige **APK novo** pro app parar de mandar o campo extra. Detalhes: `docs/CORRECAO_RECUSA_PEDIDO_E_SOM_2026-06-28.md` |
 | **`PERMISSION_DENIED` ao fazer pedido (com fotos)** | `validClientOrderUpdate` → `orderSensitiveAssignmentFieldsUnchanged()` lia `assignedProvider`/códigos direto; pedido recém-criado não tem esses campos (proibidos por `validOrderCreate`), então o `update("images")` pós-criação era negado e o pedido revertia | **CORRIGIDO** (commit `94d9136`, ruleset `c4770cb9`): guard usa `get(campo, null)`. É correção de **regra** → vale pro APK já instalado, sem novo APK. Detalhes: `docs/CORRECAO_PERMISSION_DENIED_PEDIDO_2026-06-15.md` |
@@ -742,6 +743,7 @@ KEEP_ALIVE_ENABLED=true
 KEEP_ALIVE_URL=https://aquiresolve.onrender.com/api/health
 KEEP_ALIVE_INTERVAL_MS=840000
 GROQ_API_KEY=gsk_...          # IA do assistente do app (plano 06); opcional GROQ_MODEL (default llama-3.3-70b-versatile)
+PAGARME_WEBHOOK_SECRET=...    # webhook Pagar.me (PENDENTE — cadastrar URL+secret no dashboard Pagar.me; vazio = aceita sem validação)
 ```
 
 **Atenção:** `FIREBASE_PRIVATE_KEY` deve conter a chave PEM completa com `\n` literal (não quebras de linha reais). O `env.js` do backend faz o `replace(/\\n/g, '\n')` automaticamente.

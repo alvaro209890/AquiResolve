@@ -5,14 +5,14 @@ const {
   processCardPayment,
   processPixPayment,
   getPaymentStatus,
-  settleCompletedOrder,
-  handlePagarmeWebhook
+  settleCompletedOrder
 } = require('../controllers/payments.controller');
 const { calculatePricing } = require('../controllers/pricing.controller');
 
 const router = express.Router();
 
-router.post('/webhook/pagarme', handlePagarmeWebhook);
+// O webhook Pagar.me vive em routes/payments-webhook.routes.js (montado fora
+// do paymentLimiter em app.js).
 
 router.use(authenticateRequest);
 

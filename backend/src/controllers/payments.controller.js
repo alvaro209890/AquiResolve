@@ -17,6 +17,14 @@ const {
   normalizeOrderResponse,
   mapPagarmeError
 } = require('../services/payment-mapper.service');
+const {
+  extractWebhookEventId,
+  claimWebhookEvent,
+  markWebhookEventProcessed,
+  releaseWebhookEvent
+} = require('../services/webhook-event.service');
+const { verifyWebhookRequest } = require('../utils/webhook-auth');
+const { loadEnv } = require('../config/env');
 const logger = require('../utils/logger');
 
 function validatePaymentPayload(payload) {
@@ -234,25 +242,31 @@ async function settleCompletedOrder(req, res, next) {
 }
 
 function verifyWebhookSecret(req) {
-  const expectedSecret = process.env.PAGARME_WEBHOOK_SECRET || process.env.PAYMENT_WEBHOOK_SECRET || '';
-  if (!expectedSecret) {
-    logger.warn('PAGARME_WEBHOOK_SECRET ausente; webhook aceito sem segredo compartilhado', {
+  const { pagarmeWebhookSecret } = loadEnv();
+  const result = verifyWebhookRequest({
+    headers: req.headers,
+    query: req.query,
+    rawBody: req.rawBody,
+    secret: pagarmeWebhookSecret
+  });
+
+  if (result.method === 'none-configured') {
+    logger.warn('PAGARME_WEBHOOK_SECRET ausente; webhook aceito sem validação de autenticidade', {
       requestId: req.requestId
     });
     return;
   }
 
-  const providedSecret =
-    req.headers['x-pagarme-webhook-secret'] ||
-    req.headers['x-payment-webhook-secret'] ||
-    req.headers['x-webhook-secret'] ||
-    req.query?.secret;
-
-  if (providedSecret !== expectedSecret) {
+  if (!result.ok) {
     throw new HttpError(401, 'Webhook de pagamento nao autorizado', {
       code: 'UNAUTHORIZED_WEBHOOK'
     });
   }
+
+  logger.info('Webhook Pagar.me autenticado', {
+    requestId: req.requestId,
+    method: result.method
+  });
 }
 
 function extractGatewayOrderIdFromWebhook(payload) {
@@ -270,6 +284,7 @@ function normalizeWebhookString(value) {
 }
 
 async function handlePagarmeWebhook(req, res, next) {
+  let claimedEventId = '';
   try {
     verifyWebhookSecret(req);
 
@@ -281,6 +296,26 @@ async function handlePagarmeWebhook(req, res, next) {
       });
     }
 
+    // Idempotência: cada evento é processado uma única vez (retries/duplicatas
+    // da Pagar.me respondem 200 sem reprocessar).
+    const eventId = extractWebhookEventId(eventPayload, gatewayOrderId);
+    if (eventId) {
+      const claimed = await claimWebhookEvent(eventId, {
+        gatewayOrderId,
+        eventType: normalizeWebhookString(eventPayload.type)
+      });
+      if (!claimed) {
+        logger.info('Webhook Pagar.me duplicado ignorado (idempotencia)', {
+          requestId: req.requestId,
+          eventId,
+          gatewayOrderId
+        });
+        res.status(200).json({ ok: true, duplicate: true, gatewayOrderId });
+        return;
+      }
+      claimedEventId = eventId;
+    }
+
     const session = await getPaymentSession(gatewayOrderId);
     const gatewayOrder = await getOrderStatus(gatewayOrderId);
     const syncResult = await syncPaymentStatusToFirestore({ gatewayOrder, session });
@@ -290,9 +325,17 @@ async function handlePagarmeWebhook(req, res, next) {
       gatewayStatus: gatewayOrder?.status
     });
 
+    if (claimedEventId) {
+      await markWebhookEventProcessed(claimedEventId, {
+        paymentStatus: syncResult.paymentStatus,
+        updatedOrders: syncResult.updatedOrders
+      });
+    }
+
     logger.info('Webhook Pagar.me processado com sucesso', {
       requestId: req.requestId,
       gatewayOrderId,
+      eventId: claimedEventId || null,
       eventType: normalizeWebhookString(eventPayload.type),
       paymentStatus: syncResult.paymentStatus,
       updatedOrders: syncResult.updatedOrders
@@ -305,6 +348,10 @@ async function handlePagarmeWebhook(req, res, next) {
       updatedOrders: syncResult.updatedOrders
     });
   } catch (error) {
+    // Libera o claim para o retry da Pagar.me não cair na deduplicação.
+    if (claimedEventId) {
+      await releaseWebhookEvent(claimedEventId);
+    }
     logger.warn('Falha ao processar webhook Pagar.me', {
       requestId: req.requestId,
       error: error.message
