@@ -1,0 +1,244 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
+@custom-variant dark (&:is(.dark *));
+
+/* shadcn + Aqui Resolve: primário e fundo alinhados ao wizard LGPD (antes: #2563eb + #f5f5f5 — quase igual visualmente) */
+:root {
+  --background: #F8F9FA;
+  --foreground: #212121;
+  --card: #ffffff;
+  --card-foreground: #212121;
+  --popover: #ffffff;
+  --popover-foreground: #212121;
+  --primary: #1D61FF;
+  --primary-foreground: #ffffff;
+  --secondary: #F0F2F5;
+  --secondary-foreground: #212121;
+  --muted: #F0F2F5;
+  --muted-foreground: #9E9E9E;
+  --accent: #EFF6FF;
+  --accent-foreground: #1855E0;
+  --destructive: #E53935;
+  --destructive-foreground: #ffffff;
+  --success: #16a34a;
+  --success-foreground: #ffffff;
+  --border: #E0E0E0;
+  --input: #E0E0E0;
+  --ring: #1D61FF;
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --radius: 0.75rem;
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+}
+
+.dark {
+  --background: #1a1a1a;
+  --foreground: oklch(0.985 0 0);
+  --card: #262626;
+  --card-foreground: oklch(0.985 0 0);
+  --popover: #262626;
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: #3b82f6;
+  --primary-foreground: #ffffff;
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --success: #22c55e;
+  --success-foreground: #ffffff;
+  --border: oklch(0.269 0 0);
+  --input: oklch(0.269 0 0);
+  --ring: #3b82f6;
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(0.269 0 0);
+  --sidebar-ring: oklch(0.439 0 0);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PALETA DE CORES — AQUI RESOLVE  v1.0
+   Tokens de marca e experiência pública. NÃO sobrescreve shadcn/ui.
+   Documentação completa: docs/design-tokens-aquiresolve.md
+   ═══════════════════════════════════════════════════════════════════ */
+:root {
+  /* ─── Primitivos de cor ─────────────────────────────────────────── */
+  --brand-orange-50:       #FFF7ED;
+  --brand-orange-100:      #FFEDD5;
+  --brand-orange-200:      #FED7AA;
+  --brand-orange-500:      #F97316;
+  --brand-orange-600:      #EA580C;
+
+  --brand-blue-50:         #EFF6FF;
+  --brand-blue-100:        #DBEAFE;
+  --brand-blue-300:        #93C5FD;
+  --brand-blue-500:        #1D61FF;
+  --brand-blue-600:        #1855E0;
+  --brand-blue-disabled:   #89AAFF;
+
+  /* ─── Identidade de Marca (laranja = marca/destaque) ────────────── */
+  --brand:                       var(--brand-orange-500);   /* #F97316 */
+  --brand-foreground:            #FFFFFF;
+  --brand-hover:                 var(--brand-orange-600);   /* #EA580C */
+  --brand-surface:               var(--brand-orange-50);    /* #FFF7ED */
+  --brand-surface-foreground:    var(--brand-orange-600);   /* #EA580C */
+
+  /* ─── Fluxos Transacionais / LGPD (azul = ação confiável) ───────── */
+  --lgpd-primary:                var(--brand-blue-500);     /* #1D61FF */
+  --lgpd-primary-foreground:     #FFFFFF;
+  --lgpd-primary-hover:          var(--brand-blue-600);     /* #1855E0 */
+  --lgpd-primary-disabled:       var(--brand-blue-disabled);/* #89AAFF */
+  --lgpd-primary-surface:        var(--brand-blue-50);      /* #EFF6FF */
+
+  /* ─── Aviso (caixa amarela — irreversibilidade) ─────────────────── */
+  --warning-surface:             #FFF9E6;
+  --warning-border:              #FFD666;
+  --warning-foreground:          #996633;
+  --warning-icon:                #E8A000;
+
+  /* ─── Perigo (fundo de ícone lixeira, exclusão) ─────────────────── */
+  --danger-surface:              #FFE8E8;
+  --danger-icon:                 #E53935;
+
+  /* ─── Neutros da experiência pública ───────────────────────────── */
+  --surface-page:                #F8F9FA;
+  --text-primary:                #212121;
+  --text-secondary:              #9E9E9E;
+  --border-input:                #E0E0E0;
+}
+
+@theme inline {
+  /* Breakpoint extra para telas entre 390-640px (iPhones maiores) */
+  --breakpoint-xs: 480px;
+  --font-sans: 'Geist', 'Geist Fallback';
+  --font-mono: 'Geist Mono', 'Geist Mono Fallback';
+
+  /* ─── Brand & LGPD → classes Tailwind (bg-brand, text-lgpd-primary, etc.) */
+  --color-brand:                    var(--brand);
+  --color-brand-foreground:         var(--brand-foreground);
+  --color-brand-hover:              var(--brand-hover);
+  --color-brand-surface:            var(--brand-surface);
+  --color-brand-surface-foreground: var(--brand-surface-foreground);
+
+  --color-lgpd-primary:             var(--lgpd-primary);
+  --color-lgpd-primary-foreground:  var(--lgpd-primary-foreground);
+  --color-lgpd-primary-hover:       var(--lgpd-primary-hover);
+  --color-lgpd-primary-disabled:    var(--lgpd-primary-disabled);
+  --color-lgpd-primary-surface:     var(--lgpd-primary-surface);
+
+  --color-warning-surface:          var(--warning-surface);
+  --color-warning-border:           var(--warning-border);
+  --color-warning-foreground:       var(--warning-foreground);
+  --color-warning-icon:             var(--warning-icon);
+
+  --color-danger-surface:           var(--danger-surface);
+  --color-danger-icon:              var(--danger-icon);
+
+  --color-surface-page:             var(--surface-page);
+  --color-text-primary:             var(--text-primary);
+  --color-text-secondary:           var(--text-secondary);
+  --color-border-input:             var(--border-input);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    /* Remove flash azul no toque (Android/iOS) */
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  html {
+    /* Remove bounce scroll lateral no iOS */
+    overscroll-behavior-x: none;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    /* Remove delay de 300ms em botões/links touch */
+    touch-action: manipulation;
+    /* Safe area para iOS notch/home indicator */
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    /* Previne seleção de texto acidental ao tocar */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Garante que inputs NÃO provocam zoom no iOS Safari (exige >= 16px) */
+  input:not([type='checkbox']):not([type='radio']),
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+}
+
+/* Utility: padding bottom com safe area para o home indicator do iPhone */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.min-h-dvh {
+  min-height: 100dvh;
+}
