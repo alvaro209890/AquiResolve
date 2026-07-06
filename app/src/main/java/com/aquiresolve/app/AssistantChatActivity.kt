@@ -11,6 +11,7 @@ import android.view.inputmethod.InputMethodManager
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -56,8 +57,9 @@ class AssistantChatActivity : AppCompatActivity() {
     // ---- Análise de imagem (Helô vê a foto e diz o serviço) ----
     private var cameraImageUri: android.net.Uri? = null
 
+    // Android Photo Picker — não exige permissão de mídia (política do Google Play)
     private val pickImageLauncher =
-        registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
             if (uri != null) processSelectedImage(uri)
         }
 
@@ -260,7 +262,9 @@ class AssistantChatActivity : AppCompatActivity() {
             .setItems(options) { _, which ->
                 when (which) {
                     0 -> startCameraWithPermission()
-                    1 -> pickImageLauncher.launch("image/*")
+                    1 -> pickImageLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
                 }
             }
             .show()

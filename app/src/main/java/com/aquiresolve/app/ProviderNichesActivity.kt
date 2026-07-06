@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.view.View
 import android.widget.ImageView
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -35,7 +36,8 @@ class ProviderNichesActivity : AppCompatActivity() {
     private var selfieUri: Uri? = null
     private val proofPhotoUris = mutableListOf<Uri>()
 
-    private val docPhotoLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    // Android Photo Picker — não exige permissão de mídia (política do Google Play)
+    private val docPhotoLauncher = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
             docPhotoUri = uri
             Glide.with(this).load(uri).into(binding.ivDocPhoto)
@@ -43,7 +45,7 @@ class ProviderNichesActivity : AppCompatActivity() {
         }
     }
 
-    private val selfieLauncher = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    private val selfieLauncher = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) {
             selfieUri = uri
             Glide.with(this).load(uri).into(binding.ivSelfie)
@@ -51,7 +53,7 @@ class ProviderNichesActivity : AppCompatActivity() {
         }
     }
 
-    private val proofLauncher = registerForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
+    private val proofLauncher = registerForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(3)) { uris ->
         if (uris.isNotEmpty()) {
             val remainingSlots = 3 - proofPhotoUris.size
             val urisToAdd = uris.take(remainingSlots)
@@ -86,15 +88,16 @@ class ProviderNichesActivity : AppCompatActivity() {
     }
 
     private fun setupPhotoPickers() {
-        binding.btnAttachDoc.setOnClickListener { docPhotoLauncher.launch("image/*") }
-        binding.ivDocPhoto.setOnClickListener { docPhotoLauncher.launch("image/*") }
-        
-        binding.btnTakeSelfie.setOnClickListener { selfieLauncher.launch("image/*") }
-        binding.ivSelfie.setOnClickListener { selfieLauncher.launch("image/*") }
-        
-        binding.btnAttachProof.setOnClickListener { 
+        val imageOnly = PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+        binding.btnAttachDoc.setOnClickListener { docPhotoLauncher.launch(imageOnly) }
+        binding.ivDocPhoto.setOnClickListener { docPhotoLauncher.launch(imageOnly) }
+
+        binding.btnTakeSelfie.setOnClickListener { selfieLauncher.launch(imageOnly) }
+        binding.ivSelfie.setOnClickListener { selfieLauncher.launch(imageOnly) }
+
+        binding.btnAttachProof.setOnClickListener {
             if (proofPhotoUris.size < 3) {
-                proofLauncher.launch("image/*") 
+                proofLauncher.launch(imageOnly)
             } else {
                 Toast.makeText(this, "Máximo de 3 comprovantes", Toast.LENGTH_SHORT).show()
             }

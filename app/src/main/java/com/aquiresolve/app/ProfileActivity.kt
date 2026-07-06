@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.view.View
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -41,9 +42,9 @@ class ProfileActivity : AppCompatActivity() {
     private val floatingMic = FloatingMicHelper()
     private val cashbackManager = CashbackManager()
 
-    // Launcher para galeria
+    // Launcher para galeria (Android Photo Picker — sem permissão de mídia)
     private val galleryLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
+        ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         uri?.let { launchCrop(it) }
     }
@@ -360,32 +361,32 @@ class ProfileActivity : AppCompatActivity() {
      * Mostra diálogo para selecionar imagem
      */
     private fun showImagePickerDialog() {
-        permissionManager.checkAndRequestImagePermissions(
-            onGranted = {
-                val userId = authManager.getLocalUserData()?.uid
-                    ?: authManager.getCurrentUser()?.uid
-                    ?: com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
+        val userId = authManager.getLocalUserData()?.uid
+            ?: authManager.getCurrentUser()?.uid
+            ?: com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.uid
 
-                if (userId == null) {
-                    showToast("❌ Usuário não autenticado. Faça login novamente.")
-                    return@checkAndRequestImagePermissions
+        if (userId == null) {
+            showToast("❌ Usuário não autenticado. Faça login novamente.")
+            return
+        }
+
+        AlertDialog.Builder(this)
+            .setTitle("Foto do Perfil")
+            .setItems(arrayOf("📷 Tirar Foto", "🖼️ Galeria")) { _, which ->
+                when (which) {
+                    // Câmera continua exigindo a permissão CAMERA
+                    0 -> permissionManager.checkAndRequestCameraPermission(
+                        onGranted = { takeProfilePhoto() },
+                        onDenied = { showToast("Permissão de câmera necessária para tirar foto") }
+                    )
+                    // Galeria via Photo Picker — sem permissão de mídia
+                    1 -> galleryLauncher.launch(
+                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                    )
                 }
-
-                AlertDialog.Builder(this)
-                    .setTitle("Foto do Perfil")
-                    .setItems(arrayOf("📷 Tirar Foto", "🖼️ Galeria")) { _, which ->
-                        when (which) {
-                            0 -> takeProfilePhoto()
-                            1 -> galleryLauncher.launch("image/*")
-                        }
-                    }
-                    .setNegativeButton("Cancelar", null)
-                    .show()
-            },
-            onDenied = {
-                showToast("Permissões necessárias para alterar foto do perfil")
             }
-        )
+            .setNegativeButton("Cancelar", null)
+            .show()
     }
 
     private fun takeProfilePhoto() {

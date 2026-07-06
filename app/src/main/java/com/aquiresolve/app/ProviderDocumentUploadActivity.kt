@@ -31,10 +31,19 @@ class ProviderDocumentUploadActivity : AppCompatActivity() {
     private val selectedDocs = mutableMapOf<ProviderVerificationManager.DocumentType, Uri>()
     private var currentDocType: ProviderVerificationManager.DocumentType? = null
     
+    // Galeria via Android Photo Picker — não exige permissão de mídia (política do Google Play)
+    private val photoPickerLauncher = registerForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            registerSelectedDoc(uri)
+            showSuccessMessage("Imagem selecionada com sucesso!")
+        }
+    }
+
     // Constantes para câmera e galeria
     companion object {
         private const val REQUEST_CAMERA = 1001
-        private const val REQUEST_GALLERY = 1002
         private const val REQUEST_CAMERA_PERMISSION = 1003
     }
     
@@ -146,9 +155,11 @@ class ProviderDocumentUploadActivity : AppCompatActivity() {
      * Seleciona da galeria
      */
     private fun selectFromGallery() {
-        val intent = Intent(Intent.ACTION_GET_CONTENT)
-        intent.type = "image/*"
-        startActivityForResult(Intent.createChooser(intent, "Selecionar documento"), REQUEST_GALLERY)
+        photoPickerLauncher.launch(
+            androidx.activity.result.PickVisualMediaRequest(
+                androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly
+            )
+        )
     }
     
     /**
@@ -164,13 +175,6 @@ class ProviderDocumentUploadActivity : AppCompatActivity() {
                     if (imageUri != null) {
                         registerSelectedDoc(imageUri)
                         showSuccessMessage("Foto capturada com sucesso!")
-                    }
-                }
-                REQUEST_GALLERY -> {
-                    val imageUri = data?.data
-                    if (imageUri != null) {
-                        registerSelectedDoc(imageUri)
-                        showSuccessMessage("Imagem selecionada com sucesso!")
                     }
                 }
             }

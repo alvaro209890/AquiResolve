@@ -9,6 +9,7 @@ import android.provider.OpenableColumns
 import android.provider.MediaStore
 import android.view.View
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -51,15 +52,12 @@ class DocumentUploadActivity : AppCompatActivity() {
     // Adapter da lista
     private lateinit var documentAdapter: DocumentUploadAdapter
     
-    // Launcher para seleção de arquivos
-    private val documentPickerLauncher = registerForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            result.data?.data?.let { uri ->
-                handleDocumentSelection(uri)
-            }
-        }
+    // Launcher da galeria via Android Photo Picker — não exige permissão de mídia
+    // (política do Google Play). Só imagens (documentos são fotografados/escolhidos como imagem).
+    private val photoPickerLauncher = registerForActivityResult(
+        ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        uri?.let { handleDocumentSelection(it) }
     }
 
     // Launcher para câmera
@@ -79,17 +77,6 @@ class DocumentUploadActivity : AppCompatActivity() {
         currentPhotoFile = null
     }
 
-    // Launcher para permissão de mídia
-    private val requestMediaPermissionLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
-            if (isGranted) {
-                // Reabrir diálogo após permissão
-                showDocumentTypeDialog()
-            } else {
-                showToast("Permissão de acesso a mídia negada. Não será possível enviar documentos.")
-            }
-        }
-    
     // Launcher para permissão de câmera
     private val requestCameraPermissionLauncher =
         registerForActivityResult(ActivityResultContracts.RequestPermission()) { isGranted ->
@@ -136,9 +123,9 @@ class DocumentUploadActivity : AppCompatActivity() {
             finish()
         }
         
-        // Botão adicionar documento
+        // Botão adicionar documento — galeria usa o Photo Picker (sem permissão de mídia)
         binding.btnUploadDocument.setOnClickListener {
-            ensureMediaPermissionAndOpenPicker()
+            showDocumentTypeDialog()
         }
         
         // Botão enviar para verificação
@@ -413,21 +400,6 @@ class DocumentUploadActivity : AppCompatActivity() {
         }
     }
 
-    private fun ensureMediaPermissionAndOpenPicker() {
-        val hasPermission = com.aquiresolve.app.utils.PermissionHelper.isMediaPermissionGranted(this)
-        if (hasPermission) {
-            showDocumentTypeDialog()
-            return
-        }
-
-        val permission = com.aquiresolve.app.utils.PermissionHelper.getRequiredMediaPermission()
-        if (permission != null) {
-            requestMediaPermissionLauncher.launch(permission)
-        } else {
-            showDocumentTypeDialog()
-        }
-    }
-
     /**
      * Abre seletor de documentos com opção de câmera ou galeria
      */
@@ -449,16 +421,10 @@ class DocumentUploadActivity : AppCompatActivity() {
                         }
                     }
                     1 -> {
-                        // Escolher da galeria
-                        val intent = Intent(Intent.ACTION_GET_CONTENT).apply {
-                            type = "image/*"
-                            addCategory(Intent.CATEGORY_OPENABLE)
-                            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf(
-                                "image/jpeg",
-                                "image/png"
-                            ))
-                        }
-                        documentPickerLauncher.launch(Intent.createChooser(intent, "Selecionar Imagem"))
+                        // Escolher da galeria via Photo Picker (sem permissão de mídia)
+                        photoPickerLauncher.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
                     }
                 }
             }

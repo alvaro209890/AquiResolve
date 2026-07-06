@@ -6,6 +6,7 @@ import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
@@ -33,8 +34,9 @@ class RefundRequestActivity : AppCompatActivity() {
         private const val MAX_PHOTOS = 5
     }
 
+    // Android Photo Picker (múltiplo) — não exige permissão de mídia (política do Google Play)
     private val photoPicker = registerForActivityResult(
-        ActivityResultContracts.GetMultipleContents()
+        ActivityResultContracts.PickMultipleVisualMedia(MAX_PHOTOS)
     ) { uris ->
         if (uris.isNullOrEmpty()) return@registerForActivityResult
         for (uri in uris) {
@@ -64,7 +66,9 @@ class RefundRequestActivity : AppCompatActivity() {
             if (selectedPhotos.size >= MAX_PHOTOS) {
                 showToast("Máximo de $MAX_PHOTOS fotos")
             } else {
-                photoPicker.launch("image/*")
+                photoPicker.launch(
+                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                )
             }
         }
         binding.btnSubmitRefund.setOnClickListener { submit() }

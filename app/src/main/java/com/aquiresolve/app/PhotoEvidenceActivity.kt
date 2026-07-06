@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -43,8 +44,9 @@ class PhotoEvidenceActivity : AppCompatActivity() {
     private var currentCategory = "before"
     private var cameraImageUri: Uri? = null
 
+    // Android Photo Picker — não exige permissão de mídia (política do Google Play)
     private val galleryLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
+        ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         uri?.let { addPhotoToCurrentCategory(it) }
     }
@@ -172,7 +174,9 @@ class PhotoEvidenceActivity : AppCompatActivity() {
     }
 
     private fun openGallery() {
-        galleryLauncher.launch("image/*")
+        galleryLauncher.launch(
+            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+        )
     }
 
     private fun createImageFile(): File? {

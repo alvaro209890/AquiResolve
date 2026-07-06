@@ -10,35 +10,11 @@ import androidx.core.content.ContextCompat
  * Utilitário para gerenciar permissões do aplicativo
  */
 object PermissionHelper {
-    
-    /**
-     * Verifica se a permissão de mídia foi concedida
-     */
-    fun isMediaPermissionGranted(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.READ_MEDIA_IMAGES
-            ) == PackageManager.PERMISSION_GRANTED
-        } else {
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            ) == PackageManager.PERMISSION_GRANTED
-        }
-    }
-    
-    /**
-     * Obtém a permissão de mídia necessária baseada na versão do Android
-     */
-    fun getRequiredMediaPermission(): String? {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_IMAGES
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        }
-    }
-    
+
+    // NOTA: o app NÃO usa mais READ_MEDIA_IMAGES/READ_MEDIA_VIDEO/READ_EXTERNAL_STORAGE.
+    // A seleção de imagens usa o Android Photo Picker (ActivityResultContracts.PickVisualMedia),
+    // que não exige permissão. Só a câmera continua pedindo permissão (CAMERA).
+
     /**
      * Verifica se a permissão de câmera foi concedida
      */
@@ -48,24 +24,14 @@ object PermissionHelper {
             Manifest.permission.CAMERA
         ) == PackageManager.PERMISSION_GRANTED
     }
-    
+
     /**
-     * Obtém todas as permissões necessárias para o app
+     * Obtém todas as permissões necessárias para o app (apenas câmera — mídia usa o Photo Picker)
      */
     fun getAllRequiredPermissions(): Array<String> {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            arrayOf(
-                Manifest.permission.CAMERA,
-                Manifest.permission.READ_MEDIA_IMAGES
-            )
-        } else {
-            arrayOf(
-                Manifest.permission.CAMERA,
-                Manifest.permission.READ_EXTERNAL_STORAGE
-            )
-        }
+        return arrayOf(Manifest.permission.CAMERA)
     }
-    
+
     /**
      * Verifica se precisa solicitar permissão de notificação
      */

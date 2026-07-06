@@ -7,7 +7,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.os.Build
 import android.provider.Settings
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -29,46 +28,18 @@ class ImagePermissionHelper {
     companion object {
         private const val TAG = "ImagePermissionHelper"
         
-        // Permissões necessárias
+        // Só a câmera exige permissão. A galeria usa o Android Photo Picker
+        // (ActivityResultContracts.PickVisualMedia), que dispensa permissão de mídia —
+        // por isso READ_MEDIA_IMAGES/READ_EXTERNAL_STORAGE foram removidas do app.
         val CAMERA_PERMISSION = Manifest.permission.CAMERA
-        val READ_MEDIA_IMAGES_PERMISSION = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            Manifest.permission.READ_MEDIA_IMAGES
-        } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
-        }
-        val WRITE_EXTERNAL_STORAGE_PERMISSION = Manifest.permission.WRITE_EXTERNAL_STORAGE
-        
-        // Todas as permissões necessárias (câmera + galeria) — usar só quando a tela
-        // realmente oferece as duas opções de uma vez.
-        val ALL_PERMISSIONS = arrayOf(
-            CAMERA_PERMISSION,
-            READ_MEDIA_IMAGES_PERMISSION
-        )
-
-        // ✅ BUG-04: escolher "Galeria" não deve exigir permissão de CÂMERA. Este conjunto
-        // contém apenas a leitura de mídia, usado pelo fluxo de seleção na galeria.
-        val GALLERY_PERMISSIONS = arrayOf(
-            READ_MEDIA_IMAGES_PERMISSION
-        )
 
         /**
-         * Verifica se as permissões de galeria (apenas leitura de mídia) estão concedidas.
+         * Verifica se a permissão de câmera está concedida.
          */
-        fun hasGalleryPermissions(context: Context): Boolean {
-            return GALLERY_PERMISSIONS.all { permission ->
-                ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
-            }
+        fun hasCameraPermission(context: Context): Boolean {
+            return ContextCompat.checkSelfPermission(context, CAMERA_PERMISSION) == PackageManager.PERMISSION_GRANTED
         }
-        
-        /**
-         * Verifica se todas as permissões estão concedidas
-         */
-        fun hasAllPermissions(context: Context): Boolean {
-            return ALL_PERMISSIONS.all { permission ->
-                ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
-            }
-        }
-        
+
         /**
          * Verifica se permissão específica está concedida
          */
@@ -162,51 +133,17 @@ class ActivityPermissionManager(private val activity: ComponentActivity) {
     }
     
     /**
-     * Solicita permissões de imagem
+     * Verifica e solicita a permissão de CÂMERA se necessário.
+     * A galeria não passa por aqui: usa o Android Photo Picker, que dispensa permissão.
      */
-    fun requestImagePermissions(onResult: (Boolean) -> Unit) {
-        requestPermissions(ImagePermissionHelper.ALL_PERMISSIONS, onResult)
-    }
-    
-    /**
-     * Solicita apenas as permissões de galeria (leitura de mídia, sem câmera)
-     */
-    fun requestGalleryPermissions(onResult: (Boolean) -> Unit) {
-        requestPermissions(ImagePermissionHelper.GALLERY_PERMISSIONS, onResult)
-    }
-
-    /**
-     * Verifica e solicita permissões se necessário
-     */
-    fun checkAndRequestImagePermissions(
+    fun checkAndRequestCameraPermission(
         onGranted: () -> Unit,
         onDenied: () -> Unit = {}
     ) {
-        if (ImagePermissionHelper.hasAllPermissions(activity)) {
+        if (ImagePermissionHelper.hasCameraPermission(activity)) {
             onGranted()
         } else {
-            requestImagePermissions { granted ->
-                if (granted) {
-                    onGranted()
-                } else {
-                    onDenied()
-                }
-            }
-        }
-    }
-
-    /**
-     * ✅ BUG-04: verifica/solicita SOMENTE a permissão de galeria (leitura de mídia).
-     * Use no fluxo "Galeria"; a câmera tem o seu próprio pedido de permissão.
-     */
-    fun checkAndRequestGalleryPermissions(
-        onGranted: () -> Unit,
-        onDenied: () -> Unit = {}
-    ) {
-        if (ImagePermissionHelper.hasGalleryPermissions(activity)) {
-            onGranted()
-        } else {
-            requestGalleryPermissions { granted ->
+            requestPermissions(arrayOf(ImagePermissionHelper.CAMERA_PERMISSION)) { granted ->
                 if (granted) onGranted() else onDenied()
             }
         }
@@ -238,28 +175,18 @@ class FragmentPermissionManager(private val fragment: Fragment) {
     }
     
     /**
-     * Solicita permissões de imagem
+     * Verifica e solicita a permissão de CÂMERA se necessário.
+     * A galeria não passa por aqui: usa o Android Photo Picker, que dispensa permissão.
      */
-    fun requestImagePermissions(onResult: (Boolean) -> Unit) {
-        requestPermissions(ImagePermissionHelper.ALL_PERMISSIONS, onResult)
-    }
-    
-    /**
-     * Verifica e solicita permissões se necessário
-     */
-    fun checkAndRequestImagePermissions(
+    fun checkAndRequestCameraPermission(
         onGranted: () -> Unit,
         onDenied: () -> Unit = {}
     ) {
-        if (ImagePermissionHelper.hasAllPermissions(fragment.requireContext())) {
+        if (ImagePermissionHelper.hasCameraPermission(fragment.requireContext())) {
             onGranted()
         } else {
-            requestImagePermissions { granted ->
-                if (granted) {
-                    onGranted()
-                } else {
-                    onDenied()
-                }
+            requestPermissions(arrayOf(ImagePermissionHelper.CAMERA_PERMISSION)) { granted ->
+                if (granted) onGranted() else onDenied()
             }
         }
     }

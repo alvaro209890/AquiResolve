@@ -15,6 +15,7 @@ import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.TextView
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
@@ -87,9 +88,10 @@ class CreateOrderActivity : AppCompatActivity() {
     private val dateFormatter = SimpleDateFormat("dd/MM/yyyy", Locale("pt", "BR"))
     private val timeFormatter = SimpleDateFormat("HH:mm", Locale("pt", "BR"))
     
-    // Launcher para seleção de imagens (agora só seleciona, não faz upload)
+    // Seleção de imagens via Android Photo Picker — não exige permissão de mídia
+    // (política do Google Play). Só seleciona; o upload acontece depois.
     private val imagePickerLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
+        ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         uri?.let { handleSelectedImageUri(it) }
     }
@@ -690,16 +692,10 @@ class CreateOrderActivity : AppCompatActivity() {
     }
     
     private fun selectFromGallery() {
-        // ✅ BUG-04: pedir SOMENTE a permissão de galeria (leitura de mídia). A câmera tem o
-        // seu próprio pedido de permissão em takePhoto(); escolher "Galeria" não deve mais
-        // disparar o diálogo de permissão de CÂMERA.
-        permissionManager.checkAndRequestGalleryPermissions(
-            onGranted = {
-                imagePickerLauncher.launch("image/*")
-            },
-            onDenied = {
-                showErrorMessage("Permissão de acesso às imagens é necessária para anexar fotos")
-            }
+        // Android Photo Picker: escolher "Galeria" não exige nenhuma permissão de mídia
+        // (a câmera tem o seu próprio pedido de permissão em takePhoto()).
+        imagePickerLauncher.launch(
+            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
         )
     }
 

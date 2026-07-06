@@ -7,8 +7,15 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <!-- Sem READ_MEDIA_IMAGES/READ_MEDIA_VIDEO/READ_EXTERNAL_STORAGE: o app só usa mídia de forma
+         esporádica (anexar foto/documento pontual), então usa o Android Photo Picker
+         (ActivityResultContracts.PickVisualMedia), que dispensa qualquer permissão de mídia.
+         Isso cumpre a Política de Permissões de Foto e Vídeo do Google Play. -->
+    <!-- Blindagem contra manifest merger: se qualquer biblioteca (Glide, UCrop, etc.) tentar
+         injetar essas permissões de mídia, elas são removidas do manifest final. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- Entrada por voz no Assistente IA (fala → texto) -->

@@ -1,13 +1,12 @@
 ﻿package com.aquiresolve.app
 
-import android.Manifest
 import android.app.Activity
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.provider.MediaStore
 import android.view.View
 import android.widget.Toast
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.FileProvider
@@ -47,8 +46,9 @@ class ImagePickerActivity : AppCompatActivity() {
     private var orderId: String? = null
     
     // Launchers para resultados
+    // Android Photo Picker — não exige permissão de mídia (política do Google Play)
     private val galleryLauncher = registerForActivityResult(
-        ActivityResultContracts.GetContent()
+        ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         uri?.let { handleImageSelected(it) }
     }
@@ -139,30 +139,29 @@ class ImagePickerActivity : AppCompatActivity() {
     }
     
     /**
-     * Verifica permissões e abre galeria
+     * Abre a galeria (Photo Picker) — sem pedir permissão de mídia.
      */
     private fun checkPermissionsAndOpenGallery() {
-        permissionManager.checkAndRequestImagePermissions(
-            onGranted = { openGallery() },
-            onDenied = { showPermissionDeniedDialog() }
-        )
+        openGallery()
     }
-    
+
     /**
-     * Verifica permissões e abre câmera
+     * Verifica permissão de câmera e abre a câmera
      */
     private fun checkPermissionsAndOpenCamera() {
-        permissionManager.checkAndRequestImagePermissions(
+        permissionManager.checkAndRequestCameraPermission(
             onGranted = { openCamera() },
             onDenied = { showPermissionDeniedDialog() }
         )
     }
-    
+
     /**
-     * Abre galeria de imagens
+     * Abre galeria de imagens (Android Photo Picker)
      */
     private fun openGallery() {
-        galleryLauncher.launch("image/*")
+        galleryLauncher.launch(
+            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+        )
     }
     
     /**
