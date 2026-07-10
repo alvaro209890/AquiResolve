@@ -61,6 +61,29 @@ Este arquivo é lido automaticamente pelo Claude Code. Contém tudo que qualquer
 ./gradlew test
 ```
 
+### Geração do AAB para a Play Store (LOCAL, não no CI)
+
+O **AAB é gerado neste PC** — o workflow do GitHub Actions só builda **APKs**
+(`assembleDebug`/`assembleRelease`), NÃO roda `bundleRelease`.
+
+```bash
+cd /home/acer/Documentos/Aqui_Resolve
+./gradlew bundleRelease -Dorg.gradle.java.home=/usr/lib/jvm/java-17-openjdk-amd64
+# → app/build/outputs/bundle/release/app-release.aab
+```
+
+- **Onde sai:** `app/build/outputs/bundle/release/app-release.aab` (fica fora do git —
+  `app/build/` é ignorado; suba direto no Play Console).
+- **Assinatura:** automática com a upload keystore local `keystore/upload-keystore.jks`
+  + credenciais em `keystore/upload-keystore.credentials.txt` (o `app/build.gradle` lê
+  esse arquivo e configura o `signingConfig` release; certificado CN=Aqui Resolve).
+- **JDK:** o default do PC é um JRE 21 sem compilador → sempre passar
+  `-Dorg.gradle.java.home=/usr/lib/jvm/java-17-openjdk-amd64`.
+- **Antes de gerar:** conferir `versionCode`/`versionName` em `app/build.gradle`
+  (o Play recusa versionCode repetido). Histórico: 1.3.1/20260706 (AAB de 2026-07-06,
+  Photo Picker) → **1.3.2/20260709** (AAB de 2026-07-09, insets + combos c/ quantidade;
+  verificado: versão e assinatura corretas dentro do .aab).
+
 ### Geração de APK no GitHub Actions (CI)
 Workflow `.github/workflows/build-apk.yml`. Dispara **manual** (Actions → "Build
 APK" → Run workflow, com toggle de release) ou por **tag `v*`**. Restaura
