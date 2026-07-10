@@ -171,14 +171,30 @@ class FloatingMicHelper {
         }
         decorView.addView(container, params)
 
-        // Ajustar margem inferior com base nos insets do sistema (barra de navegação)
-        ViewCompat.setOnApplyWindowInsetsListener(decorView) { _, insets ->
-            val navBarHeight = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom
+        // Ajustar margem inferior com base nos insets do sistema (barra de navegação).
+        // NUNCA registrar listener no decorView: isso substitui o onApplyWindowInsets
+        // interno do DecorView e quebra o desenho das barras do sistema. Só é preciso
+        // somar o inset quando a janela é edge-to-edge (Android 15+ ou tela que gerencia
+        // os próprios insets); nas demais a janela já termina acima da barra de navegação.
+        fun updateBottomMargin() {
+            val navBarHeight = if (EdgeToEdgeInsets.isEdgeToEdge(activity)) {
+                ViewCompat.getRootWindowInsets(decorView)
+                    ?.getInsets(WindowInsetsCompat.Type.systemBars())?.bottom ?: 0
+            } else 0
             container?.updateLayoutParams<FrameLayout.LayoutParams> {
                 bottomMargin = navBarHeight + dpToPx(activity, 80)
             }
-            insets
         }
+        container?.let { c ->
+            ViewCompat.setOnApplyWindowInsetsListener(c) { _, insets ->
+                updateBottomMargin()
+                insets
+            }
+            // O tratador global consome os insets no content; garante uma leitura
+            // após o attach (quando getRootWindowInsets passa a devolver valores).
+            c.post { updateBottomMargin() }
+        }
+        updateBottomMargin()
 
         // Animação de pulse sutil no FAB
         startPulse(activity)

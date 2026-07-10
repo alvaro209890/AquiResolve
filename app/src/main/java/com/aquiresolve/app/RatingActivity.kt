@@ -85,13 +85,8 @@ class RatingActivity : AppCompatActivity() {
     }
 
     private fun setupUI() {
-        window.statusBarColor = ContextCompat.getColor(this, android.R.color.transparent)
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            window.setDecorFitsSystemWindows(false)
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-        }
+        // Barra de status: cor sólida do tema (Android <15) / faixa do EdgeToEdgeInsets (15+).
+        // O hack fullscreen antigo deixava o conteúdo sob a barra de status sem compensação.
 
         // Nome do prestador
         providerName?.let { name ->

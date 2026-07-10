@@ -170,7 +170,6 @@ class OrderDetailsActivity : AppCompatActivity() {
         // Inicializar ViewBinding
         binding = ActivityOrderDetailsBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        InsetsHelper.apply(this, binding.rootLayout, null)
         floatingMic.attach(this)
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         

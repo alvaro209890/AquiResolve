@@ -104,7 +104,12 @@ class ComboDetailActivity : AppCompatActivity() {
 
             val rows = combo.items.map { item ->
                 val price = resolveItemPrice(item.niche, item.serviceName)
-                ComboServiceItemAdapter.Row(name = item.serviceName, niche = item.niche, price = price)
+                ComboServiceItemAdapter.Row(
+                    name = item.serviceName,
+                    niche = item.niche,
+                    price = price,
+                    quantity = item.quantity
+                )
             }
             resolvedRows = rows
             binding.rvComboItems.adapter = ComboServiceItemAdapter(rows)
@@ -128,7 +133,7 @@ class ComboDetailActivity : AppCompatActivity() {
         // Preços sempre calculados ao vivo do catálogo — os campos armazenados no combo
         // (fullPrice/promoPrice/savings) podem divergir se o admin alterar preços no catálogo
         // após a criação do combo, gerando expectativa diferente do valor realmente cobrado.
-        val full = rows.sumOf { it.price }
+        val full = rows.sumOf { it.totalPrice }
         val promo = if (combo.discountPercent > 0) round2(full * (1.0 - combo.discountPercent / 100.0)) else full
         val savings = round2(full - promo)
 
@@ -200,20 +205,24 @@ class ComboDetailActivity : AppCompatActivity() {
             var failed = 0
             for (item in combo.items) {
                 val price = resolveItemPrice(item.niche, item.serviceName)
-                val cartItem = CartItemData(
-                    serviceType = item.serviceName,
-                    serviceNiche = item.niche,
-                    description = "Combo: ${combo.name}",
-                    address = address.address,
-                    zipCode = address.zipCode,
-                    complement = address.complement,
-                    city = address.city,
-                    state = address.state,
-                    coordinates = address.coordinates,
-                    estimatedPrice = price
-                )
-                val result = cartManager.addItem(cartItem)
-                if (result.isSuccess) added++ else failed++
+                // Cada unidade vira um item separado no carrinho — o mesmo fluxo de quem
+                // adiciona o serviço N vezes à mão (ex.: 3× troca de tomada).
+                repeat(item.quantity.coerceAtLeast(1)) {
+                    val cartItem = CartItemData(
+                        serviceType = item.serviceName,
+                        serviceNiche = item.niche,
+                        description = "Combo: ${combo.name}",
+                        address = address.address,
+                        zipCode = address.zipCode,
+                        complement = address.complement,
+                        city = address.city,
+                        state = address.state,
+                        coordinates = address.coordinates,
+                        estimatedPrice = price
+                    )
+                    val result = cartManager.addItem(cartItem)
+                    if (result.isSuccess) added++ else failed++
+                }
             }
 
             isAdding = false
@@ -228,7 +237,7 @@ class ComboDetailActivity : AppCompatActivity() {
             logComboAddCart(combo, added)
             showToast(
                 if (failed == 0) "Combo adicionado ao carrinho!"
-                else "$added de ${combo.items.size} serviços adicionados ao carrinho"
+                else "$added de ${combo.items.sumOf { it.quantity.coerceAtLeast(1) }} serviços adicionados ao carrinho"
             )
             startActivity(Intent(this@ComboDetailActivity, ClientCartActivity::class.java))
             finish()

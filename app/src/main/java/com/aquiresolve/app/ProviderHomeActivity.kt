@@ -48,7 +48,7 @@ import kotlinx.coroutines.tasks.await
  * - Historico de servicos
  * - Configuracoes de disponibilidade
  */
-class ProviderHomeActivity : AppCompatActivity() {
+class ProviderHomeActivity : AppCompatActivity(), InsetsSelfManaged {
 
     private enum class AvailableOrdersFilter(val label: String) {
         ALL("Todos"),

@@ -60,7 +60,6 @@ class ClientOrdersActivity : AppCompatActivity() {
         // Inicializar ViewBinding
         binding = ActivityClientOrdersBinding.inflate(layoutInflater)
         setContentView(binding.root)
-        InsetsHelper.apply(this, binding.rootLayout, null)
         floatingMic.attach(this)
         
         // Inicializar managers

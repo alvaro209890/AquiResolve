@@ -27,6 +27,8 @@ interface ComboItem {
   niche: string
   serviceName: string
   serviceId: string
+  /** Unidades do serviço no combo (ex.: 3× tomada). Combos antigos sem o campo = 1. */
+  quantity: number
 }
 
 interface Combo {
@@ -88,6 +90,18 @@ const VEICULOS = ["Serviços automotivos"]
 
 function inGroup(niche: string, group: string[]): boolean {
   return group.some((g) => g.toLowerCase() === niche.trim().toLowerCase())
+}
+
+const MAX_ITEM_QUANTITY = 20
+
+function normalizeQuantity(value: unknown): number {
+  const n = Math.round(Number(value))
+  if (!Number.isFinite(n)) return 1
+  return Math.min(MAX_ITEM_QUANTITY, Math.max(1, n))
+}
+
+function totalUnits(items: ComboItem[]): number {
+  return items.reduce((sum, it) => sum + normalizeQuantity(it.quantity), 0)
 }
 
 // Replica PromotionManager.bestCombo: maior % entre os combos ativados pelas categorias.
@@ -168,7 +182,7 @@ export default function CombosPage() {
   }
 
   const startEdit = (c: Combo) => {
-    setForm({ ...c })
+    setForm({ ...c, items: c.items.map((it) => ({ ...it, quantity: normalizeQuantity(it.quantity) })) })
     setServiceSearch("")
     setShowServices(false)
     setShowForm(true)
@@ -187,16 +201,26 @@ export default function CombosPage() {
       const exists = f.items.some((it) => it.serviceId === svc.id)
       const items = exists
         ? f.items.filter((it) => it.serviceId !== svc.id)
-        : [...f.items, { niche: svc.niche, serviceName: svc.name, serviceId: svc.id }]
+        : [...f.items, { niche: svc.niche, serviceName: svc.name, serviceId: svc.id, quantity: 1 }]
       return { ...f, items }
     })
+  }
+
+  // Ajusta a quantidade de um item selecionado (1..MAX_ITEM_QUANTITY).
+  const setItemQuantity = (serviceId: string, quantity: number) => {
+    setForm((f) => ({
+      ...f,
+      items: f.items.map((it) =>
+        it.serviceId === serviceId ? { ...it, quantity: normalizeQuantity(quantity) } : it
+      ),
+    }))
   }
 
   // fullPrice = soma dos preços do catálogo dos itens selecionados (fonte de verdade da cobrança).
   const computedFull = useMemo(() => {
     return form.items.reduce((sum, it) => {
       const svc = services.find((s) => s.id === it.serviceId)
-      return sum + (svc?.estimatedPrice ?? 0)
+      return sum + (svc?.estimatedPrice ?? 0) * normalizeQuantity(it.quantity)
     }, 0)
   }, [form.items, services])
 
@@ -211,7 +235,11 @@ export default function CombosPage() {
 
   // Coerência: o carrinho aplica o desconto pelas categorias dos itens (PromotionManager).
   const cartCombo = useMemo(
-    () => expectedCartCombo(form.items.map((it) => it.niche), cashbackCfg),
+    () =>
+      expectedCartCombo(
+        form.items.flatMap((it) => Array(normalizeQuantity(it.quantity)).fill(it.niche) as string[]),
+        cashbackCfg
+      ),
     [form.items, cashbackCfg]
   )
 
@@ -253,8 +281,12 @@ export default function CombosPage() {
       toast({ title: "Nome obrigatório", variant: "destructive" })
       return
     }
-    if (form.items.length < 2) {
-      toast({ title: "Selecione ao menos 2 serviços", variant: "destructive" })
+    if (form.items.length < 1 || totalUnits(form.items) < 2) {
+      toast({
+        title: "Selecione ao menos 2 serviços",
+        description: "Vale somar quantidades — ex.: 2× do mesmo serviço.",
+        variant: "destructive",
+      })
       return
     }
     setSaving(true)
@@ -423,7 +455,7 @@ export default function CombosPage() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="text-sm font-medium">
-                  Serviços do combo ({form.items.length} selecionado{form.items.length === 1 ? "" : "s"})
+                  Serviços do combo ({totalUnits(form.items)} unidade{totalUnits(form.items) === 1 ? "" : "s"})
                   <span className="ml-1 font-normal text-muted-foreground">
                     · {services.length} disponíve{services.length === 1 ? "l" : "is"}
                   </span>
@@ -441,8 +473,30 @@ export default function CombosPage() {
               {form.items.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3">
                   {form.items.map(it => (
-                    <div key={it.serviceId} className="flex items-center gap-1 bg-orange-100 text-orange-800 px-2 py-1 rounded-md text-xs">
+                    <div key={it.serviceId} className="flex items-center gap-1.5 bg-orange-100 text-orange-800 px-2 py-1 rounded-md text-xs">
                       <span>{it.serviceName}</span>
+                      {/* Stepper de quantidade: permite "3× tomada" no mesmo combo */}
+                      <span className="flex items-center gap-1 rounded bg-white/70 px-1">
+                        <button
+                          type="button"
+                          aria-label={`Diminuir quantidade de ${it.serviceName}`}
+                          onClick={() => setItemQuantity(it.serviceId, normalizeQuantity(it.quantity) - 1)}
+                          disabled={normalizeQuantity(it.quantity) <= 1}
+                          className="px-1 font-bold text-orange-700 disabled:opacity-30"
+                        >
+                          −
+                        </button>
+                        <span className="min-w-[1.5rem] text-center font-semibold">{normalizeQuantity(it.quantity)}×</span>
+                        <button
+                          type="button"
+                          aria-label={`Aumentar quantidade de ${it.serviceName}`}
+                          onClick={() => setItemQuantity(it.serviceId, normalizeQuantity(it.quantity) + 1)}
+                          disabled={normalizeQuantity(it.quantity) >= MAX_ITEM_QUANTITY}
+                          className="px-1 font-bold text-orange-700 disabled:opacity-30"
+                        >
+                          +
+                        </button>
+                      </span>
                       <button 
                         type="button" 
                         onClick={() => setForm(f => ({ ...f, items: f.items.filter(x => x.serviceId !== it.serviceId) }))}
@@ -618,10 +672,16 @@ export default function CombosPage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate font-medium">{c.name}</p>
                   <p className="truncate text-sm text-muted-foreground">
-                    {c.items.length} serviços · {c.discountPercent}% · {money(c.promoPrice)}
+                    {totalUnits(c.items)} serviços · {c.discountPercent}% · {money(c.promoPrice)}
                   </p>
                   <p className="mt-1 truncate text-xs text-muted-foreground">
-                    {c.items.map((it) => it.serviceName).join(", ")}
+                    {c.items
+                      .map((it) =>
+                        normalizeQuantity(it.quantity) > 1
+                          ? `${normalizeQuantity(it.quantity)}× ${it.serviceName}`
+                          : it.serviceName
+                      )
+                      .join(", ")}
                   </p>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">

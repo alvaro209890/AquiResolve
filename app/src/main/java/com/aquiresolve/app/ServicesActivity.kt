@@ -24,7 +24,7 @@ import com.aquiresolve.app.utils.ServiceNicheCatalog
 import com.aquiresolve.app.utils.ServiceSearchHelper
 import kotlinx.coroutines.launch
 
-class ServicesActivity : AppCompatActivity() {
+class ServicesActivity : AppCompatActivity(), InsetsSelfManaged {
 
     private lateinit var binding: ActivityServicesBinding
     private lateinit var serviceManager: FirebaseServiceManager

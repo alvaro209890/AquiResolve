@@ -31,14 +31,8 @@ class ForgotPasswordActivity : AppCompatActivity() {
     }
 
     private fun setupUI() {
-        // Configurar status bar transparente
-        window.statusBarColor = android.graphics.Color.TRANSPARENT
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            window.setDecorFitsSystemWindows(false)
-        } else {
-            @Suppress("DEPRECATION")
-            window.decorView.systemUiVisibility = View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
-        }
+        // Barra de status: cor sólida do tema (Android <15) / faixa do EdgeToEdgeInsets (15+).
+        // O hack fullscreen antigo deixava o conteúdo sob a barra de status sem compensação.
     }
 
     private fun setupClickListeners() {

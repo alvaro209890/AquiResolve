@@ -42,7 +42,7 @@ import com.google.firebase.firestore.ListenerRegistration
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 
-class ClientHomeActivity : AppCompatActivity() {
+class ClientHomeActivity : AppCompatActivity(), InsetsSelfManaged {
 
     private lateinit var binding: ActivityClientHomeBinding
     private lateinit var authManager: FirebaseAuthManager

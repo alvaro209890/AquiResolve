@@ -64,7 +64,8 @@ class HomeComboAdapter(
         }
 
         // Preços calculados ao vivo do catálogo em cache — nunca dos campos estáticos do combo.
-        val liveFullPrice = combo.items.sumOf { resolveItemPrice(it) }
+        // Cada item conta a própria quantidade (ex.: 3× tomada).
+        val liveFullPrice = combo.items.sumOf { resolveItemPrice(it) * it.quantity }
         val livePromoPrice = if (combo.discountPercent > 0)
             Math.round(liveFullPrice * (1.0 - combo.discountPercent / 100.0) * 100) / 100.0
         else liveFullPrice

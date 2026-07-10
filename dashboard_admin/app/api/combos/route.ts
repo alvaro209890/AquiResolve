@@ -18,6 +18,7 @@ interface ComboItemInput {
   niche?: string
   serviceName?: string
   serviceId?: string
+  quantity?: number
 }
 
 interface ComboInput {
@@ -43,6 +44,14 @@ function clampPercent(value: number): number {
   return Math.min(100, Math.max(0, Math.round(value)))
 }
 
+// Quantidade de unidades do serviço no combo (ex.: "1 chuveiro + 3 tomadas").
+// Inteiro entre 1 e 20; combos antigos sem o campo valem 1.
+function clampQuantity(value: unknown): number {
+  const n = Math.round(Number(value))
+  if (!Number.isFinite(n)) return 1
+  return Math.min(20, Math.max(1, n))
+}
+
 function normalizeItems(items: ComboItemInput[] | undefined) {
   if (!Array.isArray(items)) return []
   return items
@@ -50,6 +59,7 @@ function normalizeItems(items: ComboItemInput[] | undefined) {
       niche: String(it.niche ?? '').trim(),
       serviceName: String(it.serviceName ?? '').trim(),
       serviceId: String(it.serviceId ?? '').trim(),
+      quantity: clampQuantity(it.quantity),
     }))
     .filter((it) => it.niche && it.serviceName)
 }
@@ -74,6 +84,7 @@ export async function GET(request: NextRequest) {
             niche: String(it.niche ?? ''),
             serviceName: String(it.serviceName ?? ''),
             serviceId: String(it.serviceId ?? ''),
+            quantity: clampQuantity(it.quantity),
           })),
           fullPrice: Number(data.fullPrice ?? 0),
           promoPrice: Number(data.promoPrice ?? 0),
@@ -110,9 +121,12 @@ export async function POST(request: NextRequest) {
     }
 
     const items = normalizeItems(input.items)
-    if (items.length < 2) {
+    // Um combo precisa de 2+ UNIDADES de serviço — vale tanto "chuveiro + tomada"
+    // quanto "3× tomada" (mesmo serviço com quantidade maior que 1).
+    const totalUnits = items.reduce((sum, it) => sum + it.quantity, 0)
+    if (items.length < 1 || totalUnits < 2) {
       return NextResponse.json(
-        { success: false, error: 'O combo precisa de pelo menos 2 serviços' },
+        { success: false, error: 'O combo precisa de pelo menos 2 serviços (some as quantidades)' },
         { status: 400 }
       )
     }

@@ -12,7 +12,10 @@ import com.aquiresolve.app.models.OsChecklistData
 import com.google.firebase.Timestamp
 import kotlinx.coroutines.launch
 
-class ChecklistActivity : AppCompatActivity() {
+class ChecklistActivity : AppCompatActivity(), StatusBarStripColor {
+
+    override val statusBarStripColorRes: Int get() = R.color.secondary_color
+
 
     private lateinit var binding: ActivityChecklistBinding
     private lateinit var checklistManager: FirebaseChecklistManager

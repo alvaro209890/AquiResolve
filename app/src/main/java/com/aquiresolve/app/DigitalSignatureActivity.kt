@@ -20,7 +20,10 @@ import kotlinx.coroutines.tasks.await
 import java.io.File
 import java.io.FileOutputStream
 
-class DigitalSignatureActivity : AppCompatActivity() {
+class DigitalSignatureActivity : AppCompatActivity(), StatusBarStripColor {
+
+    override val statusBarStripColorRes: Int get() = R.color.secondary_color
+
 
     private lateinit var binding: ActivityDigitalSignatureBinding
     private lateinit var checklistManager: FirebaseChecklistManager

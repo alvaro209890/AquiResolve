@@ -36,7 +36,10 @@ import java.util.*
  * - Informações do cliente e serviço em destaque
  * - Opções de orçamento e agendamento
  */
-class ProviderChatActivity : AppCompatActivity() {
+class ProviderChatActivity : AppCompatActivity(), StatusBarStripColor {
+
+    override val statusBarStripColorRes: Int get() = R.color.secondary_color
+
 
     private lateinit var binding: ActivityProviderChatBinding
     

@@ -23,7 +23,10 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.io.IOException
 
-class PhotoEvidenceActivity : AppCompatActivity() {
+class PhotoEvidenceActivity : AppCompatActivity(), StatusBarStripColor {
+
+    override val statusBarStripColorRes: Int get() = R.color.secondary_color
+
 
     private lateinit var binding: ActivityPhotoEvidenceBinding
     private lateinit var checklistManager: FirebaseChecklistManager

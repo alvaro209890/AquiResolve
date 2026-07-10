@@ -13,8 +13,11 @@
         <item name="colorSecondaryVariant">@color/secondary_dark</item>
         <item name="colorOnSecondary">@color/white</item>
 
-        <!-- Status bar -->
-        <item name="android:statusBarColor" tools:targetApi="l">@android:color/transparent</item>
+        <!-- Status bar: cor sólida da marca. NÃO usar windowTranslucentStatus — a flag
+             empurrava o conteúdo de TODAS as telas para baixo da barra de status e só
+             3 activities compensavam com insets (topo coberto em Android antigo).
+             Em Android 15+ esta cor é ignorada; a faixa é desenhada por EdgeToEdgeInsets. -->
+        <item name="android:statusBarColor" tools:targetApi="l">@color/primary_color</item>
         <item name="android:windowLightStatusBar" tools:targetApi="m">false</item>
 
         <!-- Navigation bar — cor sólida evita sobreposição em dispositivos com gestos -->
@@ -28,7 +31,6 @@
         <item name="colorOnBackground">@color/text_primary</item>
 
         <!-- Window flags -->
-        <item name="android:windowTranslucentStatus">true</item>
         <item name="android:windowDrawsSystemBarBackgrounds">true</item>
     </style>
 

@@ -13,6 +13,9 @@ class AppApplication : Application() {
         super.onCreate()
         // Aplica a preferência de tema (claro/escuro/sistema) antes de qualquer UI.
         ThemeManager.applyStored(this)
+        // Insets globais para o edge-to-edge forçado do Android 15+ (targetSdk 35):
+        // impede que as barras do sistema cubram topo/rodapé de qualquer tela.
+        EdgeToEdgeInsets.install(this)
         try {
             FirebaseConfig.initialize(this)
             NotificationManager.createNotificationChannels(this)

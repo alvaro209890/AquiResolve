@@ -83,7 +83,9 @@ object ComboRepository {
             HomeComboItem(
                 niche = niche,
                 serviceName = serviceName,
-                serviceId = readString(map["serviceId"], map["id"])
+                serviceId = readString(map["serviceId"], map["id"]),
+                // Combos antigos não têm quantity → 1. Teto defensivo espelha o da API (20).
+                quantity = readInt(map["quantity"]).coerceIn(1, 20)
             )
         }
     }
