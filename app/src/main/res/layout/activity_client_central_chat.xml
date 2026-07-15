@@ -22,7 +22,7 @@
             android:layout_height="48dp"
             android:src="@android:drawable/ic_menu_close_clear_cancel"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:tint="@color/white"
+            app:tint="@color/white"
             android:contentDescription="Voltar" />
 
         <LinearLayout
@@ -144,7 +144,7 @@
             android:layout_height="48dp"
             android:src="@android:drawable/ic_menu_send"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:tint="@color/primary_color"
+            app:tint="@color/primary_color"
             android:contentDescription="Enviar" />
 
     </LinearLayout>

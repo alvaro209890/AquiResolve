@@ -1,11 +1,12 @@
 package com.aquiresolve.app
 
-import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.os.Build
 import android.os.IBinder
 import android.util.Log
+import androidx.core.app.NotificationCompat
 
 /**
  * Foreground Service leve que mantém o processo do app vivo enquanto
@@ -29,7 +30,11 @@ class AlertForegroundService : Service() {
             if (isRunning) return
             val intent = Intent(context, AlertForegroundService::class.java)
             try {
-                context.startForegroundService(intent)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    context.startForegroundService(intent)
+                } else {
+                    context.startService(intent)
+                }
                 Log.d(TAG, "Foreground service iniciado")
             } catch (e: Exception) {
                 // Não propaga: o alerta sonoro não pode depender do FGS subir.
@@ -48,17 +53,19 @@ class AlertForegroundService : Service() {
         super.onCreate()
         Log.d(TAG, "Service criado")
 
-        val channel = android.app.NotificationChannel(
-            CHANNEL_ID,
-            "Alertas de Pedidos",
-            android.app.NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            description = "Mantém o app ativo para alertas de novos pedidos"
-            setSound(null, null) // sem som neste canal
-            enableVibration(false)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                CHANNEL_ID,
+                "Alertas de Pedidos",
+                android.app.NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Mantém o app ativo para alertas de novos pedidos"
+                setSound(null, null) // sem som neste canal
+                enableVibration(false)
+            }
+            val nm = getSystemService(android.app.NotificationManager::class.java)
+            nm.createNotificationChannel(channel)
         }
-        val nm = getSystemService(android.app.NotificationManager::class.java)
-        nm.createNotificationChannel(channel)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -69,12 +76,12 @@ class AlertForegroundService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = Notification.Builder(this, CHANNEL_ID)
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notifications)
             .setContentTitle("AquiResolve")
             .setContentText("Monitorando novos pedidos...")
             .setOngoing(true)
-            .setPriority(Notification.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .setContentIntent(pendingIntent)
             .build()
 

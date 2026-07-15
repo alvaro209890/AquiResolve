@@ -30,7 +30,7 @@
                 android:layout_height="48dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_arrow_back"
-                android:tint="@android:color/white"
+                app:tint="@android:color/white"
                 android:contentDescription="Voltar" />
 
             <!-- Informações do prestador -->
@@ -78,7 +78,7 @@
                 android:layout_marginStart="8dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_info"
-                android:tint="@android:color/white"
+                app:tint="@android:color/white"
                 android:contentDescription="Informações" />
 
         </LinearLayout>
@@ -210,7 +210,7 @@
                 android:layout_height="48dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:src="@drawable/ic_attach"
-                android:tint="@color/primary_color"
+                app:tint="@color/primary_color"
                 android:contentDescription="Anexar" />
 
             <!-- Campo de texto -->
@@ -242,7 +242,7 @@
                 android:layout_height="48dp"
                 android:background="@drawable/circle_primary_background"
                 android:src="@drawable/ic_send"
-                android:tint="@android:color/white"
+                app:tint="@android:color/white"
                 android:enabled="false"
                 android:contentDescription="Enviar" />
 

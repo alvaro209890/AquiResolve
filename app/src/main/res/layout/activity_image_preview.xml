@@ -43,7 +43,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_back"
             android:contentDescription="Voltar"
-            android:tint="@color/white" />
+            app:tint="@color/white" />
 
         <!-- Informações da imagem -->
         <LinearLayout
@@ -112,7 +112,7 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_share"
             android:contentDescription="Compartilhar"
-            android:tint="@color/white" />
+            app:tint="@color/white" />
 
         <!-- Botão informações -->
         <ImageButton
@@ -122,8 +122,8 @@
             android:background="?attr/selectableItemBackgroundBorderless"
             android:src="@drawable/ic_info"
             android:contentDescription="Informações"
-            android:tint="@color/white" />
+            app:tint="@color/white" />
 
     </LinearLayout>
 
-</RelativeLayout> 
+</RelativeLayout>
